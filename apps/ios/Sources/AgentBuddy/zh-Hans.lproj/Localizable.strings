@@ -150,7 +150,7 @@
 "Optional OpenAI-compatible endpoint for local models." = "用于本地模型的可选 OpenAI 兼容端点。";
 "Pair" = "配对";
 "Pair with AgentBuddy" = "与 搭子 配对";
-"Run npx agentbuddycli on the host, then scan the QR code it prints." = "在电脑上运行 npx agentbuddycli，然后扫描它打印的二维码。";
+"Install the AgentBuddy desktop app on your Mac, open its Pairing page, then scan the QR code." = "在 Mac 上安装 AgentBuddy 桌面版，打开「配对」页后扫码。";
 "Pairing" = "配对";
 "Parent" = "上级目录";
 "Password" = "密码";

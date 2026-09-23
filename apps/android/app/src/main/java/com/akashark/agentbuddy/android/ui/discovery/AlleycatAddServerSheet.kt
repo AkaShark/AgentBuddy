@@ -613,7 +613,7 @@ fun alleycatWireStorageValue(wire: AppAlleycatAgentWire): String = when (wire) {
     AppAlleycatAgentWire.JSONL -> "jsonl"
 }
 
-private const val PAIR_COMMAND = "npx agentbuddycli"
+private const val PAIR_COMMAND = "/Applications/AgentBuddy.app/Contents/MacOS/agentbuddy pair --qr"
 
 @Composable
 private fun QrScannerScreen(

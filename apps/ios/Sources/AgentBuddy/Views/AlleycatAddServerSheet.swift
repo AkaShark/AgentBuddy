@@ -218,7 +218,7 @@ struct AlleycatAddServerSheet: View {
         }
     }
 
-    private static let pairCommandLabel = "npx agentbuddycli"
+    private static let pairCommandLabel = "/Applications/AgentBuddy.app/Contents/MacOS/agentbuddy pair --qr"
 
     private func previewSection(params: AppAlleycatPairPayload) -> some View {
         Section {
@@ -539,7 +539,7 @@ private struct QRScannerScreen: View {
     let onCancel: () -> Void
     let onPermissionDenied: () -> Void
 
-    private static let pairCommand = "npx agentbuddycli"
+    private static let pairCommand = "/Applications/AgentBuddy.app/Contents/MacOS/agentbuddy pair --qr"
 
     @State private var copied = false
 

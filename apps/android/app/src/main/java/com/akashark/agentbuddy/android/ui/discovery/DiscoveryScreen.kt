@@ -565,7 +565,7 @@ fun DiscoveryScreen(
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             ChooserCard(
                 title = "与 搭子 配对",
-                subtitle = "在电脑上运行 npx agentbuddycli，然后扫描它打印的二维码。",
+                subtitle = "在 Mac 上安装 AgentBuddy 桌面版，打开「配对」页后扫码。",
                 badge = "推荐",
                 icon = Icons.Default.QrCodeScanner,
                 supportedAgents = AgentBuddyAgents,

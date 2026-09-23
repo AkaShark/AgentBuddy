@@ -255,7 +255,7 @@ struct DiscoveryView: View {
 
                 chooserCard(
                     title: "Pair with AgentBuddy",
-                    subtitle: "Run npx agentbuddycli on the host, then scan the QR code it prints.",
+                    subtitle: "Install the AgentBuddy desktop app on your Mac, open its Pairing page, then scan the QR code.",
                     badge: "RECOMMENDED",
                     icon: "qrcode.viewfinder",
                     supportedAgents: Self.kittylitterAgents,
