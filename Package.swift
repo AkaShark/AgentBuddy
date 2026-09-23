@@ -2,12 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "Baozi",
+    name: "AgentBuddy",
     platforms: [
         .iOS(.v26)
     ],
     products: [
-        .library(name: "Baozi", targets: ["Baozi"])
+        .library(name: "AgentBuddy", targets: ["AgentBuddy"])
     ],
     targets: [
         .binaryTarget(
@@ -15,9 +15,9 @@ let package = Package(
             path: "apps/ios/Frameworks/codex_bridge.xcframework"
         ),
         .target(
-            name: "Baozi",
+            name: "AgentBuddy",
             dependencies: ["codex_bridge"],
-            path: "apps/ios/Sources/Baozi",
+            path: "apps/ios/Sources/AgentBuddy",
             publicHeadersPath: "Bridge"
         )
     ]

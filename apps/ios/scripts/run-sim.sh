@@ -3,8 +3,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 DERIVED_DATA_ROOT="${HOME}/Library/Developer/Xcode/DerivedData"
-APP_PATH="$(/bin/ls -dt "${DERIVED_DATA_ROOT}"/Baozi-*/Build/Products/Debug-iphonesimulator/Baozi.app 2>/dev/null | head -1 || true)"
-BUNDLE_ID="com.kris99.baozi"
+APP_PATH="$(/bin/ls -dt "${DERIVED_DATA_ROOT}"/AgentBuddy-*/Build/Products/Debug-iphonesimulator/AgentBuddy.app 2>/dev/null | head -1 || true)"
+BUNDLE_ID="com.akashark.agentbuddy"
 
 PROFILE_ENABLED="${IOS_SIM_PROFILE:-0}"
 PROFILE_TEMPLATE="${IOS_SIM_PROFILE_TEMPLATE:-Time Profiler}"
@@ -21,7 +21,7 @@ PROFILE_PID=""
 mkdir -p "${RUN_DIR}"
 
 if [[ -z "${APP_PATH}" ]]; then
-  echo "ERROR: Baozi.app not found in DerivedData (Debug-iphonesimulator)" >&2
+  echo "ERROR: AgentBuddy.app not found in DerivedData (Debug-iphonesimulator)" >&2
   exit 1
 fi
 
@@ -114,7 +114,7 @@ if [[ "${PROFILE_ENABLED}" == "1" ]]; then
   APP_PID=""
   for _ in $(seq 1 20); do
     sleep 0.5
-    APP_PID="$(pgrep -f 'Baozi\.app/Baozi$' 2>/dev/null | while read pid; do
+    APP_PID="$(pgrep -f 'AgentBuddy\.app/AgentBuddy$' 2>/dev/null | while read pid; do
       if ! ps -p "$pid" -o args= 2>/dev/null | grep -q PlugIns; then
         echo "$pid"
         break
@@ -164,7 +164,7 @@ if [[ "${PROFILE_ENABLED}" == "1" ]]; then
       echo "WARN: failed to attach profiler; see ${PROFILE_LOG_PATH}" >&2
     fi
   else
-    echo "WARN: could not resolve Baozi pid on simulator; skipping profiler" >&2
+    echo "WARN: could not resolve AgentBuddy pid on simulator; skipping profiler" >&2
   fi
 else
   echo "==> Profiler disabled (IOS_SIM_PROFILE=${PROFILE_ENABLED})."

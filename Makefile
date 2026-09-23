@@ -45,7 +45,7 @@ PATCHES_DIR := $(ROOT)/patches/codex
 
 IOS_DEPLOYMENT_TARGET ?= 18.0
 IOS_SIM_DEVICE ?= iPhone 17 Pro
-IOS_SCHEME ?= Baozi
+IOS_SCHEME ?= AgentBuddy
 XCODE_CONFIG ?= Debug
 CARGO_FEATURES ?=
 ANDROID_ABIS ?= arm64-v8a
@@ -233,15 +233,15 @@ ios-device: ios-build-device
 ios-device-fast: ios-build-device-fast
 
 # Mac Catalyst build. Uses the same rust-ios-package (macabi arches)
-# + xcgen chain, but targets the `BaoziMac` scheme and writes into a
+# + xcgen chain, but targets the `AgentBuddyMac` scheme and writes into a
 # separate DerivedData path so it doesn't collide with the iOS sim build
 # cache.
 CATALYST_DERIVED_DATA := $(IOS_DIR)/build/catalyst
 catalyst: rust-ios-package xcgen
-	@echo "==> Building BaoziMac for Mac Catalyst..."
+	@echo "==> Building AgentBuddyMac for Mac Catalyst..."
 	@cd $(IOS_DIR) && xcodebuild \
-		-project Baozi.xcodeproj \
-		-scheme BaoziMac \
+		-project AgentBuddy.xcodeproj \
+		-scheme AgentBuddyMac \
 		-configuration $(XCODE_CONFIG) \
 		-destination 'platform=macOS,variant=Mac Catalyst' \
 		-derivedDataPath $(CATALYST_DERIVED_DATA) \
@@ -251,8 +251,8 @@ catalyst: rust-ios-package xcgen
 # Build + (kill any running copy) + launch the freshly-built Catalyst app.
 catalyst-run: catalyst
 	@echo "==> Launching Catalyst app..."
-	@pkill -9 -f "Debug-maccatalyst/Baozi.app" 2>/dev/null; true
-	@open $(CATALYST_DERIVED_DATA)/Build/Products/Debug-maccatalyst/Baozi.app
+	@pkill -9 -f "Debug-maccatalyst/AgentBuddy.app" 2>/dev/null; true
+	@open $(CATALYST_DERIVED_DATA)/Build/Products/Debug-maccatalyst/AgentBuddy.app
 
 # Fast Mac Catalyst dev lane. Mirrors `ios-sim-fast` for Catalyst:
 # host-arch-only macabi staticlib via the `ios-dev` Cargo profile (no
@@ -261,10 +261,10 @@ catalyst-run: catalyst
 # from minutes to seconds. Cold first build is still slow because cargo
 # has to compile the codex workspace once for macabi.
 catalyst-fast: rust-ios-macabi-fast xcgen
-	@echo "==> Building BaoziMac for Mac Catalyst (fast)..."
+	@echo "==> Building AgentBuddyMac for Mac Catalyst (fast)..."
 	@cd $(IOS_DIR) && xcodebuild \
-		-project Baozi.xcodeproj \
-		-scheme BaoziMac \
+		-project AgentBuddy.xcodeproj \
+		-scheme AgentBuddyMac \
 		-configuration $(XCODE_CONFIG) \
 		-destination 'platform=macOS,variant=Mac Catalyst' \
 		-derivedDataPath $(CATALYST_DERIVED_DATA) \
@@ -273,8 +273,8 @@ catalyst-fast: rust-ios-macabi-fast xcgen
 
 catalyst-fast-run: catalyst-fast
 	@echo "==> Launching Catalyst app..."
-	@pkill -9 -f "Debug-maccatalyst/Baozi.app" 2>/dev/null; true
-	@open $(CATALYST_DERIVED_DATA)/Build/Products/Debug-maccatalyst/Baozi.app
+	@pkill -9 -f "Debug-maccatalyst/AgentBuddy.app" 2>/dev/null; true
+	@open $(CATALYST_DERIVED_DATA)/Build/Products/Debug-maccatalyst/AgentBuddy.app
 
 # Direct (unsandboxed) Mac Catalyst build — same binary the DMG
 # distribution lane ships, but built with `DeveloperID` configuration
@@ -283,10 +283,10 @@ catalyst-fast-run: catalyst-fast
 # for the signed + notarized DMG.
 MAC_DIRECT_DERIVED := $(IOS_DIR)/build/mac-direct
 mac-direct: rust-ios-package xcgen
-	@echo "==> Building BaoziMac (DeveloperID — unsandboxed)..."
+	@echo "==> Building AgentBuddyMac (DeveloperID — unsandboxed)..."
 	@cd $(IOS_DIR) && xcodebuild \
-		-project Baozi.xcodeproj \
-		-scheme BaoziMac \
+		-project AgentBuddy.xcodeproj \
+		-scheme AgentBuddyMac \
 		-configuration DeveloperID \
 		-destination 'platform=macOS,variant=Mac Catalyst' \
 		-derivedDataPath $(MAC_DIRECT_DERIVED) \
@@ -295,8 +295,8 @@ mac-direct: rust-ios-package xcgen
 
 mac-direct-run: mac-direct
 	@echo "==> Launching unsandboxed Mac Catalyst app..."
-	@pkill -9 -f "DeveloperID-maccatalyst/Baozi.app" 2>/dev/null; true
-	@open $(MAC_DIRECT_DERIVED)/Build/Products/DeveloperID-maccatalyst/Baozi.app
+	@pkill -9 -f "DeveloperID-maccatalyst/AgentBuddy.app" 2>/dev/null; true
+	@open $(MAC_DIRECT_DERIVED)/Build/Products/DeveloperID-maccatalyst/AgentBuddy.app
 
 # Fast unsandboxed Catalyst lane. Same DeveloperID config as `mac-direct`
 # (so MacPairingHost / local Codex / BLE advertiser are all live), but uses
@@ -304,10 +304,10 @@ mac-direct-run: mac-direct
 # code signing (`CODE_SIGN_IDENTITY=-`) to bypass the Developer ID cert
 # requirement during local iteration.
 mac-direct-fast: rust-ios-macabi-fast xcgen
-	@echo "==> Building BaoziMac (DeveloperID — unsandboxed, fast)..."
+	@echo "==> Building AgentBuddyMac (DeveloperID — unsandboxed, fast)..."
 	@cd $(IOS_DIR) && xcodebuild \
-		-project Baozi.xcodeproj \
-		-scheme BaoziMac \
+		-project AgentBuddy.xcodeproj \
+		-scheme AgentBuddyMac \
 		-configuration DeveloperID \
 		-destination 'platform=macOS,variant=Mac Catalyst' \
 		-derivedDataPath $(MAC_DIRECT_DERIVED) \
@@ -321,9 +321,9 @@ mac-direct-fast: rust-ios-macabi-fast xcgen
 
 mac-direct-fast-run: mac-direct-fast
 	@echo "==> Launching unsandboxed Mac Catalyst app..."
-	@pkill -9 -f "DeveloperID-maccatalyst/Baozi.app" 2>/dev/null; true
-	@/System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister -f $(MAC_DIRECT_DERIVED)/Build/Products/DeveloperID-maccatalyst/Baozi.app
-	@open $(MAC_DIRECT_DERIVED)/Build/Products/DeveloperID-maccatalyst/Baozi.app
+	@pkill -9 -f "DeveloperID-maccatalyst/AgentBuddy.app" 2>/dev/null; true
+	@/System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister -f $(MAC_DIRECT_DERIVED)/Build/Products/DeveloperID-maccatalyst/AgentBuddy.app
+	@open $(MAC_DIRECT_DERIVED)/Build/Products/DeveloperID-maccatalyst/AgentBuddy.app
 loop-sim:
 	@$(ROOT)/tools/scripts/loop-ios.sh sim
 
@@ -378,7 +378,7 @@ ios-device-stop:
 	echo "==> Finalized: $$run_dir/profile.trace"
 
 ios-run: ios
-	@open $(IOS_DIR)/Baozi.xcodeproj
+	@open $(IOS_DIR)/AgentBuddy.xcodeproj
 
 android: android-fast
 android-fast: rust-android android-tools android-alpine-fs proot-android android-debug
@@ -483,7 +483,7 @@ $(STAMP_RUST_ANDROID): $(STAMP_SYNC) $(STAMP_BINDINGS_K) $(STAMP_GHOSTTY_ANDROID
 
 sync-ghostty: $(STAMP_SYNC_GHOSTTY)
 $(STAMP_SYNC_GHOSTTY): $(GHOSTTY_PATCH_FILES) apps/ios/scripts/sync-ghostty.sh Makefile
-	@echo "==> Syncing ghostty submodule + applying Baozi patches..."
+	@echo "==> Syncing ghostty submodule + applying AgentBuddy patches..."
 	@$(IOS_SCRIPTS)/sync-ghostty.sh --preserve-current
 	@touch $@
 
@@ -576,7 +576,7 @@ $(STAMP_BINDINGS_S): $(STAMP_SYNC) $(BOUNDARY_SOURCES) | alleycat-main
 	@echo "==> Generating Swift bindings..."
 	@cd $(RUST_DIR) && ./generate-bindings.sh --swift-only
 	@mkdir -p $(IOS_GENERATED)/Headers
-	@cp $(GENERATED_DIR)/swift/codex_mobile_client.swift $(IOS_SOURCES)/Baozi/Bridge/UniFFICodexClient.generated.swift
+	@cp $(GENERATED_DIR)/swift/codex_mobile_client.swift $(IOS_SOURCES)/AgentBuddy/Bridge/UniFFICodexClient.generated.swift
 	@cp $(GENERATED_DIR)/swift/codex_mobile_clientFFI.h $(IOS_GENERATED)/Headers/codex_mobile_clientFFI.h
 	@cp $(GENERATED_DIR)/swift/codex_mobile_clientFFI.modulemap $(IOS_GENERATED)/Headers/codex_mobile_clientFFI.modulemap
 	@cp $(GENERATED_DIR)/swift/module.modulemap $(IOS_GENERATED)/Headers/module.modulemap
@@ -609,7 +609,7 @@ verify-ios-project:
 
 ios-build-sim: verify-ios-project
 	@echo "==> Building iOS ($(XCODE_CONFIG), simulator)..."
-	@xcodebuild -project $(IOS_DIR)/Baozi.xcodeproj \
+	@xcodebuild -project $(IOS_DIR)/AgentBuddy.xcodeproj \
 		-scheme $(IOS_SCHEME) \
 		-configuration $(XCODE_CONFIG) \
 		-destination 'platform=iOS Simulator,name=$(IOS_SIM_DEVICE)' \
@@ -618,7 +618,7 @@ ios-build-sim: verify-ios-project
 
 ios-build-sim-fast: verify-ios-project
 	@echo "==> Building iOS ($(XCODE_CONFIG), fast simulator)..."
-	@xcodebuild -project $(IOS_DIR)/Baozi.xcodeproj \
+	@xcodebuild -project $(IOS_DIR)/AgentBuddy.xcodeproj \
 		-scheme $(IOS_SCHEME) \
 		-configuration $(XCODE_CONFIG) \
 		-destination 'platform=iOS Simulator,name=$(IOS_SIM_DEVICE)' \
@@ -628,7 +628,7 @@ ios-build-sim-fast: verify-ios-project
 
 ios-build-device: verify-ios-project
 	@echo "==> Building iOS ($(XCODE_CONFIG), device)..."
-	@xcodebuild -project $(IOS_DIR)/Baozi.xcodeproj \
+	@xcodebuild -project $(IOS_DIR)/AgentBuddy.xcodeproj \
 		-scheme $(IOS_SCHEME) \
 		-configuration $(XCODE_CONFIG) \
 		-destination 'generic/platform=iOS' \
@@ -638,7 +638,7 @@ ios-build-device: verify-ios-project
 
 ios-build-device-fast: verify-ios-project
 	@echo "==> Building iOS ($(XCODE_CONFIG), fast device)..."
-	@xcodebuild -project $(IOS_DIR)/Baozi.xcodeproj \
+	@xcodebuild -project $(IOS_DIR)/AgentBuddy.xcodeproj \
 		-scheme $(IOS_SCHEME) \
 		-configuration $(XCODE_CONFIG) \
 		-destination 'generic/platform=iOS' \
@@ -651,7 +651,7 @@ ios-build: ios-build-sim
 
 # ─────────────────────────────────────────────────────────────────────────────
 # watchOS build lanes
-# The watch app (BaoziWatch) and its complications (BaoziWatchComplications)
+# The watch app (AgentBuddyWatch) and its complications (AgentBuddyWatchComplications)
 # are pure Swift/SwiftUI — they don't link the shared Rust library, so there
 # is no rust-watch step. The watch app is also embedded into the main iOS
 # app, so `make ios-sim-fast` will build it transitively when that ships.
@@ -660,13 +660,13 @@ ios-build: ios-build-sim
 #   WATCH_SIM_DEVICE       simulator name for watch-sim-run (default: Apple Watch Series 11 (46mm))
 #   WATCH_SIM_UDID         concrete watch simulator UDID for watch-sim-run
 #   WATCH_BUILD_DESTINATION xcodebuild watchOS simulator destination (default: generic/platform=watchOS Simulator)
-#   WATCH_SCHEME           Xcode scheme (default: BaoziWatch)
+#   WATCH_SCHEME           Xcode scheme (default: AgentBuddyWatch)
 # ─────────────────────────────────────────────────────────────────────────────
 
 WATCH_SIM_DEVICE ?= Apple Watch Series 11 (46mm)
 WATCH_SIM_UDID ?=
 WATCH_BUILD_DESTINATION ?= generic/platform=watchOS Simulator
-WATCH_SCHEME ?= BaoziWatch
+WATCH_SCHEME ?= AgentBuddyWatch
 
 watch: watch-sim
 
@@ -674,11 +674,11 @@ watch-typecheck:
 	@echo "==> Type-checking watchOS sources..."
 	@cd $(IOS_DIR) && xcrun -sdk watchsimulator swiftc -typecheck \
 		-target arm64-apple-watchos11.0-simulator \
-		$$(find Sources/BaoziWatch Sources/BaoziWatchComplications -name '*.swift')
+		$$(find Sources/AgentBuddyWatch Sources/AgentBuddyWatchComplications -name '*.swift')
 
 watch-sim: verify-ios-project
 	@echo "==> Building watchOS ($(XCODE_CONFIG), simulator: $(WATCH_SIM_DEVICE))..."
-	@xcodebuild -project $(IOS_DIR)/Baozi.xcodeproj \
+	@xcodebuild -project $(IOS_DIR)/AgentBuddy.xcodeproj \
 		-scheme $(WATCH_SCHEME) \
 		-configuration $(XCODE_CONFIG) \
 		-destination '$(WATCH_BUILD_DESTINATION)' \
@@ -688,7 +688,7 @@ watch-sim: verify-ios-project
 
 watch-device: verify-ios-project
 	@echo "==> Building watchOS ($(XCODE_CONFIG), device)..."
-	@xcodebuild -project $(IOS_DIR)/Baozi.xcodeproj \
+	@xcodebuild -project $(IOS_DIR)/AgentBuddy.xcodeproj \
 		-scheme $(WATCH_SCHEME) \
 		-configuration $(XCODE_CONFIG) \
 		-destination 'generic/platform=watchOS' \
@@ -723,7 +723,7 @@ watch-register: xcgen
 
 # Boot a matching watch simulator, build, install the .app and launch.
 watch-sim-run: watch-sim
-	@echo "==> Booting $(WATCH_SIM_DEVICE) and installing BaoziWatch..."
+	@echo "==> Booting $(WATCH_SIM_DEVICE) and installing AgentBuddyWatch..."
 	@WATCH_UDID="$(WATCH_SIM_UDID)" ; \
 	if [ -z "$$WATCH_UDID" ]; then \
 		WATCH_UDID=$$(xcrun simctl list devices available | awk 'index($$0, "$(WATCH_SIM_DEVICE)") { \
@@ -734,12 +734,12 @@ watch-sim-run: watch-sim
 		echo "ERROR: no simulator matching '$(WATCH_SIM_DEVICE)'. Run 'xcrun simctl list devices' to see what's installed."; exit 1; \
 	fi ; \
 	xcrun simctl boot $$WATCH_UDID 2>/dev/null || true ; \
-	APP_PATH=$$(xcodebuild -project $(IOS_DIR)/Baozi.xcodeproj -scheme $(WATCH_SCHEME) \
+	APP_PATH=$$(xcodebuild -project $(IOS_DIR)/AgentBuddy.xcodeproj -scheme $(WATCH_SCHEME) \
 		-configuration $(XCODE_CONFIG) -destination "$(WATCH_BUILD_DESTINATION)" \
 		-showBuildSettings 2>/dev/null | awk -F' = ' '/ CODESIGNING_FOLDER_PATH /{print $$2; exit}') ; \
 	echo "==> Installing $$APP_PATH"; \
 	xcrun simctl install $$WATCH_UDID "$$APP_PATH" ; \
-	xcrun simctl launch $$WATCH_UDID com.kris99.baozi.watchkitapp
+	xcrun simctl launch $$WATCH_UDID com.akashark.agentbuddy.watchkitapp
 
 android-debug:
 	@echo "==> Building Android debug..."
@@ -786,7 +786,7 @@ test-rust: alleycat-main
 
 test-ios: xcgen
 	@echo "==> Running iOS tests..."
-	@xcodebuild test -project $(IOS_DIR)/Baozi.xcodeproj \
+	@xcodebuild test -project $(IOS_DIR)/AgentBuddy.xcodeproj \
 		-scheme $(IOS_SCHEME) \
 		-configuration Debug \
 		-destination 'platform=iOS Simulator,name=$(IOS_SIM_DEVICE)'

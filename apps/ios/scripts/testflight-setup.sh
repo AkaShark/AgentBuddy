@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_BUNDLE_ID="${APP_BUNDLE_ID:-com.kris99.baozi}"
+APP_BUNDLE_ID="${APP_BUNDLE_ID:-com.akashark.agentbuddy}"
 APP_STORE_APP_ID="${APP_STORE_APP_ID:-}"
 INTERNAL_GROUP_NAME="${INTERNAL_GROUP_NAME:-Internal Testers}"
 

@@ -3,8 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-PROJECT_FILE="$PROJECT_DIR/Baozi.xcodeproj"
-NESTED_PROJECT="$PROJECT_FILE/Baozi.xcodeproj"
+PROJECT_FILE="$PROJECT_DIR/AgentBuddy.xcodeproj"
+NESTED_PROJECT="$PROJECT_FILE/AgentBuddy.xcodeproj"
 REPAIR_ONLY=0
 
 while [[ $# -gt 0 ]]; do
@@ -54,13 +54,13 @@ if [[ -d "$NESTED_PROJECT" ]]; then
 fi
 
 # Fix StoreKit Configuration in scheme — xcodegen doesn't generate a valid reference.
-SCHEME_FILE="$PROJECT_FILE/xcshareddata/xcschemes/Baozi.xcscheme"
+SCHEME_FILE="$PROJECT_FILE/xcshareddata/xcschemes/AgentBuddy.xcscheme"
 if [[ -f "$SCHEME_FILE" ]]; then
   # Remove broken xcodegen-generated StoreKitConfigurationFileReference if present
   sed -i '' '/<StoreKitConfigurationFileReference/,/<\/StoreKitConfigurationFileReference>/d' "$SCHEME_FILE"
   # Insert correct one before </LaunchAction>
   sed -i '' 's|</LaunchAction>|      <StoreKitConfigurationFileReference\
-         identifier = "../../Sources/Baozi/Resources/TipJarProducts.storekit">\
+         identifier = "../../Sources/AgentBuddy/Resources/TipJarProducts.storekit">\
       </StoreKitConfigurationFileReference>\
    </LaunchAction>|' "$SCHEME_FILE"
 fi

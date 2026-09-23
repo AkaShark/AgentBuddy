@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Register a paired Apple Watch with Apple's Developer Portal so the
-# CLI-driven build flow can install BaoziWatch on the watch without
+# CLI-driven build flow can install AgentBuddyWatch on the watch without
 # Xcode's GUI involvement.
 #
 # When a fresh watch is paired with the Mac, Apple's developer profile
@@ -23,8 +23,8 @@
 #   ./apps/ios/scripts/register-paired-watch.sh --print-udid
 #
 # Outputs the discovered UDID to stdout and (unless --dry-run) runs:
-#   xcodebuild -project apps/ios/Baozi.xcodeproj \
-#     -scheme BaoziWatch \
+#   xcodebuild -project apps/ios/AgentBuddy.xcodeproj \
+#     -scheme AgentBuddyWatch \
 #     -destination "platform=watchOS,id=$WATCH_UDID" \
 #     -allowProvisioningUpdates \
 #     -allowProvisioningDeviceRegistration \
@@ -34,8 +34,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IOS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-PROJECT_PATH="$IOS_DIR/Baozi.xcodeproj"
-WATCH_SCHEME="${WATCH_SCHEME:-BaoziWatch}"
+PROJECT_PATH="$IOS_DIR/AgentBuddy.xcodeproj"
+WATCH_SCHEME="${WATCH_SCHEME:-AgentBuddyWatch}"
 XCODE_CONFIG="${XCODE_CONFIG:-Debug}"
 
 DRY_RUN=0
@@ -173,5 +173,5 @@ xcodebuild \
     -allowProvisioningDeviceRegistration \
     build
 
-echo "==> Registered. The watch UDID should now appear in the BaoziWatch provisioning profile."
+echo "==> Registered. The watch UDID should now appear in the AgentBuddyWatch provisioning profile."
 printf '%s\n' "$WATCH_UDID_RESOLVED"

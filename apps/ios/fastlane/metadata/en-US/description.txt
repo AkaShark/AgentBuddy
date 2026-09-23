@@ -1,4 +1,4 @@
-包子 is a native mobile client for Codex.
+AgentBuddy is a native mobile client for Codex.
 
 Connect to local or remote Codex servers, manage coding sessions from anywhere, and keep conversations moving without opening your laptop.
 
@@ -9,4 +9,4 @@ Features:
 - Review conversation history, reasoning, code blocks, and images in a mobile-native UI
 - Stay connected to the servers you control instead of sending your work through a hosted relay
 
-包子 is open source and built for people who want their coding agent with them wherever they are.
+AgentBuddy is open source and built for people who want their coding agent with them wherever they are.

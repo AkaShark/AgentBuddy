@@ -3,8 +3,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 DERIVED_DATA_ROOT="${HOME}/Library/Developer/Xcode/DerivedData"
-APP_PATH="$(/bin/ls -dt "${DERIVED_DATA_ROOT}"/Baozi-*/Build/Products/Debug-iphoneos/Baozi.app 2>/dev/null | head -1 || true)"
-BUNDLE_ID="com.kris99.baozi"
+APP_PATH="$(/bin/ls -dt "${DERIVED_DATA_ROOT}"/AgentBuddy-*/Build/Products/Debug-iphoneos/AgentBuddy.app 2>/dev/null | head -1 || true)"
+BUNDLE_ID="com.akashark.agentbuddy"
 APP_EXECUTABLE_NAME="$(basename "${APP_PATH}" .app)"
 
 PROFILE_ENABLED="${IOS_DEVICE_PROFILE:-0}"
@@ -41,7 +41,7 @@ TAILSCALE_BIN="${TAILSCALE_BIN:-}"
 mkdir -p "${RUN_DIR}"
 
 if [[ -z "${APP_PATH}" ]]; then
-  echo "ERROR: Baozi.app not found in DerivedData" >&2
+  echo "ERROR: AgentBuddy.app not found in DerivedData" >&2
   exit 1
 fi
 
