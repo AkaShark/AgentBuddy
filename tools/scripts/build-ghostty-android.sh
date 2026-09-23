@@ -97,6 +97,10 @@ for abi in $ANDROID_ABIS; do
     echo "==> Building Ghostty Android renderer for $abi ($target)..."
     (
         cd "$GHOSTTY_DIR"
+        # Match the iOS downloader policy; opt in for proxy-only networks.
+        if [ "${GHOSTTY_USE_PROXY:-0}" != "1" ]; then
+            unset http_proxy https_proxy all_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY
+        fi
         env "${env_args[@]}" zig build \
             -Dapp-runtime=none \
             -Drenderer=opengl \

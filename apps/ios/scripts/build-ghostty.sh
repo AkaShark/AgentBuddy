@@ -186,6 +186,11 @@ build_slice() {
     echo "==> Building Ghostty $name static library..."
     (
         cd "$GHOSTTY_DIR"
+        # Zig's downloader can fail with HTTP 400 through local proxies.
+        # Scope direct access to this build; leave Git and the caller unchanged.
+        if [ "${GHOSTTY_USE_PROXY:-0}" != "1" ]; then
+            unset http_proxy https_proxy all_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY
+        fi
         zig_args=(zig build \
             -Dlitter-ios-static=true \
             -Dapp-runtime=none \
