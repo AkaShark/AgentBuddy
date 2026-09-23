@@ -1,0 +1,20 @@
+:root {
+  --bg: #000000;
+  --fg: #e6e6e6;
+  --accent: #00ff9c;
+  --muted: #8a8a8a;
+  --danger: #ff5f57;
+  --surface: #111111;
+  --border: #262626;
+  --mono: "SF Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+html, body, #root { height: 100%; margin: 0; background: var(--bg); color: var(--fg); font-family: var(--mono); font-size: 13px; }
+button { font: inherit; color: var(--fg); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); color: #000; border-color: var(--accent); }
+button.danger { border-color: var(--danger); color: var(--danger); }
+button:disabled { opacity: 0.5; cursor: default; }
+input { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; }
+code, .mono { font-family: var(--mono); }
+.muted { color: var(--muted); }

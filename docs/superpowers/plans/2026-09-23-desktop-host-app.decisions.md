@@ -25,3 +25,7 @@
 - Task 10: Ruling: 新增 `src/lib/useHostState.test.tsx`，覆盖上面的 bug 和"连续 3 次失败标记为无法连接" — 计划的 Task 10 只测了纯函数，hook 的行为（spec §7 的退避与横幅）没有测试 — 代价：无。
 - Task 10: Ruling: `host.agentSettings()` 与 `AgentSettings` 类型、`StatusInfo.version?` — 对应 Task 7/5 的裁决 — 代价：无。
 - Task 10: Ruling: Vitest 的 `include` 限定为 `src/**/*.test.{ts,tsx}`，`npm test` 改为 `vitest run && node --test scripts/sync-version.test.mjs` — 否则 Vitest 会把 node:test 写的脚本测试当成空套件报失败，而 node 测试也要进 CI — 代价：无。
+- Task 11: Ruling: 概览页加一行「守护进程版本」（来自 `status.version`）— spec §6 要求同时显示守护进程版本与 App 版本，计划的概览只显示了 App 版本 — 代价：无。
+- Task 11: Ruling: 复制节点 id 用 clipboard 插件的 `writeText`，不用计划里的 `navigator.clipboard` — capability 只开了 `clipboard-manager:allow-write-text`，WKWebView 里 `navigator.clipboard` 在非安全上下文可能不可用 — 代价：无。
+- Task 11: Ruling: 「在 Finder 中显示」包进 `run()` — 计划直接 `void host.revealPath()`，目录不存在时错误会被吞掉；包进 `run` 后错误进顶部横幅 — 代价：点完会多一次状态刷新。
+- Task 11: Ruling: 配对页多加一条测试「轮换前先确认、轮换后重新拉 payload」— 计划只测了渲染；轮换 token 会让所有手机掉线，这条路径值得钉住 — 代价：无。
