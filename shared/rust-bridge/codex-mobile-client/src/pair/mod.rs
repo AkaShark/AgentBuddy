@@ -331,7 +331,7 @@ pub async fn start_pair_host(
     Ok((
         handle,
         PairServiceInfo {
-            service_name: format!("Baozi on {device_name}"),
+            service_name: format!("AgentBuddy on {device_name}"),
             port,
             txt_entries: vec![
                 "v=1".to_string(),

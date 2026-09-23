@@ -44,6 +44,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "agentbuddycli"
+version = "0.1.0"
+dependencies = [
+ "alleycat",
+ "anyhow",
+]
+
+[[package]]
 name = "ahash"
 version = "0.8.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -516,14 +524,6 @@ dependencies = [
  "fastrand",
  "gloo-timers",
  "tokio",
-]
-
-[[package]]
-name = "baozicli"
-version = "0.1.0"
-dependencies = [
- "alleycat",
- "anyhow",
 ]
 
 [[package]]

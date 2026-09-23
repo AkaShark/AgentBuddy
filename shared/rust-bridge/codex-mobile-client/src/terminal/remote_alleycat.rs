@@ -60,7 +60,7 @@ pub(crate) async fn open(
         1,
         "initialize",
         json!({
-            "clientInfo": { "name": "Baozi", "version": "1.0" },
+            "clientInfo": { "name": "AgentBuddy", "version": "1.0" },
             "capabilities": { "experimentalApi": true }
         }),
     )

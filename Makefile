@@ -886,7 +886,7 @@ $(KITTYLITTER_DEV_MANIFEST): $(KITTYLITTER_DIR)/Cargo.toml $(KITTYLITTER_DIR)/sr
 		'publish = false' \
 		'' \
 		'[[bin]]' \
-		'name = "baozi"' \
+		'name = "agentbuddy"' \
 		'path = "src/main.rs"' \
 		'' \
 		'[dependencies]' \
@@ -896,11 +896,11 @@ $(KITTYLITTER_DEV_MANIFEST): $(KITTYLITTER_DIR)/Cargo.toml $(KITTYLITTER_DIR)/sr
 	@printf '%s\n' \
 		'fn main() -> anyhow::Result<()> {' \
 		'    alleycat::App {' \
-		'        binary_name: "baozi",' \
+		'        binary_name: "agentbuddy",' \
 		'        qualifier: "com",' \
-		'        organization: "kris99",' \
-		'        application: "baozicli",' \
-		'        label: "com.kris99.baozicli",' \
+		'        organization: "akashark",' \
+		'        application: "agentbuddycli",' \
+		'        label: "com.akashark.agentbuddycli",' \
 		'        version: env!("CARGO_PKG_VERSION"),' \
 		'    }' \
 		'    .run()' \
@@ -909,17 +909,17 @@ $(KITTYLITTER_DEV_MANIFEST): $(KITTYLITTER_DIR)/Cargo.toml $(KITTYLITTER_DIR)/sr
 
 kittylitter: $(KITTYLITTER_DEV_MANIFEST)
 	@echo "── Running kittylitter $(KITTYLITTER_ARGS) via $(ALLEYCAT_DEV_DIR) ──"
-	@cd $(ROOT) && $(KITTYLITTER_CARGO_ENV) cargo run --manifest-path "$(KITTYLITTER_DEV_MANIFEST)" --bin baozi -- $(KITTYLITTER_ARGS)
+	@cd $(ROOT) && $(KITTYLITTER_CARGO_ENV) cargo run --manifest-path "$(KITTYLITTER_DEV_MANIFEST)" --bin agentbuddy -- $(KITTYLITTER_ARGS)
 
 kittylitter-restart: $(KITTYLITTER_DEV_MANIFEST)
 	@echo "── Building kittylitter via $(ALLEYCAT_DEV_DIR) ──"
-	@cd $(ROOT) && $(KITTYLITTER_CARGO_ENV) cargo build --manifest-path "$(KITTYLITTER_DEV_MANIFEST)" --bin baozi
+	@cd $(ROOT) && $(KITTYLITTER_CARGO_ENV) cargo build --manifest-path "$(KITTYLITTER_DEV_MANIFEST)" --bin agentbuddy
 	@echo "── Restarting installed kittylitter daemon ──"
-	@cd $(ROOT) && $(KITTYLITTER_CARGO_ENV) cargo run --manifest-path "$(KITTYLITTER_DEV_MANIFEST)" --bin baozi -- stop >/dev/null 2>&1 || true
-	@if launchctl print "gui/$$(id -u)/com.kris99.baozicli" >/dev/null 2>&1; then \
-		launchctl kickstart -k "gui/$$(id -u)/com.kris99.baozicli"; \
+	@cd $(ROOT) && $(KITTYLITTER_CARGO_ENV) cargo run --manifest-path "$(KITTYLITTER_DEV_MANIFEST)" --bin agentbuddy -- stop >/dev/null 2>&1 || true
+	@if launchctl print "gui/$$(id -u)/com.akashark.agentbuddycli" >/dev/null 2>&1; then \
+		launchctl kickstart -k "gui/$$(id -u)/com.akashark.agentbuddycli"; \
 		sleep 3; \
-		cd "$(ROOT)" && $(KITTYLITTER_CARGO_ENV) cargo run --manifest-path "$(KITTYLITTER_DEV_MANIFEST)" --bin baozi -- agents list; \
+		cd "$(ROOT)" && $(KITTYLITTER_CARGO_ENV) cargo run --manifest-path "$(KITTYLITTER_DEV_MANIFEST)" --bin agentbuddy -- agents list; \
 	else \
 		echo "kittylitter autostart is not installed; start it with: make kittylitter serve"; \
 	fi

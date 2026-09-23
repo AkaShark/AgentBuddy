@@ -1,8 +1,8 @@
 [workspace]
-# The baozi wrapper crate at services/kittylitter re-exports the alleycat
-# daemon under the `baozicli` npm package name (installed command: `baozi`).
-# cargo-dist runs against that workspace and produces baozicli artifacts
-# hosted on this repo's (huangguang1999/baozi) GitHub Releases.
+# The AgentBuddy wrapper crate at services/kittylitter re-exports the alleycat
+# daemon under the `agentbuddycli` npm package name (installed command: `agentbuddy`).
+# cargo-dist runs against that workspace and produces agentbuddycli artifacts
+# hosted on this repo's (AkaShark/AgentBuddy) GitHub Releases.
 members = ["cargo:services/kittylitter"]
 
 [dist]
@@ -19,13 +19,13 @@ targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-apple-da
 install-path = "CARGO_HOME"
 hosting = "github"
 install-updater = false
-# macOS signing DISABLED for the initial baozi release — no Developer ID
+# macOS signing DISABLED for the initial AgentBuddy release — no Developer ID
 # Application cert is wired into this fork's repo secrets yet. Unsigned means
 # users get a Gatekeeper "unidentified developer" prompt on first run and the
 # daemon's Local Network (TCC) permission is granted per-launch rather than
 # pinned to a stable signed identity. To enable later: set macos-sign = true
 # and add CODESIGN_CERTIFICATE / CODESIGN_CERTIFICATE_PASSWORD / CODESIGN_IDENTITY
-# (a "Developer ID Application" cert) to the huangguang1999/baozi repo secrets.
+# (a "Developer ID Application" cert) to the AkaShark/AgentBuddy repo secrets.
 macos-sign = false
 # NOTE: dnakov's sccache (Cloudflare R2) build accelerator was removed here —
 # it required SCCACHE_R2_* + AWS_* repo secrets this fork doesn't have, and CI

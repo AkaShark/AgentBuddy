@@ -1,5 +1,5 @@
 //! iOS-only iSH bootstrap + run surface. Port of the former Obj-C
-//! `apps/ios/Sources/Baozi/Bridge/IshBridge.{h,m}` into Rust.
+//! `apps/ios/Sources/AgentBuddy/Bridge/IshBridge.{h,m}` into Rust.
 //!
 //! Responsibilities, mirroring the Obj-C original 1:1:
 //! 1. Extract the bundled `fs` rootfs into `<app_support>/fs/` on first launch.

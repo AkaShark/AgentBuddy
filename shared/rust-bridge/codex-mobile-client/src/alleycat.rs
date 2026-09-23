@@ -549,7 +549,7 @@ pub async fn connect_app_server_client(
             websocket_url: format!("ws://alleycat/{agent}"),
             auth_token: None,
         },
-        client_name: "Baozi".to_string(),
+        client_name: "AgentBuddy".to_string(),
         client_version: "1.0".to_string(),
         experimental_api: true,
         opt_out_notification_methods: Vec::new(),

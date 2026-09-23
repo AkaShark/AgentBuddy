@@ -696,7 +696,7 @@ impl ServerSession {
             enable_codex_api_key_env: true,
             initialize: InitializeParams {
                 client_info: ClientInfo {
-                    name: "Baozi".to_string(),
+                    name: "AgentBuddy".to_string(),
                     version: "1.0".to_string(),
                     title: None,
                 },
@@ -1175,7 +1175,7 @@ pub(crate) fn remote_connect_args(config: &ServerConfig) -> (String, RemoteAppSe
             websocket_url: url.clone(),
             auth_token: None,
         },
-        client_name: "Baozi".to_string(),
+        client_name: "AgentBuddy".to_string(),
         client_version: "1.0".to_string(),
         experimental_api: true,
         opt_out_notification_methods: Vec::new(),

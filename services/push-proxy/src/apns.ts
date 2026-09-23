@@ -51,7 +51,7 @@ export async function sendSilentPush(
     headers: {
       authorization: `bearer ${jwt}`,
       "apns-push-type": "background",
-      "apns-topic": "com.kris99.baozi",
+      "apns-topic": "com.akashark.agentbuddy",
       "apns-priority": "5",
     },
     body: JSON.stringify({ aps: { "content-available": 1 } }),
