@@ -21,3 +21,7 @@
 - Task 9: Ruling: 托盘图标先用 App 图标（彩色，非 template），计划写的是 `icon_as_template(true)` — 彩色方形图标当 template 会渲染成一块纯色方块；等新品牌美术出一张单色菜单栏图标后再改成 template — 代价：暗色/浅色菜单栏下图标不会自动反色。
 - Task 9: Ruling: 操作失败时弹一个错误对话框（显示 `HostError.detail`）— 计划里托盘动作失败是静默的，spec §7 要求错误可见 — 代价：无。
 - Task 9: Ruling: 冒烟验证只确认了 `tauri dev` 能启动、无 panic、启动任务成功调用了 sidecar 并写出 settings.json；菜单栏截图因为菜单栏图标过多没能直接看到托盘图标，留到 Task 12 后用 System Events 再核对 — 代价：若图标没有显示，要到那一步才发现。
+- Task 10: Ruling: 修复计划 `useHostState.run()` 的一个 bug——计划在 `finally` 里调用 `refresh()`，而成功的刷新会 `setError(null)`，导致操作失败的错误一闪就消失；现在先记下操作错误，刷新后再设置回去。测试 `keeps a failed action's error visible after the follow-up refresh`（修复前失败）— 代价：无。
+- Task 10: Ruling: 新增 `src/lib/useHostState.test.tsx`，覆盖上面的 bug 和"连续 3 次失败标记为无法连接" — 计划的 Task 10 只测了纯函数，hook 的行为（spec §7 的退避与横幅）没有测试 — 代价：无。
+- Task 10: Ruling: `host.agentSettings()` 与 `AgentSettings` 类型、`StatusInfo.version?` — 对应 Task 7/5 的裁决 — 代价：无。
+- Task 10: Ruling: Vitest 的 `include` 限定为 `src/**/*.test.{ts,tsx}`，`npm test` 改为 `vitest run && node --test scripts/sync-version.test.mjs` — 否则 Vitest 会把 node:test 写的脚本测试当成空套件报失败，而 node 测试也要进 CI — 代价：无。
