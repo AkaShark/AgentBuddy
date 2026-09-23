@@ -29,3 +29,6 @@
 - Task 11: Ruling: 复制节点 id 用 clipboard 插件的 `writeText`，不用计划里的 `navigator.clipboard` — capability 只开了 `clipboard-manager:allow-write-text`，WKWebView 里 `navigator.clipboard` 在非安全上下文可能不可用 — 代价：无。
 - Task 11: Ruling: 「在 Finder 中显示」包进 `run()` — 计划直接 `void host.revealPath()`，目录不存在时错误会被吞掉；包进 `run` 后错误进顶部横幅 — 代价：点完会多一次状态刷新。
 - Task 11: Ruling: 配对页多加一条测试「轮换前先确认、轮换后重新拉 payload」— 计划只测了渲染；轮换 token 会让所有手机掉线，这条路径值得钉住 — 代价：无。
+- Task 12: Ruling: Agents 页的启用开关读 `agent_settings`（host.toml 的真实 `enabled`），路径显示 host.toml 里配置的可执行文件；改动后重新读取 — 对应 Task 7 裁决，计划原来用 `available` 冒充启用状态 — 代价：多一次命令调用。
+- Task 12: Ruling: 真机冒烟（`tauri dev` + System Events）确认：托盘项存在（`status menu`），菜单项为 状态/打开控制台/显示配对二维码/启停/开机自启/退出，点「打开控制台」弹出 760×540 窗口，概览页暗色主题与引导卡片正常渲染 — 补上 Task 9 未完成的核对 — 代价：无。
+- Task 12: Ruling: 冒烟时发现本机有一个不受 launchd 管理的守护进程（pid 70196），是 Task 5 抓 fixture 时运行 `agentbuddy pair` 自动拉起的——alleycat 的 `pair` 会在没有守护进程时 detached 启动一个。这是一个真实状态（未安装但在运行），见下一个 commit 的处理 — 代价：无。

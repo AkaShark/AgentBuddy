@@ -4,6 +4,8 @@ import { Nav } from "./components/Nav";
 import { ErrorBanner } from "./components/ErrorBanner";
 import { Overview } from "./pages/Overview";
 import { Pairing } from "./pages/Pairing";
+import { Agents } from "./pages/Agents";
+import { Logs } from "./pages/Logs";
 import { useHostState } from "./lib/host";
 
 export type Page = "overview" | "agents" | "pairing" | "logs";
@@ -35,8 +37,10 @@ export default function App() {
           <Overview state={state} busy={busy} run={run} />
         ) : page === "pairing" ? (
           <Pairing running={state.running} />
+        ) : page === "agents" ? (
+          <Agents agents={state.status?.agents ?? []} busy={busy} run={run} />
         ) : (
-          <p className="muted">页面建设中</p>
+          <Logs active={page === "logs"} />
         )}
       </main>
     </div>
