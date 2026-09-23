@@ -54,9 +54,28 @@ pub async fn run_mutating(
     state: &AppState,
     cmd: Subcommand,
 ) -> Result<(), HostError> {
-    debug_assert!(cmd.is_mutating());
+    run_mutating_seq(app, state, vec![cmd]).await
+}
+
+/// Run several mutating subcommands back to back under one lock hold.
+pub async fn run_mutating_seq(
+    app: &AppHandle,
+    state: &AppState,
+    cmds: Vec<Subcommand>,
+) -> Result<(), HostError> {
     let _guard = state.mutation.lock().await;
-    sidecar::run(app, cmd).await.map(|_| ())
+    for cmd in cmds {
+        debug_assert!(cmd.is_mutating());
+        sidecar::run(app, cmd).await?;
+    }
+    Ok(())
+}
+
+/// What "install the host service" runs: `install` writes and bootstraps the
+/// LaunchAgent; `restart` then stops any daemon that was running outside
+/// launchd (e.g. one `pair` spawned) so the LaunchAgent owns the only one.
+pub fn install_sequence() -> Vec<Subcommand> {
+    vec![Subcommand::Install, Subcommand::Restart]
 }
 
 #[cfg(test)]
@@ -83,6 +102,13 @@ mod tests {
         });
         let _ = tokio::join!(t1, t2);
         assert_eq!(*order.lock().unwrap(), vec!["a-start", "a-end", "b-start"]);
+    }
+
+    #[test]
+    fn install_adopts_any_running_daemon_under_launchd() {
+        // `install` alone leaves a daemon started by `pair` running outside
+        // launchd; `restart` hands it over to the LaunchAgent.
+        assert_eq!(install_sequence(), vec![Subcommand::Install, Subcommand::Restart]);
     }
 
     #[test]

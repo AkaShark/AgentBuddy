@@ -33,6 +33,7 @@ pub fn follow_start(app: &AppHandle) -> Result<(), HostError> {
         .sidecar(SIDECAR_NAME)
         .map_err(|e| HostError::sidecar_missing(e.to_string()))?
         .args(Subcommand::LogsFollow(200).args())
+        .env("PATH", crate::shellenv::user_path())
         .spawn()
         .map_err(|e| HostError::sidecar_missing(format!("spawn logs -f: {e}")))?;
     *slot = Some(child);

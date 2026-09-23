@@ -114,7 +114,9 @@ pub async fn run(app: &AppHandle, cmd: Subcommand) -> Result<String, HostError> 
         .shell()
         .sidecar(SIDECAR_NAME)
         .map_err(|e| HostError::sidecar_missing(e.to_string()))?
-        .args(cmd.args());
+        .args(cmd.args())
+        .env("PATH", crate::shellenv::user_path())
+        .env("SHELL", crate::shellenv::user_shell());
     let output = command.output().await.map_err(|e| {
         HostError::sidecar_missing(format!("spawn `agentbuddy {}`: {e}", cmd.label()))
     })?;

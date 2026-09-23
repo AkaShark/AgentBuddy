@@ -9,7 +9,7 @@ use crate::error::{HostError, HostErrorKind};
 use crate::launchd::{self, HostState};
 use crate::logs;
 use crate::sidecar::{self, Subcommand};
-use crate::state::{run_mutating, AppState};
+use crate::state::{install_sequence, run_mutating, run_mutating_seq, AppState};
 use crate::status::{self, PairPayload};
 
 pub async fn compute_host_state(app: &AppHandle) -> Result<HostState, HostError> {
@@ -40,7 +40,7 @@ pub async fn host_state(app: AppHandle) -> Result<HostState, HostError> {
 
 #[tauri::command]
 pub async fn host_install(app: AppHandle, state: State<'_, AppState>) -> Result<(), HostError> {
-    run_mutating(&app, &state, Subcommand::Install).await
+    run_mutating_seq(&app, &state, install_sequence()).await
 }
 
 #[tauri::command]

@@ -3,6 +3,7 @@ mod config;
 mod error;
 mod launchd;
 mod logs;
+mod shellenv;
 mod sidecar;
 mod state;
 mod status;

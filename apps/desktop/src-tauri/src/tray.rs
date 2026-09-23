@@ -7,7 +7,7 @@ use tauri_plugin_positioner::{Position, WindowExt};
 use crate::commands::compute_host_state;
 use crate::launchd::{HostState, InstallState};
 use crate::sidecar::Subcommand;
-use crate::state::{run_mutating, AppState, Settings};
+use crate::state::{install_sequence, run_mutating, run_mutating_seq, AppState, Settings};
 
 pub struct TrayHandles {
     status: MenuItem<Wry>,
@@ -106,7 +106,8 @@ async fn refresh(app: &AppHandle) {
 fn run_and_refresh(app: AppHandle, cmd: Subcommand) {
     tauri::async_runtime::spawn(async move {
         let state = app.state::<AppState>();
-        if let Err(e) = run_mutating(&app, &state, cmd).await {
+        let seq = if cmd == Subcommand::Install { install_sequence() } else { vec![cmd] };
+        if let Err(e) = run_mutating_seq(&app, &state, seq).await {
             app.dialog()
                 .message(e.detail)
                 .title("AgentBuddy")
