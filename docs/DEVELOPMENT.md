@@ -70,16 +70,26 @@ Use this flow to make Codex sessions from your Mac visible in the iOS/Android ap
 
 Upstream Codex is vendored as a submodule at `shared/third_party/codex`.
 
-Current local patch set (applied by `sync-codex.sh`):
+Current local patch set, applied in this order by `sync-codex.sh` (see
+`patches/codex/README.md` for what each patch does and which mobile code depends on it):
 
 - `patches/codex/ios-exec-hook.patch`
-- `patches/codex/client-controlled-handoff.patch`
 - `patches/codex/mobile-code-mode-stub.patch`
+- `patches/codex/thread-read-permissions.patch`
+- `patches/codex/mobile-shell-snapshot-timeout.patch`
+- `patches/codex/remote-app-server-websocket-cap.patch`
+- `patches/codex/absolute-path-cross-platform.patch`
+- `patches/codex/android-installation-id-lock.patch`
+- `patches/codex/dynamic-tool-call-arguments-delta.patch`
+- `patches/codex/approval-timestamps-serde-default.patch`
+- `patches/codex/realtime-webrtc-env-apikey.patch`
+- `patches/codex/realtime-handoff-server-hint.patch` — must come before the next two; it adds the `realtime_v2_session_tools` helper they reuse
+- `patches/codex/realtime-dynamic-tools.patch`
+- `patches/codex/realtime-client-controlled-handoff.patch`
 
-Additional patches (not auto-applied):
-
-- `patches/codex/android-vendored-openssl.patch`
-- `patches/codex/realtime-transcript-deltas.patch`
+The last three together replace the former monolithic `client-controlled-handoff.patch`.
+Every `.patch` file under `patches/codex/` is auto-applied; there is no separate
+"not auto-applied" set anymore.
 
 Sync/apply (idempotent):
 
