@@ -32,6 +32,10 @@ export interface HostState {
   install: InstallState;
   running: boolean;
   status: StatusInfo | null;
+  /** `status --json` itself failed (e.g. invalid host.toml). */
+  status_error: HostError | null;
+  /** Why installing from this bundle location is refused (dmg / translocated). */
+  install_blocked: string | null;
   app_version: string;
   sidecar_path: string;
 }
@@ -55,7 +59,9 @@ export type HostErrorKind =
   | { type: "command_failed"; code: number | null; stderr: string }
   | { type: "parse_failed" }
   | { type: "permission_denied" }
-  | { type: "config_invalid" };
+  | { type: "config_invalid" }
+  | { type: "install_location" }
+  | { type: "not_installed" };
 
 export interface HostError {
   kind: HostErrorKind;

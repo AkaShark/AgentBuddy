@@ -30,13 +30,13 @@ export default function App() {
       <Nav page={page} onSelect={setPage} />
       <main className="page">
         {unreachable && <span className="badge warn">无法连接控制通道</span>}
-        <ErrorBanner error={error} appVersion={state?.app_version} />
+        <ErrorBanner error={error ?? state?.status_error ?? null} appVersion={state?.app_version} />
         {state === null ? (
           <p className="muted">正在读取主机状态…</p>
         ) : page === "overview" ? (
-          <Overview state={state} busy={busy} run={run} />
+          <Overview state={state} busy={busy} run={run} onInstalled={() => setPage("pairing")} />
         ) : page === "pairing" ? (
-          <Pairing running={state.running} />
+          <Pairing running={state.running} installed={state.install.kind === "installed"} />
         ) : page === "agents" ? (
           <Agents agents={state.status?.agents ?? []} busy={busy} run={run} />
         ) : (

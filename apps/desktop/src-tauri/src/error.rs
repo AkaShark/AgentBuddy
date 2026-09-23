@@ -8,6 +8,10 @@ pub enum HostErrorKind {
     ParseFailed,
     PermissionDenied,
     ConfigInvalid,
+    /// The app runs from a dmg or a translocated path; a LaunchAgent pointing there breaks after eject/reboot.
+    InstallLocation,
+    /// The action needs the LaunchAgent to be installed first.
+    NotInstalled,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, thiserror::Error)]
@@ -34,6 +38,12 @@ impl HostError {
     }
     pub fn config_invalid(detail: impl Into<String>) -> Self {
         Self { kind: HostErrorKind::ConfigInvalid, detail: detail.into() }
+    }
+    pub fn install_location(detail: impl Into<String>) -> Self {
+        Self { kind: HostErrorKind::InstallLocation, detail: detail.into() }
+    }
+    pub fn not_installed(detail: impl Into<String>) -> Self {
+        Self { kind: HostErrorKind::NotInstalled, detail: detail.into() }
     }
 }
 

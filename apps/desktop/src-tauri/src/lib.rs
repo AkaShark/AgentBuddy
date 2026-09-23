@@ -9,6 +9,8 @@ mod state;
 pub mod status;
 mod tray;
 
+use tauri::Manager;
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -28,7 +30,7 @@ pub fn run() {
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
-                let _ = window.hide();
+                tray::hide_window(window.app_handle());
             }
         })
         .invoke_handler(tauri::generate_handler![

@@ -16,9 +16,17 @@ interface Props {
   run: (fn: () => Promise<void>) => Promise<void>;
   /** injectable for tests; defaults to host.install */
   installAction?: () => Promise<void>;
+  /** called only after a successful install (spec §4: jump to pairing) */
+  onInstalled?: () => void;
 }
 
-export function Overview({ state, busy, run, installAction = host.install }: Props) {
+export function Overview({ state, busy, run, installAction = host.install, onInstalled }: Props) {
+  const install = () =>
+    run(async () => {
+      await installAction();
+      onInstalled?.();
+    });
+
   if (state.install.kind === "not_installed") {
     return (
       <section className="card">
@@ -26,7 +34,8 @@ export function Overview({ state, busy, run, installAction = host.install }: Pro
         <p className="muted">
           安装后台服务后，守护进程会随登录自动启动，退出本 App 也不受影响。手机 App 通过「配对」页的二维码连接这台 Mac。
         </p>
-        <button className="primary" disabled={busy} onClick={() => void run(installAction)}>
+        {state.install_blocked && <p className="banner">{state.install_blocked}</p>}
+        <button className="primary" disabled={busy || !!state.install_blocked} onClick={() => void install()}>
           安装后台服务
         </button>
       </section>

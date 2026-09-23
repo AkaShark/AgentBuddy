@@ -36,6 +36,21 @@ export function Logs({ active }: { active: boolean }) {
     };
   }, [active, follow]);
 
+  // The backend stops `logs -f` when the window hides; reflect that here.
+  useEffect(() => {
+    if (!active) return;
+    let un: (() => void) | undefined;
+    let cancelled = false;
+    void listen("follow-stopped", () => setFollow(false)).then((f) => {
+      if (cancelled) f();
+      else un = f;
+    });
+    return () => {
+      cancelled = true;
+      un?.();
+    };
+  }, [active]);
+
   useEffect(() => {
     if (follow && box.current) box.current.scrollTop = box.current.scrollHeight;
   }, [lines, follow]);

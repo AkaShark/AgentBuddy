@@ -71,6 +71,25 @@ pub async fn run_mutating_seq(
     Ok(())
 }
 
+/// Install (or repair) the LaunchAgent, refusing dmg/translocated bundles.
+pub async fn install_host(app: &AppHandle, state: &AppState) -> Result<(), HostError> {
+    crate::launchd::install_guard(&sidecar::sidecar_path()?)?;
+    run_mutating_seq(app, state, install_sequence()).await
+}
+
+/// Stop the host service so it stays stopped: bootout the LaunchAgent when
+/// one is installed (KeepAlive would respawn a plain stop), otherwise stop
+/// the stray daemon through the sidecar.
+pub async fn stop_host(app: &AppHandle, state: &AppState) -> Result<(), HostError> {
+    let _guard = state.mutation.lock().await;
+    match crate::launchd::stop_plan(&crate::launchd::current_install_state()?) {
+        crate::launchd::StopPlan::Bootout => tauri::async_runtime::spawn_blocking(crate::launchd::bootout)
+            .await
+            .map_err(|e| HostError::config_invalid(format!("bootout task: {e}")))?,
+        crate::launchd::StopPlan::SidecarStop => sidecar::run(app, Subcommand::Stop).await.map(|_| ()),
+    }
+}
+
 /// What "install the host service" runs: `install` writes and bootstraps the
 /// LaunchAgent; `restart` then stops any daemon that was running outside
 /// launchd (e.g. one `pair` spawned) so the LaunchAgent owns the only one.

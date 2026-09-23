@@ -22,7 +22,7 @@ beforeEach(() => {
 
 describe("Pairing", () => {
   it("renders a QR code from the raw payload and shows host details", async () => {
-    const { container } = render(<Pairing running={true} />);
+    const { container } = render(<Pairing running={true} installed={true} />);
     await waitFor(() => expect(container.querySelector("svg")).not.toBeNull());
     expect(screen.getByText("studio")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "复制 payload" }));
@@ -30,7 +30,7 @@ describe("Pairing", () => {
   });
 
   it("asks before rotating the token and reloads the payload afterwards", async () => {
-    render(<Pairing running={true} />);
+    render(<Pairing running={true} installed={true} />);
     await waitFor(() => screen.getByRole("button", { name: "轮换 token" }));
     fireEvent.click(screen.getByRole("button", { name: "轮换 token" }));
     expect(invoke).not.toHaveBeenCalledWith("rotate_token");
@@ -40,7 +40,14 @@ describe("Pairing", () => {
   });
 
   it("tells the user to start the service first when not running", () => {
-    render(<Pairing running={false} />);
+    render(<Pairing running={false} installed={true} />);
     expect(screen.getByText(/先启动主机服务/)).toBeInTheDocument();
+  });
+
+  it("does not call pair before the service is installed", () => {
+    render(<Pairing running={false} installed={false} />);
+    expect(screen.getByText(/先安装后台服务/)).toBeInTheDocument();
+    expect(invoke).not.toHaveBeenCalledWith("pair_payload");
+    expect(screen.queryByRole("button", { name: "复制 payload" })).toBeNull();
   });
 });

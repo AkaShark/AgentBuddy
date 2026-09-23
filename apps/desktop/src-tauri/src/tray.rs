@@ -7,7 +7,7 @@ use tauri_plugin_positioner::{Position, WindowExt};
 use crate::commands::compute_host_state;
 use crate::launchd::{HostState, InstallState};
 use crate::sidecar::Subcommand;
-use crate::state::{install_sequence, run_mutating, run_mutating_seq, AppState, Settings};
+use crate::state::{install_host, run_mutating, run_mutating_seq, stop_host, AppState, Settings};
 
 pub struct TrayHandles {
     status: MenuItem<Wry>,
@@ -62,6 +62,12 @@ pub fn autostart_action(s: &HostState) -> TrayAction {
     }
 }
 
+/// Open the console on launch until the service is installed, so a first
+/// run is not just an icon lost in a crowded menu bar.
+pub fn should_show_on_launch(install: &InstallState) -> bool {
+    !matches!(install, InstallState::Installed)
+}
+
 /// After the app bundle was replaced the LaunchAgent still runs the old
 /// binary; hand it over with `agentbuddy upgrade` when the version changed.
 pub fn needs_upgrade(last_seen: Option<&str>, current: &str, install: &InstallState) -> bool {
@@ -79,10 +85,20 @@ pub fn show_window(app: &AppHandle, page: Option<&str>) {
     }
 }
 
+/// Hide the console and stop any `logs -f` child (spec §7); the Logs page
+/// hears `follow-stopped` and unchecks "跟随".
+pub fn hide_window(app: &AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.hide();
+    }
+    let _ = crate::logs::follow_stop(app);
+    let _ = app.emit("follow-stopped", ());
+}
+
 fn toggle_window(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
         if w.is_visible().unwrap_or(false) {
-            let _ = w.hide();
+            hide_window(app);
         } else {
             show_window(app, None);
         }
@@ -106,8 +122,12 @@ async fn refresh(app: &AppHandle) {
 fn run_and_refresh(app: AppHandle, cmd: Subcommand) {
     tauri::async_runtime::spawn(async move {
         let state = app.state::<AppState>();
-        let seq = if cmd == Subcommand::Install { install_sequence() } else { vec![cmd] };
-        if let Err(e) = run_mutating_seq(&app, &state, seq).await {
+        let result = match cmd {
+            Subcommand::Install => install_host(&app, &state).await,
+            Subcommand::Stop => stop_host(&app, &state).await,
+            other => run_mutating_seq(&app, &state, vec![other]).await,
+        };
+        if let Err(e) = result {
             app.dialog()
                 .message(e.detail)
                 .title("AgentBuddy")
@@ -121,7 +141,7 @@ fn run_and_refresh(app: AppHandle, cmd: Subcommand) {
 fn confirm_text(cmd: &Subcommand) -> (&'static str, &'static str) {
     match cmd {
         Subcommand::Uninstall => ("关闭开机自启", "这会卸载后台服务并停止它，手机将无法连接这台 Mac。"),
-        _ => ("停止主机服务", "停止后手机将无法连接这台 Mac，直到再次启动。"),
+        _ => ("停止主机服务", "停止后手机将无法连接这台 Mac，直到你在这里再次启动，或下次登录 Mac 时服务自动恢复。"),
     }
 }
 
@@ -184,6 +204,9 @@ pub fn spawn_upgrade_check(app: AppHandle) {
         let current = app.package_info().version.to_string();
         let mut settings = Settings::load(&app);
         if let Ok(s) = compute_host_state(&app).await {
+            if should_show_on_launch(&s.install) {
+                show_window(&app, Some("overview"));
+            }
             if needs_upgrade(settings.last_seen_version.as_deref(), &current, &s.install) {
                 let state = app.state::<AppState>();
                 let _ = run_mutating(&app, &state, Subcommand::Upgrade).await;
@@ -256,7 +279,15 @@ mod tests {
     use crate::launchd::{HostState, InstallState};
 
     fn state(install: InstallState, running: bool) -> HostState {
-        HostState { install, running, status: None, app_version: "0.1.0".into(), sidecar_path: "/x".into() }
+        HostState {
+            install,
+            running,
+            status: None,
+            status_error: None,
+            install_blocked: None,
+            app_version: "0.1.0".into(),
+            sidecar_path: "/x".into(),
+        }
     }
 
     #[test]
@@ -278,6 +309,18 @@ mod tests {
         let s = state(InstallState::PathMismatch { plist_exe: "/old".into() }, true);
         assert_eq!(status_label(&s), "状态：需要修复");
         assert!(autostart_checked(&s));
+    }
+
+    #[test]
+    fn console_opens_on_launch_until_the_service_is_installed() {
+        assert!(should_show_on_launch(&InstallState::NotInstalled));
+        assert!(should_show_on_launch(&InstallState::PathMismatch { plist_exe: "/old".into() }));
+        assert!(!should_show_on_launch(&InstallState::Installed));
+    }
+
+    #[test]
+    fn stop_confirmation_says_the_service_comes_back_at_next_login() {
+        assert!(confirm_text(&Subcommand::Stop).1.contains("下次登录"));
     }
 
     #[test]

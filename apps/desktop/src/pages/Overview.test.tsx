@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(async () => undefined) }));
@@ -16,6 +16,8 @@ const base: HostState = {
     config_path: "/Users/me/Library/Application Support/com.akashark.agentbuddycli/host.toml",
     uptime_secs: 3725, agents: [], version: "0.1.0",
   },
+  status_error: null,
+  install_blocked: null,
   app_version: "0.1.0",
   sidecar_path: "/Applications/AgentBuddy.app/Contents/MacOS/agentbuddy",
 };
@@ -43,6 +45,29 @@ describe("Overview", () => {
     fireEvent.click(screen.getByRole("button", { name: "安装后台服务" }));
     expect(run).toHaveBeenCalled();
     expect(install).toHaveBeenCalled();
+  });
+
+  it("jumps to pairing only after a successful install", async () => {
+    const onInstalled = vi.fn();
+    const notInstalled = { ...base, install: { kind: "not_installed" as const }, running: false, status: null };
+    const ok = vi.fn(async () => {});
+    const { unmount } = render(<Overview state={notInstalled} busy={false} run={async (f) => f()} installAction={ok} onInstalled={onInstalled} />);
+    fireEvent.click(screen.getByRole("button", { name: "安装后台服务" }));
+    await waitFor(() => expect(onInstalled).toHaveBeenCalledTimes(1));
+    unmount();
+    const failing = vi.fn(async () => { throw { kind: { type: "command_failed", code: 1, stderr: "x" }, detail: "boom" }; });
+    const swallow = async (f: () => Promise<void>) => { try { await f(); } catch { /* run() keeps the error */ } };
+    render(<Overview state={notInstalled} busy={false} run={swallow} installAction={failing} onInstalled={onInstalled} />);
+    fireEvent.click(screen.getByRole("button", { name: "安装后台服务" }));
+    await waitFor(() => expect(failing).toHaveBeenCalled());
+    expect(onInstalled).toHaveBeenCalledTimes(1);
+  });
+
+  it("explains and blocks installing from a dmg or translocated copy", () => {
+    const blocked = { ...base, install: { kind: "not_installed" as const }, running: false, status: null, install_blocked: "请先把 AgentBuddy 拖进「应用程序」文件夹" };
+    render(<Overview state={blocked} busy={false} run={async (f) => f()} />);
+    expect(screen.getByText(/拖进「应用程序」/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "安装后台服务" })).toBeDisabled();
   });
 
   it("offers repair on path mismatch", () => {

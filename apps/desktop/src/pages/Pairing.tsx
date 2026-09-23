@@ -3,7 +3,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { host, describeError, type PairPayload } from "../lib/host";
 
-export function Pairing({ running }: { running: boolean }) {
+export function Pairing({ running, installed }: { running: boolean; installed: boolean }) {
   const [payload, setPayload] = useState<PairPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -18,8 +18,9 @@ export function Pairing({ running }: { running: boolean }) {
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    // `pair` starts a daemon when none runs; only pair against the installed service.
+    if (installed) void load();
+  }, [load, installed]);
 
   const rotate = async () => {
     setConfirming(false);
@@ -30,6 +31,10 @@ export function Pairing({ running }: { running: boolean }) {
       setError(describeError(e));
     }
   };
+
+  if (!installed) {
+    return <p className="banner">请先安装后台服务（在「概览」页），再显示配对二维码。</p>;
+  }
 
   return (
     <>

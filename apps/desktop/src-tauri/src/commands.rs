@@ -9,23 +9,38 @@ use crate::error::{HostError, HostErrorKind};
 use crate::launchd::{self, HostState};
 use crate::logs;
 use crate::sidecar::{self, Subcommand};
-use crate::state::{install_sequence, run_mutating, run_mutating_seq, AppState};
-use crate::status::{self, PairPayload};
+use crate::state::{install_host, run_mutating, stop_host, AppState};
+use crate::status::{self, PairPayload, StatusInfo};
+
+/// Split a `status --json` result into (status, status_error). A daemon CLI
+/// failure (bad host.toml, wedged socket) is shown to the user, not hidden as
+/// "stopped"; a failure to spawn the sidecar at all stays a hard error.
+pub fn status_outcome(
+    res: Result<String, HostError>,
+) -> Result<(Option<StatusInfo>, Option<HostError>), HostError> {
+    match res {
+        Ok(out) => Ok((Some(status::parse_status(&out)?), None)),
+        Err(e) if matches!(e.kind, HostErrorKind::CommandFailed { .. }) => Ok((None, Some(e))),
+        Err(e) => Err(e),
+    }
+}
+
+/// After editing host.toml: a running daemon must reload it; a stopped one
+/// reads it at start, and `reload` would fail with "daemon not running".
+pub fn reload_after_config_write(running: bool) -> Option<Subcommand> {
+    running.then_some(Subcommand::Reload)
+}
 
 pub async fn compute_host_state(app: &AppHandle) -> Result<HostState, HostError> {
     let sidecar = sidecar::sidecar_path()?;
-    let plist = launchd::plist_path()?;
-    let plist_exe = launchd::read_program_path(&plist)?;
-    let install = launchd::derive_install_state(plist_exe.as_deref(), &sidecar);
-    let status = match sidecar::run(app, Subcommand::StatusJson).await {
-        Ok(out) => Some(status::parse_status(&out)?),
-        Err(e) if matches!(e.kind, HostErrorKind::CommandFailed { .. }) => None,
-        Err(e) => return Err(e),
-    };
+    let install = launchd::current_install_state()?;
+    let (status, status_error) = status_outcome(sidecar::run(app, Subcommand::StatusJson).await)?;
     Ok(HostState {
         install,
         running: status.as_ref().map(|s| s.is_running()).unwrap_or(false),
         status,
+        status_error,
+        install_blocked: launchd::install_guard(&sidecar).err().map(|e| e.detail),
         app_version: app.package_info().version.to_string(),
         sidecar_path: sidecar.to_string_lossy().into_owned(),
     })
@@ -40,7 +55,7 @@ pub async fn host_state(app: AppHandle) -> Result<HostState, HostError> {
 
 #[tauri::command]
 pub async fn host_install(app: AppHandle, state: State<'_, AppState>) -> Result<(), HostError> {
-    run_mutating_seq(&app, &state, install_sequence()).await
+    install_host(&app, &state).await
 }
 
 #[tauri::command]
@@ -55,7 +70,7 @@ pub async fn host_start(app: AppHandle, state: State<'_, AppState>) -> Result<()
 
 #[tauri::command]
 pub async fn host_stop(app: AppHandle, state: State<'_, AppState>) -> Result<(), HostError> {
-    run_mutating(&app, &state, Subcommand::Stop).await
+    stop_host(&app, &state).await
 }
 
 #[tauri::command]
@@ -74,7 +89,11 @@ pub async fn host_upgrade(app: AppHandle, state: State<'_, AppState>) -> Result<
 }
 
 #[tauri::command]
-pub async fn pair_payload(app: AppHandle) -> Result<PairPayload, HostError> {
+pub async fn pair_payload(app: AppHandle, state: State<'_, AppState>) -> Result<PairPayload, HostError> {
+    launchd::pair_guard(&launchd::current_install_state()?)?;
+    // `pair` may restart the daemon onto this binary (ensure_current_daemon),
+    // so it runs under the same lock as the other service-changing commands.
+    let _guard = state.mutation.lock().await;
     let out = sidecar::run(&app, Subcommand::Pair).await?;
     status::parse_pair(&out)
 }
@@ -84,9 +103,13 @@ pub async fn rotate_token(app: AppHandle, state: State<'_, AppState>) -> Result<
     run_mutating(&app, &state, Subcommand::Rotate).await
 }
 
-async fn config_path(app: &AppHandle) -> Result<PathBuf, HostError> {
+async fn current_status(app: &AppHandle) -> Result<StatusInfo, HostError> {
     let out = sidecar::run(app, Subcommand::StatusJson).await?;
-    Ok(PathBuf::from(status::parse_status(&out)?.config_path))
+    status::parse_status(&out)
+}
+
+async fn config_path(app: &AppHandle) -> Result<PathBuf, HostError> {
+    Ok(PathBuf::from(current_status(app).await?.config_path))
 }
 
 #[tauri::command]
@@ -102,10 +125,14 @@ pub async fn agent_set_enabled(
     name: String,
     enabled: bool,
 ) -> Result<(), HostError> {
-    let path = config_path(&app).await?;
+    let current = current_status(&app).await?;
+    let path = PathBuf::from(&current.config_path);
     let text = config::read_or_empty(&path)?;
     config::write_atomic(&path, &config::set_agent_enabled(&text, &name, enabled)?)?;
-    run_mutating(&app, &state, Subcommand::Reload).await
+    match reload_after_config_write(current.is_running()) {
+        Some(cmd) => run_mutating(&app, &state, cmd).await,
+        None => Ok(()),
+    }
 }
 
 #[tauri::command]
@@ -115,10 +142,14 @@ pub async fn agent_set_bin(
     name: String,
     path: String,
 ) -> Result<(), HostError> {
-    let cfg = config_path(&app).await?;
+    let current = current_status(&app).await?;
+    let cfg = PathBuf::from(&current.config_path);
     let text = config::read_or_empty(&cfg)?;
     config::write_atomic(&cfg, &config::set_agent_bin(&text, &name, &path)?)?;
-    run_mutating(&app, &state, Subcommand::Reload).await
+    match reload_after_config_write(current.is_running()) {
+        Some(cmd) => run_mutating(&app, &state, cmd).await,
+        None => Ok(()),
+    }
 }
 
 #[tauri::command]
@@ -150,4 +181,37 @@ pub async fn reveal_path(app: AppHandle, kind: String) -> Result<(), HostError> 
     app.opener()
         .reveal_item_in_dir(&target)
         .map_err(|e| HostError::config_invalid(e.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const STATUS: &str = include_str!("../tests/fixtures/status.json");
+
+    #[test]
+    fn status_command_failures_are_reported_not_hidden() {
+        let failed = HostError::command_failed("status --json", Some(1), "error: invalid host.toml");
+        let (status, err) = status_outcome(Err(failed)).unwrap();
+        assert!(status.is_none());
+        assert!(err.unwrap().detail.contains("invalid host.toml"));
+    }
+
+    #[test]
+    fn status_success_carries_no_error() {
+        let (status, err) = status_outcome(Ok(STATUS.to_owned())).unwrap();
+        assert!(status.is_some());
+        assert!(err.is_none());
+    }
+
+    #[test]
+    fn status_spawn_failures_stay_hard_errors() {
+        assert!(status_outcome(Err(HostError::sidecar_missing("agentbuddy not found"))).is_err());
+    }
+
+    #[test]
+    fn config_changes_reload_only_a_running_daemon() {
+        assert_eq!(reload_after_config_write(true), Some(Subcommand::Reload));
+        assert_eq!(reload_after_config_write(false), None);
+    }
 }

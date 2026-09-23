@@ -13,6 +13,7 @@ name = "agentbuddy-desktop"
 version = "0.1.0"
 dependencies = [
  "dirs",
+ "libc",
  "plist",
  "serde",
  "serde_json",
