@@ -1,12 +1,12 @@
 mod commands;
 mod config;
-mod error;
+pub mod error;
 mod launchd;
 mod logs;
 mod shellenv;
 mod sidecar;
 mod state;
-mod status;
+pub mod status;
 mod tray;
 
 pub fn run() {
