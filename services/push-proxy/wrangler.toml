@@ -19,8 +19,4 @@ new_sqlite_classes = ["PushRegistration"]
 tag = "v2"
 new_sqlite_classes = ["RateLimiter"]
 
-[[kv_namespaces]]
-binding = "PUSH_KV"
-id = "a8adc3ba6afe48ff88e3b7a4fe059626"
-
 [vars]

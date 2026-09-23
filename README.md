@@ -83,7 +83,6 @@ shared/third_party/ghostty/    上游 Ghostty 子模块（终端渲染）
 patches/codex/, patches/ghostty/  构建时应用的本地补丁
 services/kittylitter/          Mac 守护进程 npm 包 agentbuddycli（alleycat 封装）
 services/push-proxy/           APNs / FCM 推送代理（Cloudflare Worker）
-services/testflight-signup/    TestFlight 报名表单后端（Cloudflare Worker）
 tools/scripts/                 跨平台辅助脚本
 docs/                          开发、架构与发布文档
 ```
