@@ -19,7 +19,7 @@ usage() {
 Usage: ./tools/scripts/switch-app-identity.sh --to <sigkitten|your-identifier> [options]
 
 Switches local app identifiers across Android and iOS between:
-  - com.kris99.baozi(.android|.remote)
+  - com.akashark.agentbuddy(.android|.remote)
   - com.<your-identifier>.litter(.android|.remote)
 
 Options:

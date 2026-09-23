@@ -37,8 +37,8 @@ from typing import Any
 
 UTC = dt.timezone.utc
 
-DEFAULT_IOS_BUNDLE_ID = "com.kris99.baozi"
-DEFAULT_ANDROID_PACKAGE = "com.kris99.baozi.android"
+DEFAULT_IOS_BUNDLE_ID = "com.akashark.agentbuddy"
+DEFAULT_ANDROID_PACKAGE = "com.akashark.agentbuddy.android"
 DEFAULT_OUTPUT_BASE = pathlib.Path("/tmp/mobile-store-artifacts")
 DEFAULT_PLAY_ENV_FILE = pathlib.Path.home() / ".config/litter/play-upload.env"
 

@@ -219,7 +219,7 @@ jobs:
           mkdir -p apps/ios/GeneratedRust/Headers .ci-prep/shared
 
           cp shared/rust-bridge/generated/swift/codex_mobile_client.swift \
-            apps/ios/Sources/Baozi/Bridge/UniFFICodexClient.generated.swift
+            apps/ios/Sources/AgentBuddy/Bridge/UniFFICodexClient.generated.swift
           cp shared/rust-bridge/generated/swift/codex_mobile_clientFFI.h \
             apps/ios/GeneratedRust/Headers/codex_mobile_clientFFI.h
           cp shared/rust-bridge/generated/swift/codex_mobile_clientFFI.modulemap \
@@ -250,7 +250,7 @@ jobs:
 
           tar -czf .ci-prep/shared/generated-mobile-sources.tgz -C . \
             shared/rust-bridge/generated \
-            apps/ios/Sources/Baozi/Bridge/UniFFICodexClient.generated.swift \
+            apps/ios/Sources/AgentBuddy/Bridge/UniFFICodexClient.generated.swift \
             apps/ios/GeneratedRust/Headers \
             apps/ios/GeneratedRust/.swift-bindings.hash
 
@@ -589,7 +589,7 @@ jobs:
           tar -czf .ci-prep/ios/ios-release-prep.tgz -C . \
             apps/ios/Resources/fs \
             apps/ios/GeneratedRust \
-            apps/ios/Sources/Baozi/Bridge/UniFFICodexClient.generated.swift
+            apps/ios/Sources/AgentBuddy/Bridge/UniFFICodexClient.generated.swift
 
       - name: Upload iOS release prep artifact
         uses: actions/upload-artifact@v4
@@ -751,8 +751,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          SCHEME="Baozi"
-          APP_BUNDLE_ID="com.kris99.baozi"
+          SCHEME="AgentBuddy"
+          APP_BUNDLE_ID="com.akashark.agentbuddy"
           BETA_GROUP_NAMES="Internal Testers,Beta Testers"
           WAIT_FOR_PROCESSING="1"
 
@@ -765,7 +765,7 @@ jobs:
         env:
           SCHEME: ${{ env.SCHEME }}
           APP_BUNDLE_ID: ${{ env.APP_BUNDLE_ID }}
-          LIVE_ACTIVITY_BUNDLE_ID: com.kris99.baozi.liveactivity
+          LIVE_ACTIVITY_BUNDLE_ID: com.akashark.agentbuddy.liveactivity
           APP_STORE_APP_ID: ${{ secrets.IOS_APP_STORE_APP_ID }}
           TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
           APP_PROVISIONING_PROFILE_SPECIFIER: ${{ env.APP_PROVISIONING_PROFILE_SPECIFIER }}
@@ -787,7 +787,7 @@ jobs:
         env:
           SCHEME: ${{ env.SCHEME }}
           APP_BUNDLE_ID: ${{ env.APP_BUNDLE_ID }}
-          LIVE_ACTIVITY_BUNDLE_ID: com.kris99.baozi.liveactivity
+          LIVE_ACTIVITY_BUNDLE_ID: com.akashark.agentbuddy.liveactivity
           APP_STORE_APP_ID: ${{ secrets.IOS_APP_STORE_APP_ID }}
           TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
           APP_PROVISIONING_PROFILE_SPECIFIER: ${{ env.APP_PROVISIONING_PROFILE_SPECIFIER }}
@@ -905,7 +905,7 @@ jobs:
           tar -czf .ci-prep/mac/mac-release-prep.tgz -C . \
             apps/ios/Resources/fs \
             apps/ios/GeneratedRust \
-            apps/ios/Sources/Baozi/Bridge/UniFFICodexClient.generated.swift
+            apps/ios/Sources/AgentBuddy/Bridge/UniFFICodexClient.generated.swift
 
       - name: Upload Mac release prep artifact
         uses: actions/upload-artifact@v4
@@ -1033,8 +1033,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          SCHEME="BaoziMac"
-          APP_BUNDLE_ID="com.kris99.baozi"
+          SCHEME="AgentBuddyMac"
+          APP_BUNDLE_ID="com.akashark.agentbuddy"
           BETA_GROUP_NAMES="Internal Testers,Beta Testers"
           WAIT_FOR_PROCESSING="1"
 
@@ -1201,8 +1201,8 @@ jobs:
       - name: Build, sign, and notarize DMG
         if: steps.gate.outputs.configured == 'true'
         env:
-          SCHEME: BaoziMac
-          APP_BUNDLE_ID: com.kris99.baozi
+          SCHEME: AgentBuddyMac
+          APP_BUNDLE_ID: com.akashark.agentbuddy
           TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
           APP_PROVISIONING_PROFILE_SPECIFIER: ${{ env.APP_PROVISIONING_PROFILE_SPECIFIER }}
           EXPORT_SIGNING_STYLE: ${{ env.EXPORT_SIGNING_STYLE }}
@@ -1261,7 +1261,7 @@ jobs:
           BODY=$(cat <<EOF
           Mac Catalyst direct-distribution build for ${TAG}.
 
-          Notarized \`.dmg\`; drag Baozi.app into /Applications. The
+          Notarized \`.dmg\`; drag AgentBuddy.app into /Applications. The
           asset is overwritten on every CI run that targets this version,
           so the download URL below always points to the latest build.
 

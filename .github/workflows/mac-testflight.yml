@@ -87,7 +87,7 @@ jobs:
           tar -czf .ci-prep/mac/mac-release-prep.tgz -C . \
             apps/ios/Resources/fs \
             apps/ios/GeneratedRust \
-            apps/ios/Sources/Baozi/Bridge/UniFFICodexClient.generated.swift
+            apps/ios/Sources/AgentBuddy/Bridge/UniFFICodexClient.generated.swift
 
       - name: Upload Mac release prep artifact
         uses: actions/upload-artifact@v4
@@ -227,8 +227,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          SCHEME="BaoziMac"
-          APP_BUNDLE_ID="com.kris99.baozi"
+          SCHEME="AgentBuddyMac"
+          APP_BUNDLE_ID="com.akashark.agentbuddy"
 
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             BETA_GROUP_NAMES="${{ inputs.beta_group_names }}"

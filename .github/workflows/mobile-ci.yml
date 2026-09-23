@@ -107,7 +107,7 @@ jobs:
           mkdir -p apps/ios/GeneratedRust/Headers .ci-prep/shared
 
           cp shared/rust-bridge/generated/swift/codex_mobile_client.swift \
-            apps/ios/Sources/Baozi/Bridge/UniFFICodexClient.generated.swift
+            apps/ios/Sources/AgentBuddy/Bridge/UniFFICodexClient.generated.swift
           cp shared/rust-bridge/generated/swift/codex_mobile_clientFFI.h \
             apps/ios/GeneratedRust/Headers/codex_mobile_clientFFI.h
           cp shared/rust-bridge/generated/swift/codex_mobile_clientFFI.modulemap \
@@ -117,7 +117,7 @@ jobs:
 
           tar -czf .ci-prep/shared/generated-mobile-sources.tgz -C . \
             shared/rust-bridge/generated \
-            apps/ios/Sources/Baozi/Bridge/UniFFICodexClient.generated.swift \
+            apps/ios/Sources/AgentBuddy/Bridge/UniFFICodexClient.generated.swift \
             apps/ios/GeneratedRust/Headers
 
       - name: Upload shared prep artifact
@@ -328,11 +328,11 @@ jobs:
           fi
           echo "IOS_SIMULATOR_UDID=$SIMULATOR_UDID" >> "$GITHUB_ENV"
 
-      - name: Build (Baozi)
+      - name: Build (AgentBuddy)
         run: |
           xcodebuild \
-            -project apps/ios/Baozi.xcodeproj \
-            -scheme Baozi \
+            -project apps/ios/AgentBuddy.xcodeproj \
+            -scheme AgentBuddy \
             -configuration Debug \
             -destination "id=$IOS_SIMULATOR_UDID" \
             ARCHS=arm64 \

@@ -1,27 +1,27 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `apps/ios/Sources/Baozi/` contains the iOS app code.
-- `apps/ios/Sources/Baozi/Views/` holds SwiftUI screens, `Models/` contains app state/session logic, and `Bridge/` contains JSON-RPC + C FFI bridge code.
-- `apps/android/app/src/main/java/com/kris99/baozi/android/ui/` contains Android Compose shell/screens.
-- `apps/android/app/src/main/java/com/kris99/baozi/android/state/` contains Android app state, server/session manager, SSH, and websocket transport.
+- `apps/ios/Sources/AgentBuddy/` contains the iOS app code.
+- `apps/ios/Sources/AgentBuddy/Views/` holds SwiftUI screens, `Models/` contains app state/session logic, and `Bridge/` contains JSON-RPC + C FFI bridge code.
+- `apps/android/app/src/main/java/com/akashark/agentbuddy/android/ui/` contains Android Compose shell/screens.
+- `apps/android/app/src/main/java/com/akashark/agentbuddy/android/state/` contains Android app state, server/session manager, SSH, and websocket transport.
 - `apps/android/core/bridge/` contains Android UniFFI bootstrap and generated Rust bindings.
 - `apps/android/app/src/test/java/` contains Android unit tests.
 - `apps/android/docs/qa-matrix.md` tracks Android parity QA coverage.
 - `shared/rust-bridge/codex-mobile-client/` is the single shared Rust client library consumed by both iOS and Android. It owns the public UniFFI surface, generated upstream RPC coverage, canonical store/reducer state, hydration, discovery, SSH, and shared runtime logic. `MobileClient` is the top-level internal Rust facade.
 - `shared/rust-bridge/codex-bridge/` is legacy C-FFI support that should not be used for new mobile runtime features.
-- `apps/ios/Sources/Baozi/Bridge/Rust*.swift` — iOS bridge files mapping Swift to the shared Rust layer.
+- `apps/ios/Sources/AgentBuddy/Bridge/Rust*.swift` — iOS bridge files mapping Swift to the shared Rust layer.
 - `apps/android/core/bridge/.../Rust*.kt` — Android bridge files mapping Kotlin to the shared Rust layer. UniFFI Kotlin sources are generated into `shared/rust-bridge/generated/kotlin/` and consumed directly from there; do not maintain copied binding files under Android source roots.
 - `shared/third_party/codex/` is the upstream Codex submodule.
 - `apps/ios/GeneratedRust/` contains local generated Rust artifacts for iOS builds: UniFFI headers/modulemap plus raw device/simulator staticlibs. These artifacts are not committed.
 - `apps/ios/Frameworks/` contains downloaded/package-lane iOS XCFrameworks (`codex_mobile_client.xcframework` in package builds and `litter_ish.xcframework`). These artifacts are not committed.
-- `apps/ios/project.yml` is the source of truth for project generation; regenerate `apps/ios/Baozi.xcodeproj` instead of hand-editing project files.
+- `apps/ios/project.yml` is the source of truth for project generation; regenerate `apps/ios/AgentBuddy.xcodeproj` instead of hand-editing project files.
 
 ## Architecture
 - **iOS root layout:** `ContentView` uses a `ZStack` with a persistent `HeaderView`, main content area, and a `SidebarOverlay` that slides from the left.
 - **iOS state management:** `AppStore` (Rust, via UniFFI) is the canonical runtime state owner. `AppModel` is the thin Swift observation shell over Rust snapshots and updates. `AppState` is UI-only state.
 - **iOS server flow:** discovery and SSH are separate utility bridges; thread/session/account operations come from generated Rust RPC plus store updates.
-- **Android root layout:** `BaoziAppShell` is the Compose entry; `DefaultBaoziAppState` maps backend state into UI state.
+- **Android root layout:** `AgentBuddyAppShell` is the Compose entry; `DefaultAgentBuddyAppState` maps backend state into UI state.
 - **Android state/transport:** Android should use the same Rust-owned runtime model as iOS instead of re-implementing shared session/thread/account logic in Kotlin.
 - **Android server flow:** discovery seeds come from Android NSD, but discovery merge/probe policy lives in Rust; connection, auth, and thread/account flows go through Rust RPC + store updates.
 - **Message rendering parity:** both platforms support reasoning/system sections, code block rendering, and inline image handling.
@@ -65,8 +65,8 @@
   - `shared/rust-bridge/codex-mobile-client/src/store/voice.rs`
   - reducer/update boundary types in `store/`
 - Add iOS-only behavior:
-  - `apps/ios/Sources/Baozi/Models/` for controllers/platform services
-  - `apps/ios/Sources/Baozi/Views/` for SwiftUI
+  - `apps/ios/Sources/AgentBuddy/Models/` for controllers/platform services
+  - `apps/ios/Sources/AgentBuddy/Views/` for SwiftUI
   - keep those files free of shared protocol parsing and shared business rules
 - Add Android-only behavior:
   - `apps/android/app/` and `apps/android/core/bridge/`
@@ -138,7 +138,7 @@ Incremental policy:
 | `make rust-check` | Host `cargo check` for shared Rust crates |
 | `make rust-test` | Host `cargo test` for shared Rust crates |
 | `make bindings` | Regenerate UniFFI Swift + Kotlin bindings |
-| `make xcgen` | Regenerate `Baozi.xcodeproj` from `project.yml` |
+| `make xcgen` | Regenerate `AgentBuddy.xcodeproj` from `project.yml` |
 | `make test` | Run Rust + iOS + Android tests |
 | `make testflight` | Full iOS build + TestFlight upload |
 | `make play-upload` | Full Android build + Google Play upload |
@@ -151,7 +151,7 @@ Incremental policy:
 ### Configuration overrides (env vars)
 - `IOS_SIM_DEVICE` — simulator name (default: `iPhone 17 Pro`)
 - `XCODE_CONFIG` — Xcode build configuration (default: `Debug`)
-- `IOS_SCHEME` — Xcode scheme (default: `Baozi`)
+- `IOS_SCHEME` — Xcode scheme (default: `AgentBuddy`)
 - `IOS_DEPLOYMENT_TARGET` — minimum iOS version (default: `18.0`)
 - `ANDROID_SDK_ROOT` / `ANDROID_NDK_HOME` / `JAVA_HOME` — required for Android builds in bare shells; typical local values are `$HOME/Library/Android/sdk`, `$HOME/Library/Android/sdk/ndk/<version>`, and `/Applications/Android Studio.app/Contents/jbr/Contents/Home`
 
@@ -159,7 +159,7 @@ Incremental policy:
 - `./apps/ios/scripts/build-rust.sh` — cross-compile Rust for iOS; in fast mode it emits raw staticlibs + headers to `apps/ios/GeneratedRust/`, and in package mode it also creates `codex_mobile_client.xcframework`
 - `./apps/ios/scripts/download-litter-ish.sh` — fetch the pinned `dnakov/litter-ish` GitHub release, extract `litter_ish.xcframework` into `apps/ios/Frameworks/` and `alpine-fakefs/` into `apps/ios/Resources/`. Reads `LITTER_ISH_VERSION` from env (set by `make litter-ish`).
 - `./apps/ios/scripts/sync-codex.sh` — sync codex submodule + apply patches
-- `./apps/ios/scripts/regenerate-project.sh` — regenerate Xcode project via xcodegen; this is the safe path because it removes any accidental nested `apps/ios/Baozi.xcodeproj/Baozi.xcodeproj` before regenerating
+- `./apps/ios/scripts/regenerate-project.sh` — regenerate Xcode project via xcodegen; this is the safe path because it removes any accidental nested `apps/ios/AgentBuddy.xcodeproj/AgentBuddy.xcodeproj` before regenerating
 - `./apps/ios/scripts/testflight-upload.sh` — archive, export IPA, upload to TestFlight
 - `./shared/rust-bridge/generate-bindings.sh` — generate UniFFI Swift/Kotlin bindings
 - `./tools/scripts/build-android-rust.sh` — cross-compile Rust JNI libs for Android via `cargo-ndk`
@@ -176,9 +176,9 @@ Incremental policy:
 ## Autonomous Debugging Runbook
 - Prefer the fast lanes for local iteration before package/release lanes: `make ios-sim-fast`, `make ios-device-fast`, and `make android-emulator-fast`.
 - For repeated store-feedback/crash triage across GitHub, TestFlight, and Play, start with `./tools/scripts/triage-mobile-feedback.py --last-hours 24` (or an explicit `--since` / `--until` window). Review `artifacts/mobile-triage/triage-board.md`, then mark handled rows with `./tools/scripts/triage-mobile-feedback.py mark '<item-id>' --status done --note 'fixed in ...'` or `--status pr-open --note 'Fix PR #...'`. Use `fetch-mobile-store-artifacts.py` directly only for one-off raw iOS/Android store snapshots or deeper ASC / Play API debugging.
-- For iOS simulator debugging, install the latest built app directly from DerivedData instead of trusting an older installed simulator copy: `xcrun simctl install booted <.../Build/Products/Debug-iphonesimulator/Baozi.app>` then `xcrun simctl launch booted com.kris99.baozi`.
-- For Xcode project regeneration, use `make xcgen` or `./apps/ios/scripts/regenerate-project.sh`. Do not run `xcodegen generate --spec project.yml --project Baozi.xcodeproj` from inside `apps/ios`; that produces a nested `apps/ios/Baozi.xcodeproj/Baozi.xcodeproj`.
-- For Android emulator debugging, build with `make android-emulator-fast`, install with `adb -e install -r apps/android/app/build/outputs/apk/debug/app-debug.apk`, then launch with `adb -e shell am start -n com.kris99.baozi.android/com.kris99.baozi.android.MainActivity`.
+- For iOS simulator debugging, install the latest built app directly from DerivedData instead of trusting an older installed simulator copy: `xcrun simctl install booted <.../Build/Products/Debug-iphonesimulator/AgentBuddy.app>` then `xcrun simctl launch booted com.akashark.agentbuddy`.
+- For Xcode project regeneration, use `make xcgen` or `./apps/ios/scripts/regenerate-project.sh`. Do not run `xcodegen generate --spec project.yml --project AgentBuddy.xcodeproj` from inside `apps/ios`; that produces a nested `apps/ios/AgentBuddy.xcodeproj/AgentBuddy.xcodeproj`.
+- For Android emulator debugging, build with `make android-emulator-fast`, install with `adb -e install -r apps/android/app/build/outputs/apk/debug/app-debug.apk`, then launch with `adb -e shell am start -n com.akashark.agentbuddy.android/com.akashark.agentbuddy.android.MainActivity`.
 - Keep both runtimes available when validating shared Rust changes: boot a simulator with `xcrun simctl boot <device>` or through Simulator.app, and verify an emulator is visible with `adb devices -l`.
 - Mobile logs now stay local: use Xcode/device console for iOS, Logcat for Android, and normal Rust `tracing` output instead of a collector or spool directory.
 
@@ -191,7 +191,7 @@ Incremental policy:
 - No repository-local SwiftLint/SwiftFormat config is currently committed; keep formatting consistent with existing files.
 
 ## Testing Guidelines
-- iOS tests: prefer XCTest under `apps/ios/Tests/BaoziTests/` with files named `*Tests.swift`.
+- iOS tests: prefer XCTest under `apps/ios/Tests/AgentBuddyTests/` with files named `*Tests.swift`.
 - Android tests: place unit tests under `apps/android/app/src/test/java/`.
 - iOS test command: `xcodebuild test` using the same project/scheme/destination pattern as build commands.
 - Android test command: `cd apps/android && ./gradlew :app:testDebugUnitTest`.
@@ -203,14 +203,15 @@ Incremental policy:
 - If project structure changes, include updates to `apps/ios/project.yml` and mention whether project regeneration was run.
 - If using XcodeBuildMCP, use the installed XcodeBuildMCP skill before calling XcodeBuildMCP tools.
 
-## Baozi Fork Notes
+## AgentBuddy Fork Notes
 
-包子 (Baozi) is a rebranded, independently-published fork of `dnakov/litter` (the `kittylitter` Mac daemon + `alleycat` P2P transport). The shared Rust core and architecture are unchanged from upstream; the fork differs in branding, distribution identity, and a few product decisions.
+AgentBuddy (Chinese display name 「搭子」) is a rebranded, independently-published fork of 包子/Baozi (`huangguang1999/baozi`), which is itself a rebranded fork of `dnakov/litter` (the `kittylitter` Mac daemon + `alleycat` P2P transport). The shared Rust core and architecture are unchanged from upstream; the fork differs in branding, distribution identity, and a few product decisions.
 
-- **Branding**: all user-facing names, bundle/package ids, schemes, and assets are 包子/Baozi. iOS scheme + project: `Baozi` / `apps/ios/Baozi.xcodeproj` (regenerate from `project.yml`, never hand-edit). Android package: `com.kris99.baozi.android`. Mac daemon npm package: `baozicli` (binary `baozi`, `services/kittylitter`).
-- **Signing (iOS)**: Apple team `DDZU3W897W`, bundle `com.kris99.baozi`. Device build uses automatic signing: `xcodebuild ... -allowProvisioningUpdates DEVELOPMENT_TEAM=DDZU3W897W`. App Store Connect API key lives under `~/.appstoreconnect/private_keys/`. The older `UCYH39VCQT` team's certs are revoked — do not use them.
-- **Android build**: needs Android SDK platform-35 + NDK + `cargo-ndk` + JDK 17; Rust `.so`s build via `tools/scripts/build-android-rust.sh`. The Ghostty terminal feature is **disabled by default for fork builds** (`-Plitter.enableGhosttyAndroid=false`) because it requires zig 0.15.2 (the brew default 0.16.0 fails `requireZig`).
+- **Branding**: all user-facing names, bundle/package ids, schemes, and identifiers are AgentBuddy (UI shows 「搭子」 in zh-Hans / Android). iOS scheme + project: `AgentBuddy` / `apps/ios/AgentBuddy.xcodeproj` (regenerate from `project.yml`, never hand-edit). Android package: `com.akashark.agentbuddy.android` (core bridge `com.akashark.agentbuddy.android.core.bridge`; the Rust JNI exports in `android_jni.rs` / `android_context.rs` encode this package and must move with it). Mac daemon npm package: `agentbuddycli` (binary `agentbuddy`, launchd label `com.akashark.agentbuddycli`, crate in `services/kittylitter` — the directory name and the `KITTYLITTER_*` Makefile variables intentionally keep the upstream name). GitHub repo: `https://github.com/AkaShark/AgentBuddy`.
+- **Signing (iOS)**: Apple team `HNKUYWPBVC`, bundle `com.akashark.agentbuddy` (+ `.liveactivity`, `.watchkitapp`, `.watchkitapp.complications`; app group `group.com.akashark.agentbuddy`; URL scheme `agentbuddyauth`). Device build uses automatic signing: `xcodebuild ... -allowProvisioningUpdates DEVELOPMENT_TEAM=HNKUYWPBVC`. App Store Connect API key lives under `~/.appstoreconnect/private_keys/`. The Baozi-era `DDZU3W897W` and litter-era `UCYH39VCQT` teams' certs are not usable for this app — do not use them.
+- **Android build**: needs Android SDK platform-35 + NDK + `cargo-ndk` + JDK 17; Rust `.so`s build via `tools/scripts/build-android-rust.sh`. The Ghostty terminal feature is **disabled by default for fork builds** (`-Plitter.enableGhosttyAndroid=false`) because it requires zig 0.15.2 (the brew default 0.16.0 fails `requireZig`). Firebase `google-services.json` is not committed and must be generated for `com.akashark.agentbuddy.android`.
 - **alleycat fork**: the Rust deps in `shared/rust-bridge/Cargo.toml` and `services/kittylitter/Cargo.toml` point at the public `https://github.com/AkaShark/alleycat.git` fork, pinned to commit `3c6dfe2c6b060864d8cb0fcae58f73a6ed1ea10f` (same commit as upstream `dnakov/alleycat`). `tools/scripts/update-alleycat-main.sh` is a no-op by default; only `AGENTBUDDY_REFRESH_ALLEYCAT=1` moves the pin to the fork's latest `main`. `.cargo/config.toml` sets `net.git-fetch-with-cli = true` so Cargo fetches git deps through the system `git`. (`ish-embed-host` legitimately stays on `dnakov/litter-ish` — an upstream dep, not forked.)
-- **Localization**: iOS uses `apps/ios/Sources/Baozi/zh-Hans.lproj/Localizable.strings`. Android UI strings are **hardcoded Chinese literals in Kotlin** (no `values-zh` resources) — translate in place. Note `Text(stringVariable)` renders verbatim; only `Text("literal")` / `LocalizedStringKey` localizes.
-- **Product deltas from upstream**: tipping/TipJar removed on both platforms; BYO-API-key (no hosted login); top logo, splash, home cat, and the `cat_transmission` easter egg use the baozi 喵闻联播 art.
+- **Localization**: the base (English) display name is `AgentBuddy`; iOS zh-Hans strings live in `apps/ios/Sources/AgentBuddy/zh-Hans.lproj/Localizable.strings` and `InfoPlist.strings` and show 「搭子」. Android UI strings are **hardcoded Chinese literals in Kotlin** (no `values-zh` resources) — translate in place; `android:label` is 「搭子」. Note `Text(stringVariable)` renders verbatim; only `Text("literal")` / `LocalizedStringKey` localizes.
+- **Product deltas from upstream**: tipping/TipJar removed on both platforms; BYO-API-key (no hosted login); top logo, splash, home cat, and the `cat_transmission` easter egg still use the Baozi-era 喵闻联播 art (brand artwork has not been replaced yet).
+- **Legacy Baozi infrastructure still referenced** (rename does not change live services): the push proxy Worker URL `https://baozi-push-proxy.baozi-kris99.workers.dev` in iOS `PushProxyClient.swift` / Android `PushProxyClient.kt` (`services/push-proxy` is the Worker source; deploy it under an AgentBuddy account and update both clients); the Android Alpine rootfs release repo `huangguang1999/baozi-ish` in `apps/android/scripts/download-alpine-fs.sh`; the TestFlight signup Worker's `kris99app.cn` domain and Baozi ASC beta-group id in `services/testflight-signup/wrangler.toml`. `[baozi-fork]` comments mark changes inherited from the Baozi fork and are kept as provenance.
 - **Shared sentinels**: `"This Device"` is a cross-platform sentinel compared in iOS/Android/Rust — never translate the stored value; map it to a display string at render time only.

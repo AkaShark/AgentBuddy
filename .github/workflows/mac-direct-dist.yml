@@ -74,7 +74,7 @@ jobs:
           tar -czf .ci-prep/mac/mac-release-prep.tgz -C . \
             apps/ios/Resources/fs \
             apps/ios/GeneratedRust \
-            apps/ios/Sources/Baozi/Bridge/UniFFICodexClient.generated.swift
+            apps/ios/Sources/AgentBuddy/Bridge/UniFFICodexClient.generated.swift
 
       - name: Upload Mac release prep artifact
         uses: actions/upload-artifact@v4
@@ -202,8 +202,8 @@ jobs:
 
       - name: Build, sign, and notarize DMG
         env:
-          SCHEME: BaoziMac
-          APP_BUNDLE_ID: com.kris99.baozi
+          SCHEME: AgentBuddyMac
+          APP_BUNDLE_ID: com.akashark.agentbuddy
           TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
           APP_PROVISIONING_PROFILE_SPECIFIER: ${{ env.APP_PROVISIONING_PROFILE_SPECIFIER }}
           EXPORT_SIGNING_STYLE: ${{ env.EXPORT_SIGNING_STYLE }}
