@@ -1,7 +1,10 @@
+mod commands;
 mod config;
 mod error;
 mod launchd;
+mod logs;
 mod sidecar;
+mod state;
 mod status;
 
 pub fn run() {
@@ -11,6 +14,7 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_positioner::init())
+        .manage(state::AppState::default())
         .setup(|app| {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
@@ -22,6 +26,25 @@ pub fn run() {
                 let _ = window.hide();
             }
         })
+        .invoke_handler(tauri::generate_handler![
+            commands::host_state,
+            commands::host_install,
+            commands::host_uninstall,
+            commands::host_start,
+            commands::host_stop,
+            commands::host_restart,
+            commands::host_reload,
+            commands::host_upgrade,
+            commands::pair_payload,
+            commands::rotate_token,
+            commands::agent_settings,
+            commands::agent_set_enabled,
+            commands::agent_set_bin,
+            commands::logs_tail,
+            commands::logs_follow_start,
+            commands::logs_follow_stop,
+            commands::reveal_path,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running AgentBuddy");
 }
