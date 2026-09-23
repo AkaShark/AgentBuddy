@@ -9,7 +9,7 @@ static ANDROID_CONTEXT_REF: OnceLock<GlobalRef> = OnceLock::new();
 static ANDROID_CONTEXT_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_com_kris99_baozi_android_core_bridge_UniffiInit_nativeMobileClientInit(
+pub extern "system" fn Java_com_akashark_agentbuddy_android_core_bridge_UniffiInit_nativeMobileClientInit(
     env: JNIEnv,
     _class: JClass,
     context: JObject,
@@ -38,7 +38,7 @@ pub extern "system" fn Java_com_kris99_baozi_android_core_bridge_UniffiInit_nati
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_com_kris99_baozi_android_core_bridge_UniffiInit_nativeMobileClientContextProbe(
+pub extern "system" fn Java_com_akashark_agentbuddy_android_core_bridge_UniffiInit_nativeMobileClientContextProbe(
     env: JNIEnv,
     _class: JClass,
 ) -> jstring {

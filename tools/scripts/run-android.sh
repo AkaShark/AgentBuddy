@@ -4,8 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 RUN_MODE="${ANDROID_RUN_MODE:-device}"
 APK_PATH="${ANDROID_APK:-${ROOT_DIR}/apps/android/app/build/outputs/apk/debug/app-debug.apk}"
-PACKAGE_NAME="${ANDROID_PACKAGE:-com.kris99.baozi.android}"
-ACTIVITY_NAME="${ANDROID_ACTIVITY:-com.kris99.baozi.android.MainActivity}"
+PACKAGE_NAME="${ANDROID_PACKAGE:-com.akashark.agentbuddy.android}"
+ACTIVITY_NAME="${ANDROID_ACTIVITY:-com.akashark.agentbuddy.android.MainActivity}"
 REINSTALL_ON_SIGNATURE_MISMATCH="${ANDROID_REINSTALL_ON_SIGNATURE_MISMATCH:-1}"
 ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-${HOME}/Library/Android/sdk}}"
 

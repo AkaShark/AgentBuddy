@@ -14,6 +14,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "BaoziAndroid"
+rootProject.name = "AgentBuddyAndroid"
 include(":app")
 include(":core:bridge")

@@ -20,7 +20,7 @@ val enableGhosttyJni = System.getenv("LITTER_ENABLE_GHOSTTY_ANDROID")?.asBuildFl
     ?: ghosttyLibrariesAvailable
 
 android {
-    namespace = "com.kris99.baozi.android.core.bridge"
+    namespace = "com.akashark.agentbuddy.android.core.bridge"
     compileSdk = 35
     ndkVersion = System.getenv("ANDROID_NDK_VERSION")?.takeIf { it.isNotBlank() } ?: "30.0.14904198"
 

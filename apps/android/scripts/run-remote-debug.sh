@@ -3,8 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ANDROID_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-APP_ID="com.kris99.baozi.android"
-ACTIVITY="com.kris99.baozi.android.MainActivity"
+APP_ID="com.akashark.agentbuddy.android"
+ACTIVITY="com.akashark.agentbuddy.android.MainActivity"
 PORT="${OPENCODE_PORT:-4096}"
 
 if ! command -v adb >/dev/null 2>&1; then

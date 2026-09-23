@@ -21,12 +21,12 @@ val uploadKeyPassword = projectPropOrEnv("LITTER_UPLOAD_KEY_PASSWORD")
 val hasUploadSigning = listOf(uploadStoreFile, uploadStorePassword, uploadKeyAlias, uploadKeyPassword).all { !it.isNullOrBlank() }
 
 android {
-    namespace = "com.kris99.baozi.android"
+    namespace = "com.akashark.agentbuddy.android"
     compileSdk = 35
     ndkVersion = projectPropOrEnv("ANDROID_NDK_VERSION") ?: "30.0.14904198"
 
     defaultConfig {
-        applicationId = "com.kris99.baozi.android"
+        applicationId = "com.akashark.agentbuddy.android"
         minSdk = 26
         targetSdk = 35
         versionCode = 11
@@ -89,7 +89,7 @@ android {
     sourceSets {
         getByName("main") {
             java.srcDir("../../../shared/rust-bridge/generated/kotlin")
-            assets.srcDir("../../ios/Sources/Baozi/Resources/Themes")
+            assets.srcDir("../../ios/Sources/AgentBuddy/Resources/Themes")
         }
     }
 

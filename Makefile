@@ -88,8 +88,8 @@ ANDROID_ENV := JAVA_HOME='$(JAVA_HOME)' ANDROID_SDK_ROOT='$(ANDROID_SDK_ROOT)' A
 
 # Android app metadata
 ANDROID_APK := $(ANDROID_DIR)/app/build/outputs/apk/debug/app-debug.apk
-ANDROID_PACKAGE := com.kris99.baozi.android
-ANDROID_ACTIVITY := com.kris99.baozi.android.MainActivity
+ANDROID_PACKAGE := com.akashark.agentbuddy.android
+ANDROID_ACTIVITY := com.akashark.agentbuddy.android.MainActivity
 ANDROID_DEVICE_SERIAL ?=
 ANDROID_REINSTALL_ON_SIGNATURE_MISMATCH ?= 1
 
