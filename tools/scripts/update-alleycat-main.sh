@@ -1,8 +1,30 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Keeps the Alleycat git dependencies pinned, or (opt-in) moves them to the
+# latest `main` of the AkaShark/alleycat fork.
+#
+# WHY THIS IS OFF BY DEFAULT
+# --------------------------
+# This script is a prerequisite of `make alleycat-main`, which every Rust
+# target depends on, and it is also invoked directly by
+# apps/ios/scripts/build-rust.sh, tools/scripts/build-android-rust.sh,
+# shared/rust-bridge/generate-bindings.sh, .github/dist-build-setup.yml and
+# .github/workflows/release.yml. Upstream litter used it to float the deps to
+# the newest alleycat `main` on every build. AgentBuddy pins alleycat to a
+# fixed commit (see rev = "..." in shared/rust-bridge/Cargo.toml and
+# services/kittylitter/Cargo.toml) for reproducible builds and GPLv3
+# source-correspondence, so a build must never silently rewrite that rev.
+#
+# Set AGENTBUDDY_REFRESH_ALLEYCAT=1 to run the original refresh logic
+# (ls-remote the fork's main, then `cargo update --precise`). The legacy
+# LITTER_SKIP_ALLEYCAT_UPDATE=1 is still honoured and always wins.
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+ALLEYCAT_REPO_URL="${ALLEYCAT_REPO_URL:-https://github.com/AkaShark/alleycat.git}"
+ALLEYCAT_REPO_LABEL="AkaShark/alleycat"
 
 MODE="all"
 case "${1:-}" in
@@ -22,22 +44,27 @@ if [ "${LITTER_SKIP_ALLEYCAT_UPDATE:-0}" = "1" ]; then
   exit 0
 fi
 
+if [ "${AGENTBUDDY_REFRESH_ALLEYCAT:-0}" != "1" ]; then
+  echo "==> Keeping Alleycat deps pinned (set AGENTBUDDY_REFRESH_ALLEYCAT=1 to move them to $ALLEYCAT_REPO_LABEL main)"
+  exit 0
+fi
+
 if ! command -v cargo >/dev/null 2>&1; then
   echo "error: cargo is required" >&2
   exit 1
 fi
 
 ALLEYCAT_MAIN_SHA="$(
-  git ls-remote https://github.com/huangguang1999/alleycat.git refs/heads/main \
+  git ls-remote "$ALLEYCAT_REPO_URL" refs/heads/main \
     | awk '{ print $1; exit }'
 )"
 if [ -z "$ALLEYCAT_MAIN_SHA" ]; then
-  echo "error: could not resolve huangguang1999/alleycat main" >&2
+  echo "error: could not resolve $ALLEYCAT_REPO_LABEL main" >&2
   exit 1
 fi
 
 update_shared() {
-  echo "==> Resolving shared Rust Alleycat deps to huangguang1999/alleycat main ($ALLEYCAT_MAIN_SHA)..."
+  echo "==> Resolving shared Rust Alleycat deps to $ALLEYCAT_REPO_LABEL main ($ALLEYCAT_MAIN_SHA)..."
   for package in \
     alleycat-bridge-core \
     alleycat-pi-bridge \
@@ -53,7 +80,7 @@ update_shared() {
 }
 
 update_kittylitter() {
-  echo "==> Resolving kittylitter Alleycat dep to huangguang1999/alleycat main ($ALLEYCAT_MAIN_SHA)..."
+  echo "==> Resolving kittylitter Alleycat dep to $ALLEYCAT_REPO_LABEL main ($ALLEYCAT_MAIN_SHA)..."
   cargo update \
     --quiet \
     --manifest-path "$REPO_DIR/services/kittylitter/Cargo.toml" \

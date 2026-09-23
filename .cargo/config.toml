@@ -1,0 +1,6 @@
+# Fetch git dependencies (alleycat fork, openai-oss-forks patches, litter-ish)
+# through the system `git` binary instead of Cargo's built-in libgit2/gitoxide.
+# This reuses the user's normal git credential helpers / ssh-agent, so private
+# or SSH-form git deps work the same way `git clone` does.
+[net]
+git-fetch-with-cli = true

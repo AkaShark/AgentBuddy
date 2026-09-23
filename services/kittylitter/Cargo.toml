@@ -23,10 +23,11 @@ name = "baozi"
 path = "src/main.rs"
 
 [dependencies]
-# [litter-fork] Pinned to an explicit alleycat commit for reproducible builds /
-# GPLv3 source-correspondence (was: branch = "main"). Build with
-# LITTER_SKIP_ALLEYCAT_UPDATE=1 so update-alleycat-main.sh does not float it.
-alleycat = { git = "https://github.com/huangguang1999/alleycat.git", rev = "3c6dfe2c6b060864d8cb0fcae58f73a6ed1ea10f" }
+# [litter-fork] Pinned to an explicit commit of the AkaShark/alleycat fork for
+# reproducible builds / GPLv3 source-correspondence (was: branch = "main").
+# tools/scripts/update-alleycat-main.sh leaves this rev alone unless you opt in
+# with AGENTBUDDY_REFRESH_ALLEYCAT=1, so normal builds never float it.
+alleycat = { git = "https://github.com/AkaShark/alleycat.git", rev = "3c6dfe2c6b060864d8cb0fcae58f73a6ed1ea10f" }
 anyhow = "1"
 
 # cargo-dist builds with `cargo build --profile dist`. Mirrors the

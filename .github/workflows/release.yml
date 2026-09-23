@@ -134,7 +134,7 @@ jobs:
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
             echo "$HOME/.cargo/bin" >> $GITHUB_PATH
           fi
-      - name: "Resolve Alleycat to latest main"
+      - name: "Resolve Alleycat (pinned; refresh only with AGENTBUDDY_REFRESH_ALLEYCAT=1)"
         run: "./tools/scripts/update-alleycat-main.sh --kittylitter"
         shell: "bash"
       - name: Install dist
