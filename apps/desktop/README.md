@@ -16,6 +16,9 @@ cd apps/desktop && npm test && (cd src-tauri && cargo test --lib)
 前置：Node 22、rustup 的 stable 工具链、在 `apps/desktop` 下 `npm ci`。首次 `make desktop-sidecar`
 会编译 alleycat，约几分钟。本机若设置了 HTTP 代理而 npm 报网络错误，可临时 `env -u https_proxy -u http_proxy npm ci`。
 
+本地出 dmg 时，Tauri 的 `bundle_dmg.sh` 会用 AppleScript 让 Finder 摆放窗口；若终端没有「自动化 → Finder」权限会报
+`error running bundle_dmg.sh`，可以在系统设置里授权，或用 `CI=true npm run tauri build` 跳过这一步（CI 上本就会跳过）。
+
 契约测试（跑真实守护进程二进制）：
 
 ```bash
@@ -34,7 +37,8 @@ make desktop-dist
 ```
 
 CI：打 `desktop-vX.Y.Z` tag 触发 `.github/workflows/desktop-release.yml`，产出 arm64 与 x86_64 两个 dmg
-到 GitHub Releases 草稿。配置了 `MAC_DEVELOPER_ID_CERT_*` 与 `ASC_*` secrets 时会签名并公证，否则产出未签名包。
+到同一个 GitHub Releases 草稿。配置了 `MAC_DEVELOPER_ID_CERT_*` 与 `ASC_*` secrets 时会签名并公证，否则产出未签名包。
+该 workflow 还没在 GitHub 上实际跑过：第一次打 tag 前请先在 Actions 页手动触发一次（workflow_dispatch）。
 
 ## 目录
 

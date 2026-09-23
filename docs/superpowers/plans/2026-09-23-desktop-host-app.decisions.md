@@ -39,3 +39,28 @@
 - Task 15: Ruling: 没配签名 secrets 时 CI 仍产出未签名 dmg（`HAS_SIGNING` / `HAS_NOTARY` 条件步骤），手动触发时发布为 `desktop-dev-<run>` 预发布草稿 — 计划的证书导入步骤在 secrets 为空时会直接失败，而用户还没为 HNKUYWPBVC 签发 Developer ID 证书 — 代价：未签名包在别人的 Mac 上会被 Gatekeeper 拦，只适合内部测试。
 - Task 15: Ruling: 契约测试步骤结束后执行 `agentbuddy stop` — `pair` 会拉起守护进程，runner 上留着它会让后续步骤行为不确定 — 代价：无。
 - Task 15: Ruling: QA 清单增加两项：Agents 页显示 Homebrew/npm/nvm 装的 agent 为「可用」（验证 Task 12b 的 PATH 修复），以及取消勾选「开机自启」的确认流程；AGENTS.md 的前置条件把桌面 App 作为第 4 条、可选的 pymobiledevice3 顺延为第 5 条 — 代价：无。
+
+## 整分支复审（fable）后的修复
+
+复审结论 With fixes：1 Critical、6 Important、11 Minor。按"用户实际拿到什么"重新定级后，Minor #13（首启只有托盘图标）升为 Important；其余 Minor 记为延后。
+
+- Final: fixed Critical「停止主机服务」停不下来 — plist 设了 KeepAlive=true，`agentbuddy stop` 后 launchd 立刻拉起。已安装时改为 `launchctl bootout gui/<uid>/com.akashark.agentbuddycli`（固定 label，无用户输入），未安装（野守护进程）时仍用 sidecar `stop`；「启动」走 `restart`，alleycat 会重新 bootstrap；确认文案改为"直到再次启动或下次登录"。测试 `stop_plan_boots_out_installed_services_and_stops_stray_daemons`、`bootout_treats_not_loaded_as_success`、`stop_confirmation_says_the_service_comes_back_at_next_login` RED→GREEN。
+- Final: fixed Important 从 dmg / App Translocation 路径安装 — `canonicalize` 解决不了隔离挂载，计划 Review Focus 第 1 条的前提是错的。新增 `bundle_location` / `install_guard`：sidecar 路径含 `/AppTranslocation/` 或以 `/Volumes/` 开头时，Rust 拒绝安装（新错误类型 `InstallLocation`），`HostState.install_blocked` 让引导卡片提示"先拖进「应用程序」"并禁用按钮。测试 `bundle_location_flags_translocated_and_dmg_launches`、`install_guard_refuses_translocated_and_mounted_bundles`、前端 `explains and blocks installing from a dmg or translocated copy` RED→GREEN。
+- Final: fixed Important `pair` 在锁外改服务状态 — 它会在没有守护进程时拉起野进程、版本不一致时重启守护进程。`pair_payload` 现在要求已安装（`pair_guard`，新错误类型 `NotInstalled`）并持有同一把互斥锁；配对页未安装时只提示先安装、不调用 `pair`。测试 `pairing_requires_an_installed_service`、前端 `does not call pair before the service is installed` RED→GREEN。
+- Final: fixed Important 窗口隐藏后 `logs -f` 仍在跑 — 关窗口和托盘切换隐藏都走 `tray::hide_window`：停掉 `logs -f` 子进程并发 `follow-stopped` 事件，日志页收到后取消勾选「跟随」。测试 `unchecks follow when the backend stops the stream because the window was hidden` RED→GREEN（Rust 侧接线无单测，已在冒烟里覆盖启动路径）。
+- Final: fixed Important `status --json` 失败被显示成「已停止」 — 新增 `status_outcome`，CLI 失败放进 `HostState.status_error` 并在顶部横幅显示，spawn 失败仍是硬错误。测试 `status_command_failures_are_reported_not_hidden`、`status_spawn_failures_stay_hard_errors`、前端 App `shows a status --json failure instead of a silent stopped state` RED→GREEN。
+- Final: fixed Important 守护进程停止时改 agent 开关会报错 — `reload_after_config_write(running)`：只有运行中才 `reload`，停止时守护进程启动时自会读取。测试 `config_changes_reload_only_a_running_daemon` RED→GREEN。
+- Final: fixed Important CI 两路 matrix 各自建 draft release 会竞争 — 改成 tauri-action 推荐的模式：先由 `create-release` job 建一个草稿，两路用 `releaseId` 上传。结构检查脚本 RED（4 项不满足）→GREEN。CI 仍未在 GitHub 上实际跑过（本机没有 gh CLI，无法触发）——见下一条裁决。
+- Final: Ruling: `desktop-release.yml` 没有实际运行验证（x86_64 在 arm64 runner 上交叉编译 alleycat、`actions/checkout@v6` 等都是推断）— 本机没有 `gh`，且触发 workflow 会在仓库里建草稿 release，属于需要用户决定的外部操作 — 代价：第一次运行可能要再修一两处；README 与 workflow 头部已写明先手动触发一次。
+- Final: fixed Important（由 Minor #13 升级）首启只有一个托盘图标 — 在拥挤的菜单栏里新用户可能根本找不到它（本机截图里就被挤出了可见区域）。未安装或路径失配时启动即打开控制台（`should_show_on_launch`），安装成功后自动跳到配对页（spec §4，前端 `onInstalled`）。测试 `console_opens_on_launch_until_the_service_is_installed`、前端 `jumps to pairing only after a successful install` RED→GREEN；冒烟确认启动后窗口数为 1。
+- Final: Ruling: 复审"Declined to judge"清单全部维持原判 — dev 模式 plist 指向 target/debug 只影响开发者；Catalyst 清理按 spec 放在阶段 1.5；Intel 实机 QA 是 spec 开放事项；CSP 已被冒烟验证；crate-type 为模板默认；中文 UI 是计划要求；草稿 release 需手动发布是安全默认；契约测试在开发机留身份文件已写在测试头注释；手机端命令字符串长度只是观感 — 代价：无。
+- Final: minor (deferred): 修复按钮先调 `host.install()`（已含 install+restart）再调 `host.restart()`，多一轮 launchd 重启。
+- Final: minor (deferred): `shellenv` 在子进程退出后才读 stdout，env 输出超过 64 KiB 管道缓冲会卡到 5 秒超时并退回兜底 PATH。
+- Final: minor (deferred): 配对页「token 指纹」显示的是 token 原文的前后几位，应改用 `status.token_short`。
+- Final: minor (deferred): `mutating_commands_are_serialized` 直接锁 `state.mutation`，证明的是 tokio Mutex 而不是 `run_mutating_seq`。
+- Final: minor (deferred): host.toml 里内联写法的 agent 表（`codex = { enabled = true }`）会被当成 ConfigInvalid。
+- Final: minor (deferred): 在控制台窗口按 Cmd+Q 走 Tauri 默认菜单，绕过首次退出提示。
+- Final: minor (deferred): 2 秒轮询每次都跑 `status --json`，守护进程离线时 alleycat 会重新探测所有 agent 可执行文件；未运行时可放慢到 5 秒。
+- Final: minor (deferred): 启动时 `upgrade` 失败仍会记下 `last_seen_version`，之后不再重试（打开配对页触发 `pair` 时会自愈）。
+- Final: minor (deferred): 托盘图标是彩色 App 图标，发版前需要一张单色 template 图标。
+- Final: minor (deferred): spec 里计划漏掉的几项：codex host/port 高级设置与 bin 手动输入框（§6）、安装失败时提示去「登录项」（§7）、诊断信息里带守护进程版本。

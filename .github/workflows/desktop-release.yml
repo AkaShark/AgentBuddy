@@ -1,8 +1,10 @@
 name: Desktop release
 
 # Builds the AgentBuddy macOS host app (apps/desktop, Tauri v2) for Apple
-# Silicon and Intel and attaches both dmgs to a draft GitHub Release.
-# Trigger: push a `desktop-vX.Y.Z` tag, or run manually.
+# Silicon and Intel and attaches both dmgs to one draft GitHub Release.
+# Trigger: push a `desktop-vX.Y.Z` tag, or run manually (creates a
+# `desktop-dev-<run>` draft prerelease). Not yet exercised on GitHub:
+# run it once via workflow_dispatch before the first tag.
 #
 # Signing + notarization run only when the secrets below are configured;
 # without them the job still produces unsigned dmgs so CI stays useful:
@@ -20,7 +22,32 @@ permissions:
   contents: write
 
 jobs:
+  # One draft release that both matrix legs upload into (tauri-action's
+  # recommended pattern; two legs creating their own drafts would race).
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.create.outputs.result }}
+    steps:
+      - id: create
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const isTag = context.ref.startsWith('refs/tags/');
+            const tag = isTag ? context.ref.replace('refs/tags/', '') : `desktop-dev-${context.runNumber}`;
+            const { data } = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tag,
+              target_commitish: context.sha,
+              name: isTag ? `AgentBuddy Desktop ${tag}` : `AgentBuddy Desktop dev #${context.runNumber}`,
+              draft: true,
+              prerelease: !isTag,
+            });
+            return data.id;
+
   build:
+    needs: create-release
     strategy:
       fail-fast: false
       matrix:
@@ -116,8 +143,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: apps/desktop
-          tagName: ${{ github.ref_type == 'tag' && github.ref_name || format('desktop-dev-{0}', github.run_number) }}
-          releaseName: "AgentBuddy Desktop ${{ github.ref_type == 'tag' && github.ref_name || format('dev #{0}', github.run_number) }}"
-          releaseDraft: true
-          prerelease: ${{ github.ref_type != 'tag' }}
+          releaseId: ${{ needs.create-release.outputs.release_id }}
           args: --target ${{ matrix.target }} --bundles dmg
