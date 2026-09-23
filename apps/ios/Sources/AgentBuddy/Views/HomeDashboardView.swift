@@ -629,15 +629,13 @@ private struct EmptyHomeFatCatView: View {
     private let loopURL = Bundle.main.url(forResource: "home_cat", withExtension: "png")
 
     var body: some View {
-        CatTransmissionPressView {
-            if let imageURL = showingLoop ? loopURL : (entranceURL ?? loopURL) {
-                AlphaAnimatedImageView(
-                    fileURL: imageURL,
-                    repeatCount: showingLoop ? 0 : 1,
-                    onFinished: showingLoop ? nil : { showingLoop = true }
-                )
-                .accessibilityHidden(true)
-            }
+        if let imageURL = showingLoop ? loopURL : (entranceURL ?? loopURL) {
+            AlphaAnimatedImageView(
+                fileURL: imageURL,
+                repeatCount: showingLoop ? 0 : 1,
+                onFinished: showingLoop ? nil : { showingLoop = true }
+            )
+            .accessibilityHidden(true)
         }
     }
 }

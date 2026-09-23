@@ -993,17 +993,15 @@ private struct HomeCatFooterView: View {
             if let imageURL = showingLoop ? loopURL : (entranceURL ?? loopURL) {
                 let width = min(max(0, proxy.size.width - 48), 340)
                 VStack {
-                    CatTransmissionPressView {
-                        AlphaAnimatedImageView(
-                            fileURL: imageURL,
-                            repeatCount: showingLoop ? 0 : 1,
-                            onFinished: showingLoop ? nil : {
-                                showingLoop = true
-                            }
-                        )
-                    }
-                        .frame(width: width, height: width * 9.0 / 16.0)
-                        .accessibilityHidden(true)
+                    AlphaAnimatedImageView(
+                        fileURL: imageURL,
+                        repeatCount: showingLoop ? 0 : 1,
+                        onFinished: showingLoop ? nil : {
+                            showingLoop = true
+                        }
+                    )
+                    .frame(width: width, height: width * 9.0 / 16.0)
+                    .accessibilityHidden(true)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .padding(.top, 12)

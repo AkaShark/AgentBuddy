@@ -4,7 +4,6 @@ import com.akashark.agentbuddy.android.BuildConfig
 import android.graphics.ImageDecoder
 import android.graphics.drawable.Animatable
 import android.os.Build
-import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.widget.ImageView
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -12,7 +11,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.WindowInsets
@@ -77,12 +75,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -96,7 +92,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import kotlin.math.hypot
 import kotlin.math.roundToInt
 import com.akashark.agentbuddy.android.state.AppLifecycleController
 import com.akashark.agentbuddy.android.state.DebugSettings
@@ -119,7 +114,6 @@ import com.akashark.agentbuddy.android.ui.scaled
 import com.akashark.agentbuddy.android.R
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 import com.akashark.agentbuddy.android.ui.common.AgentRuntimeKind
 import uniffi.codex_mobile_client.AppProject
 import uniffi.codex_mobile_client.AppServerSnapshot
@@ -1097,8 +1091,6 @@ private fun HomeCatFooter(
 ) {
     val context = LocalContext.current
     var showingLoop by remember(playEntrance) { mutableStateOf(!playEntrance) }
-    var transmissionActive by remember { mutableStateOf(false) }
-    val transmissionFrameIndex = rememberCatTransmissionFrameIndex(transmissionActive)
     val normalResourceId = if (showingLoop) R.drawable.home_cat else R.drawable.home_cat_entrance
     val normalDrawable = remember(context, normalResourceId) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -1109,14 +1101,7 @@ private fun HomeCatFooter(
             ContextCompat.getDrawable(context, normalResourceId)
         }
     }
-    val transmissionDrawables = remember(context) {
-        CatTransmissionFrames.map { ContextCompat.getDrawable(context, it) }
-    }
-    val drawable = if (transmissionActive) {
-        transmissionDrawables.getOrNull(transmissionFrameIndex)
-    } else {
-        normalDrawable
-    }
+    val drawable = normalDrawable
 
     LaunchedEffect(showingLoop) {
         if (!showingLoop) {
@@ -1154,147 +1139,22 @@ private fun HomeCatFooter(
             },
             update = { view ->
                 view.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                view.scaleType = if (transmissionActive) {
-                    ImageView.ScaleType.CENTER_CROP
-                } else {
-                    ImageView.ScaleType.FIT_CENTER
-                }
+                view.scaleType = ImageView.ScaleType.FIT_CENTER
                 view.setImageDrawable(drawable)
                 (drawable as? Animatable)?.start()
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(16f / 9f)
-                .catTransmissionPress { transmissionActive = it },
+                .aspectRatio(16f / 9f),
         )
     }
 }
 
 private const val HOME_CAT_ENTRANCE_DURATION_MS = 11_100L
-private const val CAT_TRANSMISSION_FRAME_DURATION_MS = 82L
-private val CatTransmissionFrames = intArrayOf(
-    R.drawable.cat_transmission_01,
-    R.drawable.cat_transmission_02,
-    R.drawable.cat_transmission_03,
-    R.drawable.cat_transmission_04,
-    R.drawable.cat_transmission_05,
-    R.drawable.cat_transmission_06,
-    R.drawable.cat_transmission_07,
-    R.drawable.cat_transmission_08,
-    R.drawable.cat_transmission_09,
-    R.drawable.cat_transmission_10,
-    R.drawable.cat_transmission_11,
-    R.drawable.cat_transmission_12,
-    R.drawable.cat_transmission_13,
-    R.drawable.cat_transmission_14,
-    R.drawable.cat_transmission_15,
-    R.drawable.cat_transmission_16,
-    R.drawable.cat_transmission_17,
-    R.drawable.cat_transmission_18,
-    R.drawable.cat_transmission_19,
-    R.drawable.cat_transmission_20,
-    R.drawable.cat_transmission_21,
-    R.drawable.cat_transmission_22,
-    R.drawable.cat_transmission_23,
-    R.drawable.cat_transmission_24,
-    R.drawable.cat_transmission_25,
-    R.drawable.cat_transmission_26,
-    R.drawable.cat_transmission_27,
-    R.drawable.cat_transmission_28,
-    R.drawable.cat_transmission_29,
-    R.drawable.cat_transmission_30,
-    R.drawable.cat_transmission_31,
-    R.drawable.cat_transmission_32,
-    R.drawable.cat_transmission_33,
-    R.drawable.cat_transmission_34,
-    R.drawable.cat_transmission_35,
-    R.drawable.cat_transmission_36,
-    R.drawable.cat_transmission_37,
-    R.drawable.cat_transmission_38,
-    R.drawable.cat_transmission_39,
-    R.drawable.cat_transmission_40,
-    R.drawable.cat_transmission_41,
-    R.drawable.cat_transmission_42,
-    R.drawable.cat_transmission_43,
-    R.drawable.cat_transmission_44,
-    R.drawable.cat_transmission_45,
-    R.drawable.cat_transmission_46,
-)
-
-@Composable
-private fun rememberCatTransmissionFrameIndex(active: Boolean): Int {
-    var frameIndex by remember { mutableIntStateOf(0) }
-    LaunchedEffect(active) {
-        frameIndex = 0
-        if (!active) return@LaunchedEffect
-        while (true) {
-            delay(CAT_TRANSMISSION_FRAME_DURATION_MS)
-            frameIndex = (frameIndex + 1) % CatTransmissionFrames.size
-        }
-    }
-    return frameIndex
-}
-
-private fun Modifier.catTransmissionPress(onActiveChange: (Boolean) -> Unit): Modifier =
-    pointerInput(Unit) {
-        val holdTimeoutMs = ViewConfiguration.getLongPressTimeout().toLong()
-        val touchSlop = viewConfiguration.touchSlop
-        awaitPointerEventScope {
-            while (true) {
-                val down = awaitFirstDown(requireUnconsumed = false)
-                val pointerId = down.id
-                val start = down.position
-                var active = false
-                try {
-                    val cancelledBeforeHold = withTimeoutOrNull(holdTimeoutMs) {
-                        while (true) {
-                            val event = awaitPointerEvent(PointerEventPass.Final)
-                            val change = event.changes.firstOrNull { it.id == pointerId }
-                                ?: return@withTimeoutOrNull true
-                            if (
-                                !change.pressed ||
-                                change.isConsumed ||
-                                distanceFromStart(change.position, start) > touchSlop
-                            ) {
-                                return@withTimeoutOrNull true
-                            }
-                        }
-                    } == true
-                    if (!cancelledBeforeHold) {
-                        active = true
-                        onActiveChange(true)
-                        while (true) {
-                            val event = awaitPointerEvent(PointerEventPass.Final)
-                            val change = event.changes.firstOrNull { it.id == pointerId }
-                            if (
-                                change == null ||
-                                !change.pressed ||
-                                change.isConsumed ||
-                                distanceFromStart(change.position, start) > touchSlop
-                            ) {
-                                break
-                            }
-                        }
-                    }
-                } finally {
-                    if (active) {
-                        onActiveChange(false)
-                    }
-                }
-            }
-        }
-    }
-
-private fun distanceFromStart(current: Offset, start: Offset): Float {
-    return hypot(current.x - start.x, current.y - start.y)
-}
-
 @Composable
 private fun EmptyHomeFatCat(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     var showingLoop by remember { mutableStateOf(false) }
-    var transmissionActive by remember { mutableStateOf(false) }
-    val transmissionFrameIndex = rememberCatTransmissionFrameIndex(transmissionActive)
     val normalResourceId = if (showingLoop) R.drawable.home_cat else R.drawable.home_cat_entrance
     val normalDrawable = remember(context, normalResourceId) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -1305,14 +1165,7 @@ private fun EmptyHomeFatCat(modifier: Modifier = Modifier) {
             ContextCompat.getDrawable(context, normalResourceId)
         }
     }
-    val transmissionDrawables = remember(context) {
-        CatTransmissionFrames.map { ContextCompat.getDrawable(context, it) }
-    }
-    val drawable = if (transmissionActive) {
-        transmissionDrawables.getOrNull(transmissionFrameIndex)
-    } else {
-        normalDrawable
-    }
+    val drawable = normalDrawable
 
     LaunchedEffect(showingLoop) {
         if (!showingLoop) {
@@ -1338,8 +1191,7 @@ private fun EmptyHomeFatCat(modifier: Modifier = Modifier) {
         Box(
             modifier = Modifier
                 .offset(x = offsetX, y = offsetY)
-                .size(width = catWidth, height = catHeight)
-                .catTransmissionPress { transmissionActive = it },
+                .size(width = catWidth, height = catHeight),
         ) {
             AndroidView(
                 factory = { ctx ->
@@ -1358,11 +1210,7 @@ private fun EmptyHomeFatCat(modifier: Modifier = Modifier) {
                 },
                 update = { view ->
                     view.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                    view.scaleType = if (transmissionActive) {
-                        ImageView.ScaleType.CENTER_CROP
-                    } else {
-                        ImageView.ScaleType.FIT_CENTER
-                    }
+                    view.scaleType = ImageView.ScaleType.FIT_CENTER
                     view.setImageDrawable(drawable)
                     (drawable as? Animatable)?.start()
                 },
