@@ -21,7 +21,7 @@
   brew install meson
   ```
 
-- **xcodegen** (for regenerating `Litter.xcodeproj`):
+- **xcodegen** (for regenerating `AgentBuddy.xcodeproj`):
 
   ```bash
   brew install xcodegen
@@ -117,13 +117,13 @@ make xcgen
 Open in Xcode:
 
 ```bash
-open apps/ios/Litter.xcodeproj
+open apps/ios/AgentBuddy.xcodeproj
 ```
 
 CLI build:
 
 ```bash
-xcodebuild -project apps/ios/Litter.xcodeproj -scheme Litter -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
+xcodebuild -project apps/ios/AgentBuddy.xcodeproj -scheme AgentBuddy -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
 ```
 
 ## Build and Run Android

@@ -36,7 +36,7 @@ This handles submodule sync, patching, UniFFI bindings, Rust cross-compilation, 
 4. Generate project:
    - `./apps/ios/scripts/regenerate-project.sh`
 5. Build app:
-   - `xcodebuild -project apps/ios/Litter.xcodeproj -scheme Litter -configuration Debug -destination 'generic/platform=iOS Simulator' build`
+   - `xcodebuild -project apps/ios/AgentBuddy.xcodeproj -scheme AgentBuddy -configuration Debug -destination 'generic/platform=iOS Simulator' build`
 
 ## Configuration
 Override via environment variables:
