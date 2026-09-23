@@ -1,97 +1,112 @@
-# 包子
+# AgentBuddy（搭子）
 
 <p align="center">
-  <img src="apps/ios/Sources/Baozi/Resources/brand_logo.png" alt="包子 logo" width="180" />
+  <img src="apps/ios/Sources/AgentBuddy/Resources/brand_logo.png" alt="AgentBuddy logo" width="180" />
 </p>
 
 <p align="center">
-  Native iOS + Android client that remote-controls AI coding agents (<a href="https://github.com/openai/codex">Codex</a>, Claude, and more) running on your own Mac. Pair your phone with a lightweight daemon on your computer to manage sessions, stream output, and run agentic coding workflows on the go.
+  <b>iOS + Android 原生 App，遥控跑在你自己 Mac 上的 AI 编程 agent。</b><br/>
+  支持 <a href="https://github.com/openai/codex">Codex</a>、Claude Code、Pi、OpenCode 等。Mac 端只跑一个轻量守护进程，
+  手机通过端到端加密的 P2P 链路配对，不经过任何托管中继，也不需要账号。
 </p>
 
 <p align="center">
-  <a href="https://github.com/huangguang1999/baozi"><img src="docs/badges/website.svg" alt="github.com/huangguang1999/baozi" /></a>
-  &nbsp;
-  &nbsp;
-  <a href="https://github.com/huangguang1999/baozi/releases/latest"><img src="docs/badges/android-beta.svg" alt="Android APK" /></a>
+  <a href="https://github.com/AkaShark/AgentBuddy">GitHub</a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/AkaShark/AgentBuddy/releases/latest">Releases</a>
+  &nbsp;·&nbsp;
+  <a href="docs/DEVELOPMENT.md">开发文档</a>
 </p>
 
-## Screenshots (iOS)
+## 工作原理
 
-<p align="center">
-  <img src="docs/screenshots/01-home.png" alt="首页 — 包子" width="200" />
-  <img src="docs/screenshots/02-remote-control.png" alt="手机遥控 Mac 上的 AI 编程" width="200" />
-  <img src="docs/screenshots/03-agents.png" alt="Codex · Claude · Grok 随你指挥" width="200" />
-  <img src="docs/screenshots/04-privacy.png" alt="端到端加密" width="200" />
-</p>
+AgentBuddy 分三层，手机 App 只做「遥控器」，真正的 agent 在你的 Mac 上运行：
 
-## Download
+```
+┌──────────────────────────────┐
+│  手机 App（iOS SwiftUI / Android Compose）
+│  只负责 UI、平台权限、通知、音频等平台能力
+└──────────────┬───────────────┘
+               │ UniFFI 生成的 Swift / Kotlin 绑定
+┌──────────────▼───────────────┐
+│  Rust 共享核心  shared/rust-bridge/codex-mobile-client
+│  会话/线程状态、流式渲染、hydration、审批、账号、发现、SSH、语音转写
+└──────────────┬───────────────┘
+               │ 端到端加密 P2P（Iroh）/ 局域网 / SSH
+┌──────────────▼───────────────┐
+│  Mac 守护进程  agentbuddycli（alleycat 的品牌封装，services/kittylitter）
+│  把本机 agent 多路复用给已配对的手机
+└──────┬───────────┬───────────┬───────────┬──────┘
+       │           │           │           │
+   Codex      Claude Code      Pi       OpenCode …
+ (app-server   (bridge 翻译   (bridge)   (bridge)
+  协议直通)     成同一协议)
+```
 
-- **iOS** — TestFlight / App Store (in review)
-- **Android** — [download the latest APK](https://github.com/huangguang1999/baozi/releases/latest) (arm64, direct install; enable "unknown sources"). Not on Google Play.
-- **Your computer** — run the daemon: `npx baozicli` (see below)
+- **Codex** 走 app-server 协议直通：守护进程把 `codex app-server` 的 JSON-RPC 原样转给手机，Rust 核心直接复用上游 `codex-app-server-protocol`。
+- **Claude Code、Pi、OpenCode 等其他 agent** 由 alleycat 里对应的 bridge（`alleycat-claude-bridge`、`alleycat-pi-bridge`、`alleycat-opencode-bridge`）翻译成同一套协议，手机端不需要知道差别。
+- 两端共用一个 Rust 核心，Swift/Kotlin 保持很薄：状态机、合并策略、协议解析都不在平台层重复实现。
 
-## Quick Start
+## 快速开始
+
+### 手机 App
 
 ```bash
-make ios-device-fast   # fast device build
-make ios-sim-fast      # fast simulator build
-make android-emulator-fast  # fast Android emulator build
+make ios-device-fast          # iOS 真机快速构建（raw staticlib）
+make ios-sim-fast             # iOS 模拟器快速构建
+make android-emulator-fast    # Android 模拟器快速构建
 ```
 
-### Fresh Checkout Prerequisites
-
-After pairing a **new Apple Watch** with Xcode (Window → Devices and Simulators),
-run this once so CLI builds can install BaoziWatch on it:
+### Mac 端守护进程
 
 ```bash
-make watch-register
+npx agentbuddycli             # 启动守护进程；命令名为 agentbuddy
+agentbuddy pair               # 打印配对二维码，用 App 扫描
 ```
 
-This registers the watch UDID with Apple's developer portal and refreshes the
-provisioning profile. Without it, `xcodebuild` succeeds but `devicectl ...
-install app` fails with "App could not be installed at this time". The target
-is idempotent (stamped per-UDID under `.build-stamps/`), so re-runs are no-ops
-until a new watch is paired. Override discovery with `WATCH_UDID=<udid>` if
-auto-detection fails.
+App 会自动在局域网发现守护进程，也可以手动配对或通过 SSH 引导。自带 API key 即可，没有托管登录。
 
-See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for prerequisites, full build options, TestFlight/App Store release, and SSH setup.
+首次构建前的环境要求（Xcode、rustup、xcodegen、Android SDK/NDK/JDK 17）、完整构建选项、TestFlight / App Store 发布和 SSH 配置见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。仓库约定见 [AGENTS.md](AGENTS.md)。
 
-## Repository Layout
+## 仓库布局
 
 ```
-apps/ios/                  iOS app (Baozi scheme, project.yml is source of truth)
-apps/android/              Android app (Compose UI, Gradle build)
+apps/ios/                      iOS / watchOS / Mac Catalyst App（AgentBuddy scheme，project.yml 是唯一真源）
+apps/android/                  Android App（Compose UI，Gradle 构建，包名 com.akashark.agentbuddy.android）
 shared/rust-bridge/
-  codex-mobile-client/     Shared Rust client crate + UniFFI surface (iOS & Android)
-  codex-ios-audio/         iOS-only audio/AEC crate
-shared/third_party/codex/  Upstream Codex submodule
-patches/codex/             Local patch set applied during builds
-tools/scripts/             Cross-platform helper scripts
+  codex-mobile-client/         两端共用的 Rust 客户端 crate + UniFFI 公共面
+  codex-slingshot/             JSON-line / websocket 传输适配
+  codex-bridge/                旧的 C-FFI 支持层（不用于新功能）
+  uniffi-bindgen/              绑定生成工具
+shared/third_party/codex/      上游 Codex 子模块
+shared/third_party/ghostty/    上游 Ghostty 子模块（终端渲染）
+patches/codex/, patches/ghostty/  构建时应用的本地补丁
+services/kittylitter/          Mac 守护进程 npm 包 agentbuddycli（alleycat 封装）
+services/push-proxy/           APNs / FCM 推送代理（Cloudflare Worker）
+services/testflight-signup/    TestFlight 报名表单后端（Cloudflare Worker）
+tools/scripts/                 跨平台辅助脚本
+docs/                          开发、架构与发布文档
 ```
 
-## Architecture
+## 截图
 
-Both platforms share a single Rust core (`codex-mobile-client`) via UniFFI-generated bindings. Platform code (Swift/Kotlin) stays thin: UI, permissions, notifications, and platform APIs only. Session state, streaming, hydration, discovery, and auth logic live in Rust.
+截图区暂留占位。后续会补上 iOS / Android 的首页、远程会话、多 agent 切换与配对流程截图，
+放在 `docs/screenshots/` 下并在这里引用。
 
-## Connecting Your Mac
+## 致谢与许可
 
-包子 drives agents that run on your own computer — the app is the remote, your Mac does the work. Run the daemon on the Mac, then pair it from the app over an end-to-end-encrypted P2P link (no account, no cloud relay of your code):
+AgentBuddy 采用 **GNU GPLv3**，并依据 GPLv3 第 7 节附加了 Apple App Store / Google Play 分发例外，见 [LICENSE](LICENSE)。
 
-```bash
-npx baozicli      # the Mac daemon, published from services/kittylitter (binary: baozi)
-```
+衍生链：
 
-The app discovers the daemon on your LAN automatically; you can also pair manually or over SSH. Bring your own API key — there is no hosted login.
+**AgentBuddy** ← [包子 / Baozi](https://github.com/huangguang1999/baozi) ← [litter](https://github.com/dnakov/litter) + [alleycat](https://github.com/dnakov/alleycat)（作者 [@dnakov](https://github.com/dnakov)）
 
-## Contributing
+- [litter](https://github.com/dnakov/litter) 是最初的手机端 App 与 `kittylitter` Mac 守护进程，GPLv3。
+- [alleycat](https://github.com/dnakov/alleycat) 是 P2P 传输与各 agent bridge，GPLv3。AgentBuddy 当前使用
+  [AkaShark/alleycat](https://github.com/AkaShark/alleycat) fork，固定在与上游相同的 commit。
+- [包子 / Baozi](https://github.com/huangguang1999/baozi) 是 litter 的中文化换皮 fork，GPLv3；AgentBuddy 由它衍生而来。
 
-包子 is under active development and a lot of features are in flight. PRs are welcome but will likely only be merged if they're small and target a specific problem — sweeping refactors and new features tend to collide with work already underway. See [CONTRIBUTING.md](CONTRIBUTING.md) before opening one.
-
-## License
-
-包子 is licensed under the GNU General Public License version 3 with an additional permission under GPLv3 section 7 for Apple App Store and Google Play distribution. See [LICENSE](LICENSE).
-
-包子 is a rebranded fork of the open-source [litter](https://github.com/dnakov/litter) project — the `kittylitter` daemon and `alleycat` P2P transport by [@dnakov](https://github.com/dnakov), also GPLv3.
+源码文件头中保留的上游版权声明均为原作者所有。
 
 ## Make Targets
 
