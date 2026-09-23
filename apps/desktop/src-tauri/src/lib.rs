@@ -1,4 +1,5 @@
 mod error;
+mod launchd;
 mod sidecar;
 mod status;
 
