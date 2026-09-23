@@ -6,6 +6,7 @@ mod logs;
 mod sidecar;
 mod state;
 mod status;
+mod tray;
 
 pub fn run() {
     tauri::Builder::default()
@@ -18,6 +19,9 @@ pub fn run() {
         .setup(|app| {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+            tray::install(app.handle())?;
+            tray::spawn_refresher(app.handle().clone());
+            tray::spawn_upgrade_check(app.handle().clone());
             Ok(())
         })
         .on_window_event(|window, event| {

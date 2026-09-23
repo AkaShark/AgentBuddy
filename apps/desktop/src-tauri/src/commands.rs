@@ -33,7 +33,9 @@ pub async fn compute_host_state(app: &AppHandle) -> Result<HostState, HostError>
 
 #[tauri::command]
 pub async fn host_state(app: AppHandle) -> Result<HostState, HostError> {
-    compute_host_state(&app).await
+    let s = compute_host_state(&app).await?;
+    crate::tray::apply(&app, &s);
+    Ok(s)
 }
 
 #[tauri::command]

@@ -14,3 +14,10 @@
 - Task 7: Ruling: shell agent 的可执行文件键是 `shell_bin`，`set_agent_bin("shell", …)` 写 `shell_bin` 而不是 `bin` — 真实 host.toml 里 `[agents.shell]` 没有 `bin` 键 — 代价：以后 alleycat 改键名需要同步这里。
 - Task 7: Ruling: 新增 `read_agent_settings(text) -> BTreeMap<String, AgentSettings{enabled, bin}>`，Task 8 暴露为命令 `agent_settings`，Task 12 的 Agents 页用它显示真实启用状态 — 计划里 Agents 页把 `available`（找到可执行文件）当作启用状态，这两者不是一回事，spec §6 要的是启用开关 — 代价：多一个只读命令。
 - Task 7: Ruling: fixture `host.toml` 按真实文件结构（含 `[session]`、shell 的 `shell_bin`）编写，token 用假值 — 贴近真实格式才能测出"保留其余内容" — 代价：无。
+- Task 9: Ruling: 托盘里所有确认/提示对话框改用非阻塞的 `show(|ok| …)` 回调，不用计划里的 `blocking_show()` — tauri-plugin-dialog 2.7.3 源码注释明确写着 blocking 版本不能在主线程调用，而托盘菜单事件就在 macOS 主线程上，会卡死 — 代价：无，行为一致。
+- Task 9: Ruling: 把菜单决策抽成纯函数 `start_stop_action` / `autostart_action`，返回 `TrayAction::{Run, Confirm}`，并加了单测 — 让"何时要确认"可测试，也让回调式对话框能简单接入 — 代价：无。
+- Task 9: Ruling: 未安装时点「启动主机服务」执行 `install`（计划是 `restart`）— 没有 LaunchAgent 时 `restart` 会失败；`install` 本身就会启动服务 — 代价：无。
+- Task 9: Ruling: 取消确认框时重新刷新一次托盘 — 勾选型菜单项在点击时已经自动切换了勾选状态，取消后要恢复成真实状态 — 代价：无。
+- Task 9: Ruling: 托盘图标先用 App 图标（彩色，非 template），计划写的是 `icon_as_template(true)` — 彩色方形图标当 template 会渲染成一块纯色方块；等新品牌美术出一张单色菜单栏图标后再改成 template — 代价：暗色/浅色菜单栏下图标不会自动反色。
+- Task 9: Ruling: 操作失败时弹一个错误对话框（显示 `HostError.detail`）— 计划里托盘动作失败是静默的，spec §7 要求错误可见 — 代价：无。
+- Task 9: Ruling: 冒烟验证只确认了 `tauri dev` 能启动、无 panic、启动任务成功调用了 sidecar 并写出 settings.json；菜单栏截图因为菜单栏图标过多没能直接看到托盘图标，留到 Task 12 后用 System Events 再核对 — 代价：若图标没有显示，要到那一步才发现。
