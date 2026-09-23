@@ -17,6 +17,7 @@ ROOT := $(shell pwd)
 STAMPS := $(ROOT)/.build-stamps
 RUST_DIR := $(ROOT)/shared/rust-bridge
 KITTYLITTER_DIR := $(ROOT)/services/kittylitter
+DESKTOP_DIR := $(ROOT)/apps/desktop
 ALLEYCAT_DEV_DIR ?= $(HOME)/dev/alleycat
 KITTYLITTER_DEV_DIR := $(STAMPS)/kittylitter-dev
 KITTYLITTER_DEV_MANIFEST := $(KITTYLITTER_DEV_DIR)/Cargo.toml
@@ -212,6 +213,7 @@ $(shell mkdir -p $(STAMPS))
 	watch watch-sim watch-sim-run watch-device watch-typecheck watch-register \
 	test test-rust test-ios test-android \
 	ios-release-prep mac-release-prep testflight mac-testflight mac-direct-dist appstore-release play-upload play-release \
+	desktop-sidecar desktop-dev desktop-build desktop-dist \
 	clean clean-rust clean-ios clean-android \
 	rebuild-bindings kittylitter kittylitter-restart tui tui-run help
 
@@ -529,6 +531,10 @@ help:
 		'make ghostty-ios        build pinned Ghostty iOS renderer artifacts' \
 		'make ghostty-android    build pinned Ghostty Android renderer artifacts (requires Android platform patch)' \
 		'make alleycat-main      keep Alleycat git deps pinned (set AGENTBUDDY_REFRESH_ALLEYCAT=1 to move them to AkaShark/alleycat main)' \
+		'make desktop-sidecar    build services/kittylitter and stage it as the Tauri sidecar' \
+		'make desktop-dev        sidecar + tauri dev for the desktop host app' \
+		'make desktop-build      sidecar + tauri build (.app + .dmg, unsigned unless APPLE_* set)' \
+		'make desktop-dist       signed + notarized dmg (APPLE_SIGNING_IDENTITY, APPLE_API_KEY*)' \
 		'make catalyst           full Mac Catalyst build (release+LTO macabi staticlib + xcodebuild)' \
 		'make catalyst-run       full Mac Catalyst build + launch' \
 		'make catalyst-fast      fast Mac Catalyst dev build (ios-dev profile, host arch)' \
@@ -868,6 +874,20 @@ screenshots-ios:
 screenshots-android:
 	@echo "── Capturing Android screenshots ──"
 	cd $(ANDROID_DIR) && bundle exec fastlane screenshots
+
+desktop-sidecar:
+	@$(DESKTOP_DIR)/scripts/build-sidecar.sh
+
+desktop-dev: desktop-sidecar
+	@cd $(DESKTOP_DIR) && node scripts/sync-version.mjs && npm run tauri dev
+
+desktop-build: desktop-sidecar
+	@cd $(DESKTOP_DIR) && node scripts/sync-version.mjs && npm run tauri build
+
+# Signed + notarized dmg. Needs APPLE_SIGNING_IDENTITY plus APPLE_API_KEY,
+# APPLE_API_ISSUER and APPLE_API_KEY_PATH in the environment.
+desktop-dist: desktop-sidecar
+	@cd $(DESKTOP_DIR) && node scripts/sync-version.mjs && npm run tauri build -- --bundles dmg
 
 $(KITTYLITTER_DEV_MANIFEST): $(KITTYLITTER_DIR)/Cargo.toml $(KITTYLITTER_DIR)/src/main.rs
 	@if [ ! -f "$(ALLEYCAT_DEV_DIR)/crates/alleycat/Cargo.toml" ]; then \
