@@ -94,3 +94,10 @@ skills-lock.json
 
 # local sccache/build env
 .local/
+
+# Desktop (Tauri) build outputs
+apps/desktop/node_modules/
+apps/desktop/dist/
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/binaries/
+apps/desktop/src-tauri/gen/
