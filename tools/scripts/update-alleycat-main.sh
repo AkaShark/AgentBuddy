@@ -9,9 +9,8 @@ set -euo pipefail
 # This script is a prerequisite of `make alleycat-main`, which every Rust
 # target depends on, and it is also invoked directly by
 # apps/ios/scripts/build-rust.sh, tools/scripts/build-android-rust.sh,
-# shared/rust-bridge/generate-bindings.sh, .github/dist-build-setup.yml and
-# .github/workflows/release.yml. Upstream litter used it to float the deps to
-# the newest alleycat `main` on every build. AgentBuddy pins alleycat to a
+# shared/rust-bridge/generate-bindings.sh. Upstream litter used it to float
+# the deps to the newest alleycat `main` on every build. AgentBuddy pins alleycat to a
 # fixed commit (see rev = "..." in shared/rust-bridge/Cargo.toml and
 # services/kittylitter/Cargo.toml) for reproducible builds and GPLv3
 # source-correspondence, so a build must never silently rewrite that rev.
