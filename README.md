@@ -34,7 +34,7 @@ AgentBuddy 分三层，手机 App 只做「遥控器」，真正的 agent 在你
 └──────────────┬───────────────┘
                │ 端到端加密 P2P（Iroh）/ 局域网 / SSH
 ┌──────────────▼───────────────┐
-│  Mac 守护进程  agentbuddycli（alleycat 的品牌封装，services/kittylitter）
+│  Mac 桌面 App 内置的守护进程 agentbuddy（alleycat 的品牌封装，services/kittylitter）
 │  把本机 agent 多路复用给已配对的手机
 └──────┬───────────┬───────────┬───────────┬──────┘
        │           │           │           │
@@ -57,12 +57,17 @@ make ios-sim-fast             # iOS 模拟器快速构建
 make android-emulator-fast    # Android 模拟器快速构建
 ```
 
-### Mac 端守护进程
+### Mac 端
+
+下载 [Releases](https://github.com/AkaShark/AgentBuddy/releases) 里的 `AgentBuddy_<版本>_<架构>.dmg`，拖进 Applications 后打开。
+首次启动在菜单栏图标 → 打开控制台 → 「安装后台服务」，随后在「配对」页用手机 App 扫码。守护进程作为
+LaunchAgent 独立运行，退出 App 或重启 Mac 后手机仍能连接。终端用户也可以直接调用包内的守护进程：
 
 ```bash
-npx agentbuddycli             # 启动守护进程；命令名为 agentbuddy
-agentbuddy pair               # 打印配对二维码，用 App 扫描
+/Applications/AgentBuddy.app/Contents/MacOS/agentbuddy pair --qr
 ```
+
+从源码运行桌面 App：`make desktop-dev`，详见 [apps/desktop/README.md](apps/desktop/README.md)。
 
 App 会自动在局域网发现守护进程，也可以手动配对或通过 SSH 引导。自带 API key 即可，没有托管登录。
 
@@ -73,6 +78,7 @@ App 会自动在局域网发现守护进程，也可以手动配对或通过 SSH
 ```
 apps/ios/                      iOS / watchOS / Mac Catalyst App（AgentBuddy scheme，project.yml 是唯一真源）
 apps/android/                  Android App（Compose UI，Gradle 构建，包名 com.akashark.agentbuddy.android）
+apps/desktop/                  macOS 菜单栏主机 App（Tauri v2 + React/TS）
 shared/rust-bridge/
   codex-mobile-client/         两端共用的 Rust 客户端 crate + UniFFI 公共面
   codex-slingshot/             JSON-line / websocket 传输适配
@@ -81,7 +87,7 @@ shared/rust-bridge/
 shared/third_party/codex/      上游 Codex 子模块
 shared/third_party/ghostty/    上游 Ghostty 子模块（终端渲染）
 patches/codex/, patches/ghostty/  构建时应用的本地补丁
-services/kittylitter/          Mac 守护进程 npm 包 agentbuddycli（alleycat 封装）
+services/kittylitter/          Mac 守护进程二进制 agentbuddy（alleycat 封装，作为桌面 App 的 sidecar）
 services/push-proxy/           APNs / FCM 推送代理（Cloudflare Worker）
 tools/scripts/                 跨平台辅助脚本
 docs/                          开发、架构与发布文档

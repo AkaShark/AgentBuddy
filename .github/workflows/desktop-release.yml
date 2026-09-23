@@ -1,0 +1,123 @@
+name: Desktop release
+
+# Builds the AgentBuddy macOS host app (apps/desktop, Tauri v2) for Apple
+# Silicon and Intel and attaches both dmgs to a draft GitHub Release.
+# Trigger: push a `desktop-vX.Y.Z` tag, or run manually.
+#
+# Signing + notarization run only when the secrets below are configured;
+# without them the job still produces unsigned dmgs so CI stays useful:
+#   MAC_DEVELOPER_ID_CERT_P12_B64, MAC_DEVELOPER_ID_CERT_PASSWORD
+#     base64 of a "Developer ID Application" .p12 for team HNKUYWPBVC
+#   ASC_KEY_ID, ASC_ISSUER_ID, ASC_PRIVATE_KEY_P8_B64
+#     App Store Connect API key used by notarytool
+
+on:
+  push:
+    tags: ["desktop-v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+          - target: x86_64-apple-darwin
+    runs-on: macos-15
+    env:
+      CARGO_TERM_COLOR: always
+      HAS_SIGNING: ${{ secrets.MAC_DEVELOPER_ID_CERT_P12_B64 != '' }}
+      HAS_NOTARY: ${{ secrets.ASC_PRIVATE_KEY_P8_B64 != '' }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          submodules: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install frontend deps
+        working-directory: apps/desktop
+        run: npm ci
+
+      # tauri-build needs binaries/agentbuddy-<triple> for the host (tests)
+      # and for the matrix target (bundle); build the sidecar first.
+      - name: Build sidecar
+        run: ./apps/desktop/scripts/build-sidecar.sh ${{ matrix.target }}
+
+      - name: Rust unit tests
+        if: matrix.target == 'aarch64-apple-darwin'
+        working-directory: apps/desktop/src-tauri
+        run: cargo test --lib
+
+      - name: Sidecar contract test
+        if: matrix.target == 'aarch64-apple-darwin'
+        working-directory: apps/desktop/src-tauri
+        env:
+          AGENTBUDDY_SIDECAR: ${{ github.workspace }}/apps/desktop/src-tauri/binaries/agentbuddy-${{ matrix.target }}
+        run: |
+          cargo test --test sidecar_contract
+          "$AGENTBUDDY_SIDECAR" stop || true
+
+      - name: Frontend tests
+        if: matrix.target == 'aarch64-apple-darwin'
+        working-directory: apps/desktop
+        run: npm test
+
+      - name: Sync version
+        run: node apps/desktop/scripts/sync-version.mjs
+
+      - name: Import Developer ID certificate
+        if: env.HAS_SIGNING == 'true'
+        env:
+          CERT_P12_B64: ${{ secrets.MAC_DEVELOPER_ID_CERT_P12_B64 }}
+          CERT_PASSWORD: ${{ secrets.MAC_DEVELOPER_ID_CERT_PASSWORD }}
+        run: |
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          echo "$CERT_P12_B64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+          security import "$RUNNER_TEMP/cert.p12" -k build.keychain -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+          IDENTITY="$(security find-identity -v -p codesigning build.keychain | grep 'Developer ID Application' | head -1 | awk -F'"' '{print $2}')"
+          test -n "$IDENTITY"
+          echo "APPLE_SIGNING_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
+
+      - name: Configure notarization
+        if: env.HAS_SIGNING == 'true' && env.HAS_NOTARY == 'true'
+        env:
+          ASC_PRIVATE_KEY_P8_B64: ${{ secrets.ASC_PRIVATE_KEY_P8_B64 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          echo "$ASC_PRIVATE_KEY_P8_B64" | base64 --decode > "$RUNNER_TEMP/AuthKey.p8"
+          {
+            echo "APPLE_API_KEY_PATH=$RUNNER_TEMP/AuthKey.p8"
+            echo "APPLE_API_KEY=$ASC_KEY_ID"
+            echo "APPLE_API_ISSUER=$ASC_ISSUER_ID"
+          } >> "$GITHUB_ENV"
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: apps/desktop
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || format('desktop-dev-{0}', github.run_number) }}
+          releaseName: "AgentBuddy Desktop ${{ github.ref_type == 'tag' && github.ref_name || format('dev #{0}', github.run_number) }}"
+          releaseDraft: true
+          prerelease: ${{ github.ref_type != 'tag' }}
+          args: --target ${{ matrix.target }} --bundles dmg
