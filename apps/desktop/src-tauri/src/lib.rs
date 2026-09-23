@@ -1,3 +1,4 @@
+mod config;
 mod error;
 mod launchd;
 mod sidecar;

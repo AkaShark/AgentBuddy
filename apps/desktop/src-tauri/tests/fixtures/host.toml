@@ -1,0 +1,21 @@
+# AgentBuddy host config
+token = "abc123"
+
+[agents.codex]
+enabled = true   # keep codex on
+bin = "codex"
+host = "127.0.0.1"
+port = 8390
+
+[agents.claude]
+enabled = false
+bin = "claude"
+bypass_permissions = true
+
+[agents.shell]
+enabled = true
+shell_bin = "/bin/zsh"
+allow_env_passthrough = false
+
+[session]
+replay_max_msgs = 2048
