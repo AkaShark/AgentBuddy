@@ -1,0 +1,236 @@
+{
+  "pid": 0,
+  "node_id": "4a8f2c1e9b7d6a5f3e2d1c0b9a8f7e6d5c4b3a291807f6e5d4c3b2a190817263",
+  "token_short": "ab12cd34",
+  "relay": null,
+  "config_path": "/Users/example/Library/Application Support/com.akashark.agentbuddycli/host.toml",
+  "uptime_secs": 0,
+  "agents": [
+    {
+      "name": "codex",
+      "display_name": "Codex",
+      "wire": "jsonl",
+      "available": false,
+      "presentation": {
+        "is_beta": false,
+        "sort_order": 0,
+        "description": "OpenAI Codex app-server."
+      },
+      "capabilities": {
+        "locks_reasoning_effort_after_activity": false,
+        "supports_ssh_bridge": true,
+        "uses_direct_codex_port": true,
+        "supports_thread_permission_overrides": true,
+        "reports_effective_thread_permissions": true
+      }
+    },
+    {
+      "name": "pi",
+      "display_name": "Pi",
+      "wire": "jsonl",
+      "available": false,
+      "presentation": {
+        "is_beta": true,
+        "sort_order": 1,
+        "description": "Pi coding agent.",
+        "aliases": [
+          "pi.dev",
+          "pidev"
+        ]
+      },
+      "capabilities": {
+        "locks_reasoning_effort_after_activity": false,
+        "supports_ssh_bridge": true,
+        "uses_direct_codex_port": false,
+        "supports_thread_permission_overrides": false,
+        "reports_effective_thread_permissions": false
+      }
+    },
+    {
+      "name": "amp",
+      "display_name": "Amp",
+      "wire": "jsonl",
+      "available": false,
+      "presentation": {
+        "title": "Amp",
+        "is_beta": true,
+        "sort_order": 2,
+        "description": "Sourcegraph Amp.",
+        "aliases": [
+          "ampcode",
+          "amp-code",
+          "amp_code",
+          "amp code"
+        ]
+      },
+      "capabilities": {
+        "locks_reasoning_effort_after_activity": true,
+        "visible_modes": [
+          "smart",
+          "rush",
+          "deep"
+        ],
+        "supports_ssh_bridge": false,
+        "uses_direct_codex_port": false,
+        "supports_thread_permission_overrides": false,
+        "reports_effective_thread_permissions": false
+      }
+    },
+    {
+      "name": "opencode",
+      "display_name": "opencode",
+      "wire": "jsonl",
+      "available": false,
+      "presentation": {
+        "title": "Opencode",
+        "is_beta": true,
+        "sort_order": 3,
+        "description": "Open-source local coding agent.",
+        "aliases": [
+          "open-code",
+          "open_code",
+          "open code"
+        ]
+      },
+      "capabilities": {
+        "locks_reasoning_effort_after_activity": false,
+        "supports_ssh_bridge": true,
+        "uses_direct_codex_port": false,
+        "supports_thread_permission_overrides": false,
+        "reports_effective_thread_permissions": false
+      }
+    },
+    {
+      "name": "claude",
+      "display_name": "Claude",
+      "wire": "jsonl",
+      "available": true,
+      "presentation": {
+        "is_beta": true,
+        "sort_order": 4,
+        "description": "Anthropic Claude Code.",
+        "aliases": [
+          "claude-code",
+          "claude_code"
+        ]
+      },
+      "capabilities": {
+        "locks_reasoning_effort_after_activity": false,
+        "supports_ssh_bridge": true,
+        "uses_direct_codex_port": false,
+        "supports_thread_permission_overrides": false,
+        "reports_effective_thread_permissions": false
+      }
+    },
+    {
+      "name": "droid",
+      "display_name": "Droid",
+      "wire": "jsonl",
+      "available": false,
+      "presentation": {
+        "title": "Factory Droid",
+        "is_beta": true,
+        "sort_order": 5,
+        "description": "Factory Droid coding agent.",
+        "aliases": [
+          "factory",
+          "factory-droid",
+          "factory_droid",
+          "factory droid"
+        ]
+      },
+      "capabilities": {
+        "locks_reasoning_effort_after_activity": false,
+        "supports_ssh_bridge": false,
+        "uses_direct_codex_port": false,
+        "supports_thread_permission_overrides": false,
+        "reports_effective_thread_permissions": false
+      }
+    },
+    {
+      "name": "hermes",
+      "display_name": "Hermes",
+      "wire": "jsonl",
+      "available": true,
+      "presentation": {
+        "title": "Hermes",
+        "is_beta": true,
+        "sort_order": 6,
+        "description": "Nous Research Hermes agent."
+      },
+      "capabilities": {
+        "locks_reasoning_effort_after_activity": false,
+        "supports_ssh_bridge": false,
+        "uses_direct_codex_port": false,
+        "supports_thread_permission_overrides": false,
+        "reports_effective_thread_permissions": false
+      }
+    },
+    {
+      "name": "devin",
+      "display_name": "Devin",
+      "wire": "jsonl",
+      "available": false,
+      "presentation": {
+        "title": "Devin",
+        "is_beta": true,
+        "sort_order": 7,
+        "description": "Devin coding agent."
+      },
+      "capabilities": {
+        "locks_reasoning_effort_after_activity": false,
+        "supports_ssh_bridge": true,
+        "uses_direct_codex_port": false,
+        "supports_thread_permission_overrides": false,
+        "reports_effective_thread_permissions": false
+      }
+    },
+    {
+      "name": "grok",
+      "display_name": "Grok",
+      "wire": "jsonl",
+      "available": true,
+      "presentation": {
+        "title": "Grok",
+        "is_beta": true,
+        "sort_order": 8,
+        "description": "xAI Grok coding agent.",
+        "aliases": [
+          "grok-code",
+          "xai-grok",
+          "xai grok"
+        ]
+      },
+      "capabilities": {
+        "locks_reasoning_effort_after_activity": false,
+        "supports_ssh_bridge": true,
+        "uses_direct_codex_port": false,
+        "supports_thread_permission_overrides": false,
+        "reports_effective_thread_permissions": false
+      }
+    },
+    {
+      "name": "shell",
+      "display_name": "Shell",
+      "wire": "jsonl",
+      "available": true,
+      "presentation": {
+        "title": "Shell",
+        "is_beta": true,
+        "sort_order": 9,
+        "description": "PTY-backed host shell.",
+        "aliases": [
+          "terminal"
+        ]
+      },
+      "capabilities": {
+        "locks_reasoning_effort_after_activity": false,
+        "supports_ssh_bridge": false,
+        "uses_direct_codex_port": false,
+        "supports_thread_permission_overrides": false,
+        "reports_effective_thread_permissions": false
+      }
+    }
+  ],
+  "version": "0.1.0"
+}

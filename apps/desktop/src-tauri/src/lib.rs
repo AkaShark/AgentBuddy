@@ -1,5 +1,6 @@
 mod error;
 mod sidecar;
+mod status;
 
 pub fn run() {
     tauri::Builder::default()
