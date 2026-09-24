@@ -157,14 +157,17 @@ impl AlleycatHostInfo {
     }
 }
 
-/// Target device for a `push_subscribe` request.
+/// Target device for a `push_subscribe` request. The push token itself is
+/// only inside `sealed` (host push design §5.5), which the host stores and
+/// forwards without being able to read it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PushSubscribeTarget {
     /// `ios` | `android`.
     pub platform: String,
-    pub push_token: String,
     /// `sandbox` | `production`; iOS only.
     pub apns_environment: Option<String>,
+    /// Sealed target (base64url, opaque to the host).
+    pub sealed: String,
 }
 
 /// Device-signed grant carried by `push_subscribe` (design §5.1).
@@ -469,9 +472,9 @@ struct Resume {
 #[derive(Debug, Clone, Serialize)]
 struct PushTargetWire {
     platform: String,
-    push_token: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     apns_environment: Option<String>,
+    sealed: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -743,8 +746,8 @@ fn push_subscribe_request(token: String, args: PushSubscribeArgs) -> Request {
         turn_id: args.turn_id,
         target: PushTargetWire {
             platform: args.target.platform,
-            push_token: args.target.push_token,
             apns_environment: args.target.apns_environment,
+            sealed: args.target.sealed,
         },
         grant: PushGrantWire {
             device_id: args.grant.device_id,
@@ -754,6 +757,12 @@ fn push_subscribe_request(token: String, args: PushSubscribeArgs) -> Request {
             signature: args.grant.signature,
         },
     }
+}
+
+/// The exact `push_subscribe` frame body, for push manager tests.
+#[cfg(test)]
+pub(crate) fn push_subscribe_request_json(token: String, args: PushSubscribeArgs) -> String {
+    serde_json::to_string(&push_subscribe_request(token, args)).expect("serialize request")
 }
 
 fn push_unsubscribe_request(token: String, scope: PushUnsubscribeScope) -> Request {
@@ -1564,8 +1573,8 @@ mod tests {
                 turn_id: "turn-1".into(),
                 target: PushSubscribeTarget {
                     platform: "ios".into(),
-                    push_token: "a1a1".into(),
                     apns_environment: Some("production".into()),
+                    sealed: "AQGsealed".into(),
                 },
                 grant: PushSubscribeGrant {
                     device_id: "dev".into(),
@@ -1588,8 +1597,8 @@ mod tests {
                 "turn_id": "turn-1",
                 "target": {
                     "platform": "ios",
-                    "push_token": "a1a1",
-                    "apns_environment": "production"
+                    "apns_environment": "production",
+                    "sealed": "AQGsealed"
                 },
                 "grant": {
                     "device_id": "dev",
@@ -1612,8 +1621,8 @@ mod tests {
                 turn_id: "tu".into(),
                 target: PushSubscribeTarget {
                     platform: "android".into(),
-                    push_token: "fcm".into(),
                     apns_environment: None,
+                    sealed: "AQGandroid".into(),
                 },
                 grant: PushSubscribeGrant {
                     device_id: "dev".into(),
@@ -1626,6 +1635,7 @@ mod tests {
         );
         let value = serde_json::to_value(request).expect("serialize");
         assert_eq!(value["target"]["platform"], "android");
+        assert_eq!(value["target"]["sealed"], "AQGandroid");
         assert!(value["target"].get("apns_environment").is_none());
     }
 

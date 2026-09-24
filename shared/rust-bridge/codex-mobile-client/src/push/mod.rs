@@ -8,10 +8,12 @@
 //! asks the Worker to push a visible notification. Platforms only hand Rust
 //! their push token (`AppClient.set_push_registration`) and ask
 //! `AppClient.turn_push_state` whether a local completion notification is
-//! still needed.
+//! still needed. The token itself never reaches the host: it is sealed to
+//! the Worker's key (§5.5) and the host forwards the opaque blob.
 
 mod backend;
 pub(crate) mod manager;
+pub(crate) mod seal;
 pub(crate) mod signing;
 
 use std::collections::HashMap;

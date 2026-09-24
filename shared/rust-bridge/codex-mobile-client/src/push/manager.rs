@@ -10,6 +10,10 @@
 //! order. Every subscribe attempt carries an attempt number, and results are
 //! only applied when the entry still expects that attempt, so stale in-flight
 //! work can never overwrite newer state.
+//!
+//! Contract v2 (design §5): the push token only travels inside a target
+//! sealed to the Worker (§5.5); grants and revokes carry `aud`; ids are
+//! checked against the §13 rules before anything is signed.
 
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -20,6 +24,7 @@ use iroh::{EndpointId, SecretKey};
 use serde::Serialize;
 use tracing::{debug, info, warn};
 
+use super::seal::{SealError, SealTarget};
 use super::signing::{self, GrantFields};
 use super::{AppApnsEnvironment, AppPushPlatform, AppPushRegistration, AppTurnPushState};
 use crate::alleycat::{
@@ -35,16 +40,21 @@ pub(crate) const GRANT_LIFETIME_SECS: u64 = 24 * 60 * 60;
 /// final subscription state, so platforms can still decide whether to post
 /// a local completion notification after `TurnCompleted`.
 pub(crate) const COMPLETED_RETENTION_SECS: u64 = 15 * 60;
+/// §13: at most this many live subscriptions per host; further turns on
+/// that host are reported as `Unsupported` and never sent.
+pub(crate) const MAX_TRACKED_SUBSCRIPTIONS_PER_SERVER: usize = 64;
 
 /// Injectable side effects for [`PushManager`]: device key, clock, nonces,
-/// the alleycat push ops and the direct Worker revoke.
+/// target sealing, the alleycat push ops and the direct Worker revoke.
 #[async_trait]
 pub(crate) trait PushBackend: Send + Sync {
-    /// The device iroh key (the alleycat endpoint's key), if bound.
+    /// The device iroh key (the alleycat endpoint's key), if known.
     fn device_secret_key(&self) -> Option<SecretKey>;
     fn now_unix_secs(&self) -> u64;
-    /// Fresh 32-hex-character nonce.
+    /// Fresh 32-hex-character CSPRNG nonce.
     fn new_nonce(&self) -> String;
+    /// Seal the push target to the Worker key (design §5.5).
+    fn seal_target(&self, target: &SealTarget<'_>) -> Result<String, SealError>;
     async fn subscribe(
         &self,
         host: &ParsedPairPayload,
@@ -130,6 +140,14 @@ fn normalized_host_id(params: &ParsedPairPayload) -> String {
         .unwrap_or_else(|_| params.node_id.trim().to_ascii_lowercase())
 }
 
+/// Host id from an `alleycat:<64 hex>` server id, for revoking a host this
+/// launch has no record of (§13, cold start).
+fn host_id_from_server_id(server_id: &str) -> Option<String> {
+    let hex = server_id.strip_prefix("alleycat:")?;
+    (hex.len() == 64 && hex.bytes().all(|byte| byte.is_ascii_hexdigit()))
+        .then(|| hex.to_ascii_lowercase())
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) struct TurnKey {
     pub server_id: String,
@@ -204,15 +222,22 @@ pub(crate) enum PushJob {
         host: ParsedPairPayload,
         worker_base_url: Option<String>,
     },
+    /// Device-signed Worker revoke only: the host is unknown this launch
+    /// (unpaired after a cold start), so there is no way to reach it.
+    RevokeDirect {
+        server_id: String,
+        host_id: String,
+        worker_base_url: String,
+    },
 }
 
 impl PushJob {
     fn server_id(&self) -> &str {
         match self {
             Self::Subscribe { turn, .. } => &turn.server_id,
-            Self::UnsubscribeTurn { server_id, .. } | Self::UnsubscribeAll { server_id, .. } => {
-                server_id
-            }
+            Self::UnsubscribeTurn { server_id, .. }
+            | Self::UnsubscribeAll { server_id, .. }
+            | Self::RevokeDirect { server_id, .. } => server_id,
         }
     }
 }
@@ -237,6 +262,9 @@ struct PushState {
     hosts: HashMap<String, HostPushRecord>,
     turns: HashMap<TurnKey, TurnEntry>,
     next_attempt: u64,
+    /// Host id → unix second of this device's latest direct Worker revoke.
+    /// The Worker rejects grants issued at or before that second (§5.3).
+    revoked_at: HashMap<String, u64>,
 }
 
 impl PushState {
@@ -264,8 +292,22 @@ impl PushState {
         self.next_attempt
     }
 
+    /// Subscriptions on `server_id` the host may still be holding for us.
+    fn live_subscriptions(&self, server_id: &str) -> usize {
+        self.turns
+            .iter()
+            .filter(|(key, entry)| {
+                key.server_id == server_id
+                    && entry.completed_at.is_none()
+                    && entry.status != EntryStatus::Unsupported
+            })
+            .count()
+    }
+
     /// Subscribe `turn` unless it already has an entry (dedupe by
-    /// `(server, thread, turn)`) or is not eligible.
+    /// `(server, thread, turn)`) or is not eligible. Turns whose ids break
+    /// the §13 rules, or beyond the per-server cap, are recorded as
+    /// `Unsupported` without contacting the host.
     fn plan_subscribe(&mut self, turn: &ActiveTurn, now: u64) -> Option<PushJob> {
         let turn_key = TurnKey::new(&turn.key, &turn.turn_id);
         if self.turns.contains_key(&turn_key) {
@@ -276,18 +318,42 @@ impl PushState {
         else {
             return None;
         };
+        let refused = if !signing::is_valid_agent(&agent)
+            || !signing::is_valid_ref_id(&turn_key.thread_id)
+            || !signing::is_valid_ref_id(&turn_key.turn_id)
+        {
+            warn!(
+                "PushManager: agent/thread/turn id breaks push id rules; not subscribing server_id={}",
+                turn_key.server_id
+            );
+            true
+        } else if self.live_subscriptions(&turn_key.server_id)
+            >= MAX_TRACKED_SUBSCRIPTIONS_PER_SERVER
+        {
+            warn!(
+                "PushManager: {} live push subscriptions on server_id={}; not subscribing another turn",
+                MAX_TRACKED_SUBSCRIPTIONS_PER_SERVER, turn_key.server_id
+            );
+            true
+        } else {
+            false
+        };
         let attempt = self.next_attempt();
         self.turns.insert(
             turn_key.clone(),
             TurnEntry {
                 agent: agent.clone(),
-                status: EntryStatus::Pending,
+                status: if refused {
+                    EntryStatus::Unsupported
+                } else {
+                    EntryStatus::Pending
+                },
                 attempt,
                 planned_at: now,
                 completed_at: None,
             },
         );
-        Some(PushJob::Subscribe {
+        (!refused).then_some(PushJob::Subscribe {
             turn: turn_key,
             attempt,
             agent,
@@ -303,6 +369,16 @@ impl PushState {
                 .is_some_and(|at| now.saturating_sub(at) >= COMPLETED_RETENTION_SECS);
             !expired && !stale_completed
         });
+        self.revoked_at.retain(|_, revoked| *revoked >= now);
+    }
+
+    /// `issued` for a new grant to `host_id`: never within the second of this
+    /// device's own revoke (the Worker requires `issued` strictly later).
+    fn grant_issued_at(&self, host_id: &str, now: u64) -> u64 {
+        match self.revoked_at.get(host_id) {
+            Some(&revoked) if revoked >= now => revoked + 1,
+            _ => now,
+        }
     }
 
     fn worker_base_url(&self) -> Option<String> {
@@ -574,22 +650,40 @@ impl PushManager {
     }
 
     /// User disconnected / unpaired `server_id`: forget it and revoke this
-    /// device's subscriptions on that host.
+    /// device's subscriptions on that host. Without a host record (unpaired
+    /// before it connected this launch) the host id comes from the
+    /// `alleycat:<hostId>` server id and only the Worker revoke is sent.
     pub(crate) fn server_removed(&self, server_id: &str) -> Vec<PushJob> {
         let mut state = self.state();
         state.turns.retain(|key, _| key.server_id != server_id);
-        let Some(record) = state.hosts.remove(server_id) else {
-            return Vec::new();
-        };
-        if !record.supports_push() {
-            return Vec::new();
+        match state.hosts.remove(server_id) {
+            Some(record) if record.supports_push() => {
+                info!("PushManager: server removed; unsubscribing server_id={server_id}");
+                vec![PushJob::UnsubscribeAll {
+                    server_id: server_id.to_string(),
+                    host: record.params,
+                    worker_base_url: state.worker_base_url(),
+                }]
+            }
+            Some(_) => Vec::new(),
+            None => {
+                let Some(host_id) = host_id_from_server_id(server_id) else {
+                    return Vec::new();
+                };
+                let Some(worker_base_url) = state.worker_base_url().filter(|url| !url.is_empty())
+                else {
+                    return Vec::new();
+                };
+                info!(
+                    "PushManager: unknown host removed; direct Worker revoke server_id={server_id}"
+                );
+                vec![PushJob::RevokeDirect {
+                    server_id: server_id.to_string(),
+                    host_id,
+                    worker_base_url,
+                }]
+            }
         }
-        info!("PushManager: server removed; unsubscribing server_id={server_id}");
-        vec![PushJob::UnsubscribeAll {
-            server_id: server_id.to_string(),
-            host: record.params,
-            worker_base_url: state.worker_base_url(),
-        }]
     }
 
     // ── Queries ──────────────────────────────────────────────────────────
@@ -693,6 +787,14 @@ impl PushManager {
                 self.run_unsubscribe_all(&server_id, &host, worker_base_url.as_deref())
                     .await
             }
+            PushJob::RevokeDirect {
+                server_id,
+                host_id,
+                worker_base_url,
+            } => {
+                self.run_direct_revoke(&server_id, &host_id, &worker_base_url)
+                    .await
+            }
         }
     }
 
@@ -727,17 +829,47 @@ impl PushManager {
             self.apply_attempt_result(&turn, attempt, EntryStatus::Failed);
             return;
         };
+        let aud = match signing::worker_origin(&registration.worker_base_url) {
+            Ok(aud) => aud,
+            Err(error) => {
+                warn!(
+                    "PushManager: unusable worker URL; cannot sign grant server_id={} error={error}",
+                    turn.server_id
+                );
+                self.apply_attempt_result(&turn, attempt, EntryStatus::Failed);
+                return;
+            }
+        };
         let host_id = normalized_host_id(&host);
         let device_id = signing::device_id(&device_key);
-        let issued = self.backend.now_unix_secs();
+        let sealed = match self.backend.seal_target(&SealTarget {
+            platform: registration.platform,
+            token: &registration.token,
+            apns_environment: registration.apns_environment,
+            device_id: &device_id,
+            host_id: &host_id,
+        }) {
+            Ok(sealed) => sealed,
+            Err(error) => {
+                warn!(
+                    "PushManager: sealing push target failed server_id={} error={error}",
+                    turn.server_id
+                );
+                self.apply_attempt_result(&turn, attempt, EntryStatus::Failed);
+                return;
+            }
+        };
+        let now = self.backend.now_unix_secs();
+        let issued = self.state().grant_issued_at(&host_id, now);
         let expires = issued + GRANT_LIFETIME_SECS;
         let nonce = self.backend.new_nonce();
         let fields = GrantFields {
+            aud: &aud,
             host_id: &host_id,
             device_id: &device_id,
             platform: registration.platform,
             environment: registration.apns_environment,
-            push_token: &registration.token,
+            sealed_target: &sealed,
             agent: &agent,
             thread_id: &turn.thread_id,
             turn_id: &turn.turn_id,
@@ -752,10 +884,10 @@ impl PushManager {
             turn_id: turn.turn_id.clone(),
             target: PushSubscribeTarget {
                 platform: signing::platform_wire(registration.platform).to_string(),
-                push_token: registration.token.clone(),
                 apns_environment: registration
                     .apns_environment
                     .map(|environment| signing::environment_wire(environment).to_string()),
+                sealed,
             },
             grant: PushSubscribeGrant {
                 device_id,
@@ -828,17 +960,38 @@ impl PushManager {
             debug!("PushManager: no worker base URL for direct revoke server_id={server_id}");
             return;
         };
+        self.run_direct_revoke(server_id, &normalized_host_id(host), worker_base_url)
+            .await;
+    }
+
+    /// Best-effort device-signed `scope=all` Worker revoke (design §5.3).
+    async fn run_direct_revoke(&self, server_id: &str, host_id: &str, worker_base_url: &str) {
+        let aud = match signing::worker_origin(worker_base_url) {
+            Ok(aud) => aud,
+            Err(error) => {
+                warn!(
+                    "PushManager: unusable worker URL for direct revoke server_id={server_id} error={error}"
+                );
+                return;
+            }
+        };
         let Some(device_key) = self.backend.device_secret_key() else {
             debug!("PushManager: no device key for direct revoke server_id={server_id}");
             return;
         };
-        let host_id = normalized_host_id(host);
         let timestamp = self.backend.now_unix_secs();
         let nonce = self.backend.new_nonce();
+        // Recorded before sending: whether or not the request lands, later
+        // grants for this host are issued after this second.
+        {
+            let mut state = self.state();
+            let revoked = state.revoked_at.entry(host_id.to_string()).or_insert(0);
+            *revoked = (*revoked).max(timestamp);
+        }
         let request = DirectRevokeRequest {
-            signature: signing::sign_revoke(&device_key, &host_id, timestamp, &nonce),
+            signature: signing::sign_revoke(&device_key, &aud, host_id, timestamp, &nonce),
             device_id: signing::device_id(&device_key),
-            host_id,
+            host_id: host_id.to_string(),
             scope: signing::REVOKE_SCOPE_ALL.to_string(),
             timestamp,
             nonce,
@@ -861,10 +1014,39 @@ impl PushManager {
 mod tests {
     use super::*;
     use crate::alleycat::{AlleycatHostPush, PushSubscriptionStatus};
+    use crate::push::seal::{self, WorkerSealKey};
     use std::collections::VecDeque;
     use std::sync::atomic::{AtomicU64, Ordering};
 
     const NOW: u64 = 1_790_300_000;
+    const WORKER_ORIGIN: &str = "https://worker.example.com";
+    /// Test Worker sealing secret; the fake backend seals to its public key
+    /// so tests can open what the manager sent.
+    const TEST_SEAL_SECRET: [u8; 32] = [9u8; 32];
+
+    fn test_seal_public_hex() -> String {
+        hex::encode(
+            x25519_dalek::PublicKey::from(&x25519_dalek::StaticSecret::from(TEST_SEAL_SECRET))
+                .as_bytes(),
+        )
+    }
+
+    /// Open a sealed target sent for `(host_id, device_id)` and return its
+    /// plaintext JSON.
+    fn open_sealed(sealed: &str, host_id: &str, device_id: &str) -> serde_json::Value {
+        let (kid, plaintext) =
+            seal::open_target(TEST_SEAL_SECRET, sealed, &format!("{host_id}|{device_id}"))
+                .expect("sealed target opens with the test Worker key");
+        assert_eq!(kid, 1);
+        serde_json::from_str(&plaintext).expect("plaintext is JSON")
+    }
+
+    fn sealed_token(args: &PushSubscribeArgs, host_id: &str) -> String {
+        open_sealed(&args.target.sealed, host_id, &args.grant.device_id)["token"]
+            .as_str()
+            .expect("token")
+            .to_string()
+    }
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     enum Call {
@@ -936,6 +1118,17 @@ mod tests {
 
         fn new_nonce(&self) -> String {
             format!("{:032x}", self.nonce.fetch_add(1, Ordering::SeqCst) + 1)
+        }
+
+        fn seal_target(&self, target: &SealTarget<'_>) -> Result<String, SealError> {
+            let public_hex = test_seal_public_hex();
+            seal::seal_target(
+                &WorkerSealKey {
+                    kid: 1,
+                    public_hex: &public_hex,
+                },
+                target,
+            )
         }
 
         async fn subscribe(
@@ -1203,7 +1396,6 @@ mod tests {
         assert_eq!(args.thread_id, "thread-1");
         assert_eq!(args.turn_id, "turn-1");
         assert_eq!(args.target.platform, "ios");
-        assert_eq!(args.target.push_token, "tok-1");
         assert_eq!(args.target.apns_environment.as_deref(), Some("production"));
         let device_key = SecretKey::from_bytes(&[2u8; 32]);
         assert_eq!(args.grant.device_id, signing::device_id(&device_key));
@@ -1211,14 +1403,27 @@ mod tests {
         assert_eq!(args.grant.expires, NOW + GRANT_LIFETIME_SECS);
         assert!(args.grant.expires - args.grant.issued <= 48 * 60 * 60);
         assert_eq!(args.grant.nonce.len(), 32);
+        // The sealed target binds token, platform, environment, device, host.
+        assert_eq!(
+            open_sealed(&args.target.sealed, &host_node(1), &args.grant.device_id),
+            serde_json::json!({
+                "v": 1,
+                "platform": "ios",
+                "token": "tok-1",
+                "apnsEnvironment": "production",
+                "deviceId": args.grant.device_id,
+                "hostId": host_node(1),
+            })
+        );
         let expected_signature = signing::sign_grant(
             &device_key,
             &GrantFields {
+                aud: WORKER_ORIGIN,
                 host_id: &host_node(1),
                 device_id: &args.grant.device_id,
                 platform: AppPushPlatform::Ios,
                 environment: Some(AppApnsEnvironment::Production),
-                push_token: "tok-1",
+                sealed_target: &args.target.sealed,
                 agent: "codex",
                 thread_id: "thread-1",
                 turn_id: "turn-1",
@@ -1400,7 +1605,7 @@ mod tests {
             panic!("expected subscribe, got {:?}", calls[1]);
         };
         assert_eq!(args.turn_id, "u");
-        assert_eq!(args.target.push_token, "tok-2");
+        assert_eq!(sealed_token(args, &host_node(1)), "tok-2");
     }
 
     #[tokio::test]
@@ -1431,7 +1636,7 @@ mod tests {
         manager.run_jobs(stale).await;
         let subscribes = subscribe_calls(&backend.calls());
         assert_eq!(subscribes.len(), 1);
-        assert_eq!(subscribes[0].1.target.push_token, "tok-2");
+        assert_eq!(sealed_token(&subscribes[0].1, &host_node(1)), "tok-2");
         assert_eq!(
             state_of(&manager, 1, "t", "u"),
             AppTurnPushState::Subscribed
@@ -1518,7 +1723,13 @@ mod tests {
         assert_eq!(request.timestamp, NOW);
         assert_eq!(
             request.signature,
-            signing::sign_revoke(&device_key, &host_node(1), NOW, &request.nonce)
+            signing::sign_revoke(
+                &device_key,
+                WORKER_ORIGIN,
+                &host_node(1),
+                NOW,
+                &request.nonce
+            )
         );
         let body = serde_json::to_value(request).expect("serialize");
         for field in [
@@ -1562,8 +1773,12 @@ mod tests {
             state_of(&manager, 2, "t", "u"),
             AppTurnPushState::Subscribed
         );
-        // Removing it again (or a never-seen server) is a no-op.
-        assert!(manager.server_removed(&server_id(1)).is_empty());
+        // Removing it again only reaches the Worker (no host record left);
+        // a non-alleycat server is a no-op.
+        assert!(matches!(
+            manager.server_removed(&server_id(1)).as_slice(),
+            [PushJob::RevokeDirect { host_id, .. }] if *host_id == host_node(1)
+        ));
         assert!(manager.server_removed("local").is_empty());
     }
 
@@ -1796,5 +2011,272 @@ mod tests {
         assert_eq!(calls.len(), 1);
         assert_eq!(calls[0].1.target.platform, "android");
         assert_eq!(calls[0].1.target.apns_environment, None);
+        let plaintext = open_sealed(
+            &calls[0].1.target.sealed,
+            &host_node(1),
+            &calls[0].1.grant.device_id,
+        );
+        assert_eq!(plaintext["platform"], "android");
+        assert_eq!(plaintext["token"], "fcm-token");
+        assert!(plaintext["apnsEnvironment"].is_null());
+    }
+
+    #[tokio::test]
+    async fn push_subscribe_request_carries_sealed_target_and_never_the_raw_token() {
+        const TOKEN: &str = "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1";
+        let backend = FakeBackend::new();
+        let manager = manager_with(&backend);
+        manager.record_host(&server_id(1), record(1, push_host(&["codex"])));
+        manager.set_registration(Some(registration(TOKEN)), Vec::new());
+        let jobs = manager.turn_started(turn(1, "thread-1", "turn-1", "codex"));
+        manager.run_jobs(jobs).await;
+        let calls = subscribe_calls(&backend.calls());
+        assert_eq!(calls.len(), 1);
+        let args = &calls[0].1;
+
+        let json =
+            crate::alleycat::push_subscribe_request_json("pair-token-1".into(), args.clone());
+        assert!(!json.contains(TOKEN), "raw push token leaked: {json}");
+        assert!(!format!("{args:?}").contains(TOKEN));
+        let value: serde_json::Value = serde_json::from_str(&json).expect("json");
+        assert_eq!(value["op"], "push_subscribe");
+        let mut target_keys: Vec<&str> = value["target"]
+            .as_object()
+            .expect("target object")
+            .keys()
+            .map(String::as_str)
+            .collect();
+        target_keys.sort_unstable();
+        assert_eq!(target_keys, ["apns_environment", "platform", "sealed"]);
+        assert_eq!(value["target"]["sealed"], args.target.sealed.as_str());
+        assert_eq!(value["target"]["apns_environment"], "production");
+        // Only the Worker key opens it, and it names this device and host.
+        assert_eq!(sealed_token(args, &host_node(1)), TOKEN);
+    }
+
+    #[tokio::test]
+    async fn ids_breaking_push_rules_are_unsupported_without_contacting_host() {
+        let backend = FakeBackend::new();
+        let manager = manager_with(&backend);
+        let mut host_record = record(1, push_host(&["codex", "bad agent"]));
+        host_record.runtime_agents = HashMap::from([
+            ("codex".to_string(), "codex".to_string()),
+            ("claude".to_string(), "bad agent".to_string()),
+        ]);
+        manager.record_host(&server_id(1), host_record);
+        manager.set_registration(Some(registration("tok")), Vec::new());
+        let long_thread = "t".repeat(signing::MAX_REF_ID_BYTES + 1);
+        let cases = [
+            turn(1, "t", "u", "claude"),
+            turn(1, &long_thread, "u", "codex"),
+            turn(1, "t", "turn\n1", "codex"),
+            turn(1, "t", "", "codex"),
+        ];
+        for case in &cases {
+            assert!(manager.turn_started(case.clone()).is_empty(), "{case:?}");
+            assert_eq!(
+                manager.turn_push_state(
+                    &case.key,
+                    Some(&case.turn_id),
+                    Some(&case.turn_id),
+                    &case.runtime_kind
+                ),
+                AppTurnPushState::Unsupported,
+                "{case:?}"
+            );
+        }
+        // Never retried on background, never re-subscribed on token change.
+        assert!(manager.app_entered_background(cases.to_vec()).is_empty());
+        assert!(
+            manager
+                .set_registration(Some(registration("tok-2")), cases.to_vec())
+                .is_empty()
+        );
+        assert!(backend.calls().is_empty());
+        // A well-formed turn on the same host still subscribes.
+        assert_eq!(manager.turn_started(turn(1, "t", "ok", "codex")).len(), 1);
+    }
+
+    #[tokio::test]
+    async fn live_subscriptions_are_capped_per_server() {
+        let backend = FakeBackend::new();
+        let manager = ready_manager(&backend);
+        manager.record_host(&server_id(2), record(2, push_host(&["codex"])));
+        let mut jobs = Vec::new();
+        for index in 0..MAX_TRACKED_SUBSCRIPTIONS_PER_SERVER {
+            jobs.extend(manager.turn_started(turn(1, "t", &format!("u{index}"), "codex")));
+        }
+        assert_eq!(jobs.len(), MAX_TRACKED_SUBSCRIPTIONS_PER_SERVER);
+        assert!(
+            manager
+                .turn_started(turn(1, "t", "over", "codex"))
+                .is_empty()
+        );
+        assert_eq!(
+            state_of(&manager, 1, "t", "over"),
+            AppTurnPushState::Unsupported
+        );
+        // Other hosts have their own budget.
+        assert_eq!(manager.turn_started(turn(2, "t", "u", "codex")).len(), 1);
+        manager.run_jobs(jobs).await;
+        assert_eq!(
+            subscribe_calls(&backend.calls()).len(),
+            MAX_TRACKED_SUBSCRIPTIONS_PER_SERVER
+        );
+        // Subscribed turns keep their slot; a finished turn frees one.
+        assert!(
+            manager
+                .turn_started(turn(1, "t", "over2", "codex"))
+                .is_empty()
+        );
+        manager.turn_completed(&key(1, "t"), "u0");
+        assert_eq!(manager.turn_started(turn(1, "t", "next", "codex")).len(), 1);
+    }
+
+    #[tokio::test]
+    async fn cold_start_unpair_derives_host_id_and_revokes_at_worker() {
+        let backend = FakeBackend::new();
+        let manager = manager_with(&backend);
+        manager.set_registration(Some(registration("tok")), Vec::new());
+        // No host record this launch; the server id may carry upper-case hex.
+        let removed = format!("alleycat:{}", host_node(1).to_ascii_uppercase());
+        let jobs = manager.server_removed(&removed);
+        assert_eq!(
+            jobs,
+            vec![PushJob::RevokeDirect {
+                server_id: removed.clone(),
+                host_id: host_node(1),
+                worker_base_url: WORKER_ORIGIN.to_string(),
+            }]
+        );
+        manager.run_jobs(jobs).await;
+        let calls = backend.take_calls();
+        assert_eq!(calls.len(), 1, "only the Worker is contacted: {calls:?}");
+        let Call::Revoke { url, request } = &calls[0] else {
+            panic!("expected direct revoke, got {:?}", calls[0]);
+        };
+        assert_eq!(url, WORKER_ORIGIN);
+        assert_eq!(request.host_id, host_node(1));
+        assert_eq!(request.scope, "all");
+        let device_key = SecretKey::from_bytes(&[2u8; 32]);
+        assert_eq!(request.device_id, signing::device_id(&device_key));
+        assert_eq!(
+            request.signature,
+            signing::sign_revoke(
+                &device_key,
+                WORKER_ORIGIN,
+                &host_node(1),
+                NOW,
+                &request.nonce
+            )
+        );
+        // Server ids that do not name an alleycat host revoke nothing.
+        for server in [
+            "local".to_string(),
+            "alleycat:not-hex".to_string(),
+            format!("alleycat:{}", &host_node(1)[..63]),
+            format!("alleycat:{}0", host_node(1)),
+            format!("ssh:{}", host_node(1)),
+        ] {
+            assert!(manager.server_removed(&server).is_empty(), "{server}");
+        }
+    }
+
+    #[test]
+    fn cold_start_unpair_without_worker_url_does_nothing() {
+        let backend = FakeBackend::new();
+        let manager = manager_with(&backend);
+        assert!(manager.server_removed(&server_id(1)).is_empty());
+    }
+
+    #[tokio::test]
+    async fn grant_is_never_issued_in_the_second_of_own_revoke() {
+        let backend = FakeBackend::new();
+        let manager = ready_manager(&backend);
+        manager.record_host(&server_id(2), record(2, push_host(&["codex"])));
+        backend.push_unsubscribe_result(Err(AlleycatPushError::Transport("offline".into())));
+        backend.push_unsubscribe_result(Ok(()));
+        let jobs = manager.set_registration(None, Vec::new());
+        manager.run_jobs(jobs).await;
+        let revokes: Vec<DirectRevokeRequest> = backend
+            .take_calls()
+            .into_iter()
+            .filter_map(|call| match call {
+                Call::Revoke { request, .. } => Some(request),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(revokes.len(), 1);
+        assert_eq!(revokes[0].timestamp, NOW);
+        let revoked_host = revokes[0].host_id.clone();
+        let other_seed = if revoked_host == host_node(1) { 2 } else { 1 };
+        let revoked_seed = if other_seed == 1 { 2 } else { 1 };
+
+        // Re-registered and turns start within the same second.
+        manager.set_registration(Some(registration("tok-1")), Vec::new());
+        let mut jobs = manager.turn_started(turn(revoked_seed, "t", "u", "codex"));
+        jobs.extend(manager.turn_started(turn(other_seed, "t", "u", "codex")));
+        manager.run_jobs(jobs).await;
+        let calls = subscribe_calls(&backend.take_calls());
+        assert_eq!(calls.len(), 2);
+        let (_, revoked_args) = calls
+            .iter()
+            .find(|(node, _)| *node == revoked_host)
+            .expect("grant for the revoked host");
+        let (_, other_args) = calls
+            .iter()
+            .find(|(node, _)| *node != revoked_host)
+            .expect("grant for the other host");
+        let grant = &revoked_args.grant;
+        assert_eq!(grant.issued, NOW + 1);
+        assert_eq!(grant.expires, NOW + 1 + GRANT_LIFETIME_SECS);
+        let device_key = SecretKey::from_bytes(&[2u8; 32]);
+        assert_eq!(
+            grant.signature,
+            signing::sign_grant(
+                &device_key,
+                &GrantFields {
+                    aud: WORKER_ORIGIN,
+                    host_id: &revoked_host,
+                    device_id: &grant.device_id,
+                    platform: AppPushPlatform::Ios,
+                    environment: Some(AppApnsEnvironment::Production),
+                    sealed_target: &revoked_args.target.sealed,
+                    agent: "codex",
+                    thread_id: "t",
+                    turn_id: "u",
+                    issued: NOW + 1,
+                    expires: NOW + 1 + GRANT_LIFETIME_SECS,
+                    nonce: &grant.nonce,
+                },
+            )
+        );
+        // A host this device did not revoke is unaffected.
+        assert_eq!(other_args.grant.issued, NOW);
+
+        // Once the clock has moved past the revoke second, grants use now.
+        backend.advance(5);
+        let jobs = manager.turn_started(turn(revoked_seed, "t", "u2", "codex"));
+        manager.run_jobs(jobs).await;
+        let calls = subscribe_calls(&backend.take_calls());
+        assert_eq!(calls[0].1.grant.issued, NOW + 5);
+    }
+
+    #[tokio::test]
+    async fn unusable_worker_url_fails_without_contacting_host() {
+        let backend = FakeBackend::new();
+        let manager = manager_with(&backend);
+        manager.record_host(&server_id(1), record(1, push_host(&["codex"])));
+        manager.set_registration(
+            Some(AppPushRegistration {
+                worker_base_url: "http://worker.example.com".into(),
+                ..registration("tok")
+            }),
+            Vec::new(),
+        );
+        let jobs = manager.turn_started(turn(1, "t", "u", "codex"));
+        manager.run_jobs(jobs).await;
+        assert_eq!(state_of(&manager, 1, "t", "u"), AppTurnPushState::Failed);
+        assert!(backend.calls().is_empty());
     }
 }

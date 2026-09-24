@@ -707,8 +707,12 @@ impl MobileClient {
         let sessions = Arc::new(RwLock::new(HashMap::new()));
         let lag_recovery = StoreLagRecovery::new(Arc::clone(&app_store));
         let alleycat_endpoint = Arc::new(tokio::sync::OnceCell::new());
+        let alleycat_secret_key = Arc::new(StdMutex::new(None));
         let push_manager = Arc::new(crate::push::PushManager::new(Arc::new(
-            crate::push::IrohPushBackend::new(Arc::clone(&alleycat_endpoint)),
+            crate::push::IrohPushBackend::new(
+                Arc::clone(&alleycat_endpoint),
+                Arc::clone(&alleycat_secret_key),
+            ),
         )));
         spawn_store_listener(
             Arc::clone(&app_store),
@@ -733,7 +737,7 @@ impl MobileClient {
             direct_resumed_threads: Arc::new(StdMutex::new(HashSet::new())),
             thread_runtime_routes: Arc::new(StdMutex::new(HashMap::new())),
             alleycat_endpoint,
-            alleycat_secret_key: Arc::new(StdMutex::new(None)),
+            alleycat_secret_key,
             ssh_bootstrap_flows: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
             alleycat_restart_targets: Arc::new(StdMutex::new(HashMap::new())),
             terminal_sessions: Arc::new(StdMutex::new(HashMap::new())),
