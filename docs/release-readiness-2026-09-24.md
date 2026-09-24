@@ -72,3 +72,9 @@
 8. 工作区原有/并行产生的 Ghostty 脚本与 patches 改动和两个脏子模块保留，未纳入本次提交，也未推子模块。
 
 - 推送注销原先返回纯文本 `ok`，Android 会按 JSON 解析失败；`e6bc9ea` 修复为 JSON 并透传响应头。新增回归测试先复现失败后通过；Worker `npm test`、`tsc --noEmit` 均通过。Android URL 切换后单元测试通过（42 项任务，5 执行、37 缓存）。初始公开域名 TLS 连接失败，域名生效后在线注册/注销验收通过。
+
+## iPhone 推送实测准备
+
+- 已连接 iPhone 15 Pro Max，确认调试包使用 AgentBuddy 新 Worker 地址。
+- 首次启动复现 APNs 注册失败：应用缺少 `aps-environment`。在 `project.yml` 补齐推送 entitlement 后重新生成工程，设备构建成功，签名包含 `aps-environment=development`。
+- 修复包已安装并启动，设备回调成功取得 32 字节 APNs token（不在文档中记录 token）。真机后台接收与业务刷新仍待实测；token 注册成功不代表推送送达。

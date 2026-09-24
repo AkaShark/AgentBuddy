@@ -56,9 +56,12 @@ targets:
     deploymentTarget: "18.0"
     entitlements:
       path: Sources/AgentBuddy/AgentBuddy.entitlements
-      properties: {}
+      properties:
+        aps-environment: development
     attributes:
       SystemCapabilities:
+        com.apple.Push:
+          enabled: true
         com.apple.BackgroundModes:
           enabled: true
     sources:

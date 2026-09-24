@@ -1845,7 +1845,7 @@
 					};
 					FB10F64474F8F06D5D296857 = {
 						DevelopmentTeam = HNKUYWPBVC;
-						SystemCapabilities = "[\"com.apple.BackgroundModes\": [\"enabled\": true]]";
+						SystemCapabilities = "[\"com.apple.Push\": [\"enabled\": true], \"com.apple.BackgroundModes\": [\"enabled\": true]]";
 					};
 				};
 			};
