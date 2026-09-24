@@ -54,6 +54,13 @@ fn login_shell_output(shell: &str, timeout: Duration) -> Option<String> {
         .spawn()
         .ok()?;
     let deadline = Instant::now() + timeout;
+    let mut stdout = child.stdout.take()?;
+    let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+    std::thread::spawn(move || {
+        let mut output = String::new();
+        let result = stdout.read_to_string(&mut output).map(|_| output);
+        let _ = sender.send(result);
+    });
     loop {
         match child.try_wait() {
             Ok(Some(_)) => break,
@@ -65,9 +72,9 @@ fn login_shell_output(shell: &str, timeout: Duration) -> Option<String> {
             }
         }
     }
-    let mut out = String::new();
-    child.stdout.take()?.read_to_string(&mut out).ok()?;
-    Some(out)
+    // A shell helper may inherit stdout; keep the same deadline even if the
+    // shell itself has exited before that helper closes the pipe.
+    receiver.recv_timeout(deadline.saturating_duration_since(Instant::now())).ok()?.ok()
 }
 
 /// PATH to hand to every sidecar process; computed once per app run.
@@ -97,6 +104,19 @@ pub fn user_path() -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn login_shell_drains_output_larger_than_the_pipe_buffer() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let shell = dir.path().join("shell");
+        std::fs::write(&shell, format!(
+            "#!/bin/sh\n/usr/bin/head -c 262144 /dev/zero\nprintf '{DELIM}\\nPATH=/test/bin\\n{DELIM}'\n"
+        )).unwrap();
+        std::fs::set_permissions(&shell, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let output = login_shell_output(shell.to_str().unwrap(), Duration::from_secs(2));
+        assert_eq!(output.as_deref().and_then(parse_path).as_deref(), Some("/test/bin"));
+    }
 
     #[test]
     fn parse_path_reads_path_between_delimiters_and_ignores_rc_noise() {
