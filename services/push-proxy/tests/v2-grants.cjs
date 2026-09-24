@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const h = require("./support/harness");
 
 const worker = h.load("index").default;
+const { RATE_LIMITS, MAX_UNSEEN_REVOCATIONS } = h.load("host-channel");
 const { HOST_A, HOST_B, DEVICE_A, DEVICE_B } = h;
 
 beforeEach(() => {
@@ -34,6 +35,7 @@ test("a valid grant registers a subscription with the spec storage layout", asyn
       issuedAt: grant.issuedAt, expiresAt: grant.expiresAt, grantNonce: grant.grantNonce, createdAt: undefined,
     }
   );
+  assert.equal(JSON.stringify(sub).includes(grant.sealedTarget), false, "the sealed target itself is not stored");
   assert.equal(ctx.map.get(`idx:codex|thread-1|turn-1|${DEVICE_A.id}`), body.subscriptionId);
   assert.deepEqual(ctx.map.get(`grant:${grant.grantNonce}`), { exp: grant.expiresAt * 1000 });
   assert.ok(ctx.alarm !== null && ctx.alarm <= grant.expiresAt * 1000, "alarm armed for cleanup");
@@ -97,7 +99,10 @@ test("grant rules: each violation is forbidden and stores nothing", async () => 
   const now = h.clock.sec;
   const cases = {
     "grant for another host": h.makeGrant(DEVICE_A, HOST_A.id, {}, { host: HOST_B.id }),
-    "token mismatch": h.makeGrant(DEVICE_A, HOST_A.id, {}, { token: h.IOS_TOKEN_2 }),
+    "grant for another Worker (aud)": h.makeGrant(DEVICE_A, HOST_A.id, {}, { aud: "https://other.example.test" }),
+    "target hash mismatch": h.makeGrant(DEVICE_A, HOST_A.id, {}, {
+      target: h.sealTarget({ platform: "ios", token: h.IOS_TOKEN_2, apnsEnvironment: "production", deviceId: DEVICE_A.id, hostId: HOST_A.id }),
+    }),
     "environment mismatch": h.makeGrant(DEVICE_A, HOST_A.id, { apnsEnvironment: "sandbox" }, { environment: "production" }),
     "thread mismatch": h.makeGrant(DEVICE_A, HOST_A.id, {}, { thread: "thread-2" }),
     "signed by another device": h.makeGrant(DEVICE_A, HOST_A.id, {}, { signer: DEVICE_B }),
@@ -165,7 +170,11 @@ test("device revoke deletes that device's subscriptions and blocks older grants"
   const old = await register(env, preRevokeGrant);
   assert.equal(old.status, 403);
   assert.equal(old.body.message, "grant issued before device revocation");
-  const fresh = await register(env, h.makeGrant(DEVICE_A, HOST_A.id, { turnId: "turn-4", issuedAt: revoke.timestamp }));
+  // Issued in the same second as the revocation: also rejected (LOW-7).
+  const sameSecond = await register(env, h.makeGrant(DEVICE_A, HOST_A.id, { turnId: "turn-4", issuedAt: revoke.timestamp }));
+  assert.equal(sameSecond.status, 403);
+  assert.equal(sameSecond.body.message, "grant issued before device revocation");
+  const fresh = await register(env, h.makeGrant(DEVICE_A, HOST_A.id, { turnId: "turn-4", issuedAt: revoke.timestamp + 1 }));
   assert.equal(fresh.status, 201);
 
   // An older revoke never moves the revocation point backwards.
@@ -180,6 +189,7 @@ test("revoke requests: bad signature, stale timestamp and replay are unauthorize
     [h.makeRevoke(DEVICE_A, HOST_A.id, {}, DEVICE_B), 401, "unauthorized"],
     [{ ...h.makeRevoke(DEVICE_A, HOST_A.id), hostId: HOST_B.id }, 401, "unauthorized"],
     [h.makeRevoke(DEVICE_A, HOST_A.id, { timestamp: h.clock.sec - 301 }), 401, "unauthorized"],
+    [h.makeRevoke(DEVICE_A, HOST_A.id, {}, DEVICE_A, "https://other.example.test"), 401, "unauthorized"],
     [h.makeRevoke(DEVICE_A, HOST_A.id, { scope: "one" }), 400, "bad_request"],
     [h.makeRevoke(DEVICE_A, HOST_A.id, { nonce: "xyz" }), 400, "bad_request"],
     [{ ...h.makeRevoke(DEVICE_A, HOST_A.id), signature: undefined }, 400, "bad_request"],
@@ -210,4 +220,83 @@ test("revocation records expire after the longest grant lifetime", async () => {
   await h.runAlarm(ctx);
   assert.equal(ctx.map.size, 0);
   assert.equal(ctx.alarm, null, "nothing left, no alarm re-armed");
+});
+
+test("revoke nonces live apart from host nonces: neither can pre-claim the other", async () => {
+  const { env, channel } = h.makeEnv();
+  await register(env, h.makeGrant(DEVICE_A, HOST_A.id));
+  const ctx = channel(HOST_A.id);
+
+  // A device revoke (anyone can mint a device key) using nonce N ...
+  const nonce = h.randHex(16);
+  const stranger = h.ed25519FromSeed(h.randHex(32));
+  assert.equal((await worker.fetch(h.revokeRequest(h.makeRevoke(stranger, HOST_A.id, { nonce })), env)).status, 200);
+  assert.ok(ctx.map.has(`rnonce:${nonce}`));
+  assert.equal(ctx.map.has(`nonce:${nonce}`), false);
+  // ... does not block the host's own request with the same nonce.
+  const event = await worker.fetch(h.hostRequest(HOST_A, "POST", "/v2/events", h.makeEvent(), { nonce }), env);
+  assert.equal(event.status, 202);
+  assert.equal((await event.json()).matched, 1);
+  assert.ok(ctx.map.has(`nonce:${nonce}`));
+
+  // And a host nonce does not block a revoke; a replayed revoke nonce does.
+  const hostNonce = h.randHex(16);
+  const sub = await worker.fetch(h.hostRequest(HOST_A, "POST", "/v2/subscriptions", h.makeGrant(DEVICE_A, HOST_A.id, { turnId: "turn-9" }), { nonce: hostNonce }), env);
+  assert.equal(sub.status, 201);
+  assert.ok(ctx.map.has(`nonce:${hostNonce}`));
+  const revoke = h.makeRevoke(DEVICE_B, HOST_A.id, { nonce: hostNonce });
+  assert.equal((await worker.fetch(h.revokeRequest(revoke, "198.51.100.77"), env)).status, 200);
+  const replay = await worker.fetch(h.revokeRequest(h.makeRevoke(DEVICE_B, HOST_A.id, { nonce: hostNonce }), "198.51.100.78"), env);
+  assert.equal(replay.status, 401);
+
+  // Revoke nonces expire like host nonces.
+  h.clock.advance(10 * 60_000 + 1);
+  await h.runAlarm(ctx);
+  assert.deepEqual(ctx.keys("rnonce:"), []);
+});
+
+test("device revoke is rate limited per target host", async () => {
+  const { env } = h.makeEnv();
+  const limit = RATE_LIMITS.revokes;
+  for (let i = 0; i < limit; i++) {
+    // A different client IP each time, so only the per-host budget applies.
+    const response = await worker.fetch(h.revokeRequest(h.makeRevoke(DEVICE_A, HOST_A.id), `198.51.100.${i + 1}`), env);
+    assert.equal(response.status, 200, `revoke ${i}`);
+  }
+  const limited = await worker.fetch(h.revokeRequest(h.makeRevoke(DEVICE_A, HOST_A.id), "203.0.113.200"), env);
+  assert.equal(limited.status, 429);
+  assert.equal((await limited.json()).error, "rate_limited");
+  assert.ok(Number(limited.headers.get("retry-after")) >= 1);
+  // Another host has its own budget.
+  assert.equal((await worker.fetch(h.revokeRequest(h.makeRevoke(DEVICE_A, HOST_B.id), "203.0.113.201"), env)).status, 200);
+  h.clock.advance(60_000);
+  assert.equal((await worker.fetch(h.revokeRequest(h.makeRevoke(DEVICE_A, HOST_A.id), "203.0.113.202"), env)).status, 200);
+});
+
+test("revocation records for never-seen devices are capped per host", async () => {
+  const { env, channel } = h.makeEnv();
+  await register(env, h.makeGrant(DEVICE_A, HOST_A.id));
+  const ctx = channel(HOST_A.id);
+  // Pre-fill the object with the maximum number of live revocation records.
+  const exp = h.clock.now + 3600_000;
+  for (let i = 0; i < MAX_UNSEEN_REVOCATIONS; i++) {
+    ctx.map.set(`revoked:${i.toString(16).padStart(64, "0")}`, { at: h.clock.sec, exp });
+  }
+  const minted = h.ed25519FromSeed(h.randHex(32));
+  const capped = await worker.fetch(h.revokeRequest(h.makeRevoke(minted, HOST_A.id), "198.51.100.1"), env);
+  assert.equal(capped.status, 429);
+  assert.equal((await capped.json()).error, "rate_limited");
+  assert.ok(Number(capped.headers.get("retry-after")) >= 60);
+  assert.equal(ctx.map.has(`revoked:${minted.id}`), false);
+  assert.equal(ctx.keys("rnonce:").length, 0, "a capped revoke stores nothing");
+
+  // A device with a subscription here can still revoke ...
+  const seen = await worker.fetch(h.revokeRequest(h.makeRevoke(DEVICE_A, HOST_A.id), "198.51.100.2"), env);
+  assert.equal(seen.status, 200);
+  assert.deepEqual(await seen.json(), { revoked: 1 });
+  // ... and so can a device that already has a revocation record.
+  const again = await worker.fetch(h.revokeRequest(h.makeRevoke(DEVICE_A, HOST_A.id), "198.51.100.3"), env);
+  assert.equal(again.status, 200);
+  // Other hosts are unaffected.
+  assert.equal((await worker.fetch(h.revokeRequest(h.makeRevoke(minted, HOST_B.id), "198.51.100.4"), env)).status, 200);
 });

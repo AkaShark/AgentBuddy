@@ -5,7 +5,7 @@ const assert = require("node:assert/strict");
 const h = require("./support/harness");
 
 const worker = h.load("index").default;
-const { MAX_DELIVERY_ATTEMPTS } = h.load("host-channel");
+const { MAX_DELIVERY_ATTEMPTS, LIST_PAGE_SIZE } = h.load("host-channel");
 const { HOST_A, DEVICE_A, DEVICE_B } = h;
 
 beforeEach(() => {
@@ -305,12 +305,19 @@ test("other APNs 4xx responses are permanent failures", async () => {
 test("FCM error classification: token errors, 401 refresh, retryable and permanent", async () => {
   const android = { platform: "android", pushToken: h.ANDROID_TOKEN, apnsEnvironment: undefined };
   const fcmError = (status, error, headers = {}) => () => new Response(JSON.stringify({ error }), { status, headers });
+  const badRequest = (field) => ({ "@type": "type.googleapis.com/google.rpc.BadRequest", fieldViolations: [{ field, description: "Invalid registration token" }] });
   const cases = [
     ["unregistered", fcmError(404, { status: "NOT_FOUND", details: [{ "@type": "type.googleapis.com/google.firebase.fcm.v1.FcmError", errorCode: "UNREGISTERED" }] }), "invalid_token"],
-    ["not found", fcmError(404, { status: "NOT_FOUND", message: "Requested entity was not found." }), "invalid_token"],
-    ["invalid token argument", fcmError(400, { status: "INVALID_ARGUMENT", message: "The registration token is not a valid FCM registration token", details: [{ errorCode: "INVALID_ARGUMENT" }] }), "invalid_token"],
-    ["token field violation", fcmError(400, { status: "INVALID_ARGUMENT", details: [{ "@type": "type.googleapis.com/google.rpc.BadRequest", fieldViolations: [{ field: "message.token" }] }] }), "invalid_token"],
-    ["other invalid argument", fcmError(400, { status: "INVALID_ARGUMENT", message: "Invalid value at 'message.android.ttl'", details: [{ fieldViolations: [{ field: "message.android.ttl" }] }] }), "failed"],
+    ["token field violation", fcmError(400, { status: "INVALID_ARGUMENT", details: [badRequest("message.token")] }), "invalid_token"],
+    ["FcmError INVALID_ARGUMENT + token field violation", fcmError(400, { status: "INVALID_ARGUMENT", message: "The registration token is not a valid FCM registration token", details: [{ "@type": "type.googleapis.com/google.firebase.fcm.v1.FcmError", errorCode: "INVALID_ARGUMENT" }, badRequest("message.token")] }), "invalid_token"],
+    // Spec §13: a bare 404 / NOT_FOUND, or INVALID_ARGUMENT that does not name
+    // message.token, is not proof that the token is dead.
+    ["bare 404", fcmError(404, {}), "failed"],
+    ["not found without UNREGISTERED", fcmError(404, { status: "NOT_FOUND", message: "Requested entity was not found." }), "failed"],
+    ["invalid argument mentioning the token only in the message", fcmError(400, { status: "INVALID_ARGUMENT", message: "The registration token is not a valid FCM registration token", details: [{ errorCode: "INVALID_ARGUMENT" }] }), "failed"],
+    ["other invalid argument", fcmError(400, { status: "INVALID_ARGUMENT", message: "Invalid value at 'message.android.ttl'", details: [badRequest("message.android.ttl")] }), "failed"],
+    ["token field violation without INVALID_ARGUMENT", fcmError(403, { status: "PERMISSION_DENIED", details: [badRequest("message.token")] }), "failed"],
+    ["malformed details", fcmError(400, { status: "INVALID_ARGUMENT", details: [null, 5, { fieldViolations: [null] }] }), "failed"],
     ["quota", fcmError(429, { status: "RESOURCE_EXHAUSTED" }, { "retry-after": "300" }), "retrying"],
     ["unavailable", fcmError(503, { status: "UNAVAILABLE" }), "retrying"],
     ["sender mismatch", fcmError(403, { status: "PERMISSION_DENIED", details: [{ errorCode: "SENDER_ID_MISMATCH" }] }), "failed"],
@@ -318,11 +325,14 @@ test("FCM error classification: token errors, 401 refresh, retryable and permane
   for (const [name, respond, expected] of cases) {
     const { env, channel } = h.makeEnv();
     const subscriptionId = await subscribe(env, android);
+    // Another subscription with the same token: only invalid_token removes it.
+    const sibling = await subscribe(env, { ...android, turnId: "turn-2" });
     h.fetchMock.reset(respond);
     const { event, body } = await sendEvent(env);
     assert.equal(body.results[0].state, expected, name);
     const ctx = channel(HOST_A.id);
-    if (expected === "invalid_token" || expected === "failed") assert.deepEqual(ctx.keys("sub:"), [], name);
+    if (expected === "invalid_token") assert.deepEqual(ctx.keys("sub:"), [], name);
+    if (expected === "failed") assert.deepEqual(ctx.keys("sub:"), [`sub:${sibling}`], name);
     if (name === "quota") {
       assert.equal(ctx.map.get(`retry:${event.eventId}|${subscriptionId}`).nextAt, h.clock.now + 300_000, "Retry-After honored");
     }
@@ -418,4 +428,110 @@ test("a crash between the provider call and the result write is recovered by the
   await h.runAlarm(ctx);
   assert.equal(ctx.map.get(`evt:${event.eventId}|${subscriptionId}`).state, "sent");
   assert.equal(h.fetchMock.providerCalls().length, 1);
+});
+
+test("an event for a host object with no matching subscription writes no state", async () => {
+  const { env, channel } = h.makeEnv();
+  const event = h.makeEvent();
+  const nonce = h.randHex(16);
+  const response = await worker.fetch(h.hostRequest(HOST_A, "POST", "/v2/events", event, { nonce }), env);
+  assert.equal(response.status, 202);
+  assert.deepEqual(await response.json(), { eventId: event.eventId, matched: 0, results: [] });
+  const ctx = channel(HOST_A.id);
+  assert.equal(ctx.map.size, 0, [...ctx.map.keys()].join(","));
+  assert.equal(ctx.alarm, null);
+  // Nothing was recorded, so the (harmless) replay is answered the same way.
+  const replay = await worker.fetch(h.hostRequest(HOST_A, "POST", "/v2/events", event, { nonce }), env);
+  assert.deepEqual(await replay.json(), { eventId: event.eventId, matched: 0, results: [] });
+  // A DELETE of an unknown subscription is also answered without writes.
+  const del = await worker.fetch(h.hostRequest(HOST_A, "DELETE", `/v2/subscriptions/sub_${"3".repeat(32)}`), env);
+  assert.deepEqual(await del.json(), { ok: true });
+  assert.equal(ctx.map.size, 0);
+  assert.equal(ctx.alarm, null);
+  // The signature is still verified first.
+  const forged = await worker.fetch(h.hostRequest(HOST_A, "POST", "/v2/events", h.makeEvent(), { signer: h.HOST_B }), env);
+  assert.equal(forged.status, 401);
+  assert.equal(h.fetchMock.calls.length, 0);
+
+  // With subscriptions for other turns only, a non-matching event is still a no-op.
+  await subscribe(env, { turnId: "turn-9" });
+  const before = new Map(ctx.map);
+  const other = await worker.fetch(h.hostRequest(HOST_A, "POST", "/v2/events", h.makeEvent()), env);
+  assert.equal((await other.json()).matched, 0);
+  assert.deepEqual([...ctx.map.keys()].sort(), [...before.keys()].sort());
+  assert.deepEqual(ctx.map.get("rl:events"), undefined);
+});
+
+test("queued retries of a host added to BLOCKED_HOST_IDS stop and finalize as failed", async () => {
+  const { env, channel } = h.makeEnv();
+  const subscriptionId = await subscribe(env);
+  const other = await subscribe(env, { turnId: "turn-2" });
+  h.fetchMock.reset(apnsError(503, "ServiceUnavailable"));
+  const { event } = await sendEvent(env);
+  const second = await sendEvent(env, { turnId: "turn-2" });
+  const ctx = channel(HOST_A.id);
+  const key = `${event.eventId}|${subscriptionId}`;
+  assert.equal(ctx.map.get(`retry:${key}`).attempts, 1);
+  assert.equal(h.fetchMock.providerCalls().length, 2);
+
+  // The operator blocks the host (vars are read on every use).
+  env.BLOCKED_HOST_IDS = HOST_A.id;
+  h.fetchMock.reset(() => new Response(null, { status: 200 }));
+  const logs = h.captureLogs();
+  try {
+    h.clock.set(ctx.map.get(`retry:${key}`).nextAt);
+    await h.runAlarm(ctx);
+  } finally {
+    logs.restore();
+  }
+  assert.equal(h.fetchMock.providerCalls().length, 0, "no provider call for a blocked host");
+  assert.equal(ctx.map.get(`evt:${key}`).state, "failed");
+  assert.equal(ctx.map.get(`evt:${second.event.eventId}|${other}`).state, "failed");
+  assert.deepEqual(ctx.keys("retry:"), []);
+  assert.deepEqual(ctx.keys("sub:"), []);
+  assert.ok(logs.lines.some((line) => line.includes("stopped: host blocked")));
+});
+
+test("cleanup pages through storage.list with more than 1000 keys", async () => {
+  const { env, channel } = h.makeEnv();
+  const live = await subscribe(env);
+  const ctx = channel(HOST_A.id);
+  const now = h.clock.now;
+  const expiredKeys = [];
+  const liveKeys = [];
+  // 2600 expired + 1200 live records across several namespaces, plus index
+  // entries pointing at missing and at expired subscriptions.
+  for (let i = 0; i < 2600; i++) {
+    const key = `grant:${i.toString(16).padStart(32, "0")}`;
+    ctx.map.set(key, { exp: now - 1 });
+    expiredKeys.push(key);
+  }
+  for (let i = 0; i < 1200; i++) {
+    const key = `nonce:${i.toString(16).padStart(32, "0")}`;
+    ctx.map.set(key, { exp: now + 60_000 });
+    liveKeys.push(key);
+  }
+  for (let i = 0; i < 300; i++) {
+    const key = `idx:codex|t-${i}|turn|${"0".repeat(64)}`;
+    ctx.map.set(key, `sub_${i.toString(16).padStart(32, "0")}`);
+    expiredKeys.push(key);
+  }
+  const stale = `sub_${"e".repeat(32)}`;
+  ctx.map.set(`sub:${stale}`, { ...ctx.map.get(`sub:${live}`), subscriptionId: stale, turnId: "turn-stale", expiresAt: h.clock.sec - 1 });
+  ctx.map.set(`idx:codex|thread-1|turn-stale|${DEVICE_A.id}`, stale);
+  expiredKeys.push(`sub:${stale}`, `idx:codex|thread-1|turn-stale|${DEVICE_A.id}`);
+
+  ctx.listCalls.length = 0;
+  await h.runAlarm(ctx);
+  for (const key of expiredKeys) assert.equal(ctx.map.has(key), false, key);
+  for (const key of liveKeys) assert.ok(ctx.map.has(key), key);
+  assert.ok(ctx.map.has(`sub:${live}`));
+  assert.ok(ctx.map.has(`idx:codex|thread-1|turn-1|${DEVICE_A.id}`));
+  assert.ok(ctx.listCalls.length > 0);
+  assert.ok(ctx.listCalls.every((call) => typeof call.limit === "number" && call.limit <= LIST_PAGE_SIZE), JSON.stringify(ctx.listCalls.slice(0, 3)));
+  const fullScans = ctx.listCalls.filter((call) => call.prefix === undefined);
+  assert.ok(fullScans.length >= 4, `paged full scan (${fullScans.length} pages)`);
+  assert.equal(fullScans[0].startAfter, undefined);
+  assert.ok(fullScans.slice(1).every((call) => typeof call.startAfter === "string"));
+  assert.ok(ctx.alarm !== null, "re-armed for the live records");
 });

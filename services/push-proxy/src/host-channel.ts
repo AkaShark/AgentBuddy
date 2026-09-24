@@ -1,12 +1,14 @@
 // HostChannel: one Durable Object per host (idFromName(hostId)), spec §7.2.
-// It owns that host's subscriptions, the host nonce replay cache, grant nonces,
-// device revocation points, per-event delivery records and delivery retries.
-// The Worker entry has already verified the host (or device) signature and
+// It owns that host's subscriptions, the host nonce replay cache, the separate
+// revoke nonce cache, grant nonces, device revocation points, per-event
+// delivery records and delivery retries. The Worker entry has already verified
+// the host (or device) signature, the grant and the sealed target, and
 // validated the payload before a request reaches this object.
 import { ApnsEnvironment, DeliveryState, Platform, sendTurnAlert, TurnKind } from "./alerts"
 import { errorResponse, jsonResponse } from "./http"
-import { grantSigningString, HEX32_RE, randomHex, sha256Hex, SIGNATURE_WINDOW_SECONDS, verifyEd25519 } from "./signing"
+import { HEX32_RE, randomHex } from "./signing"
 import { Env } from "./types"
+import { blockedHostIds } from "./validation"
 
 export const MAX_GRANT_LIFETIME_SECONDS = 48 * 3600
 export const HOST_NONCE_TTL_MS = 10 * 60_000
@@ -14,7 +16,11 @@ export const EVENT_RECORD_TTL_MS = 48 * 3600_000
 // Any grant issued before a revocation point has expired 48h later.
 export const REVOCATION_TTL_MS = (MAX_GRANT_LIFETIME_SECONDS + 3600) * 1000
 export const RATE_WINDOW_MS = 60_000
-export const RATE_LIMITS = { subscriptions: 60, events: 120, deletes: 120 } as const
+export const RATE_LIMITS = { subscriptions: 60, events: 120, deletes: 120, revokes: 30 } as const
+// Revocation records for devices with no subscription here (anyone can mint a
+// device key) are capped per host object; beyond this a revoke gets 429.
+export const MAX_UNSEEN_REVOCATIONS = 1000
+export const UNSEEN_REVOCATION_RETRY_AFTER_SECONDS = 3600
 export const MAX_DELIVERY_ATTEMPTS = 8
 export const RETRY_BASE_MS = 30_000
 export const RETRY_MAX_MS = 30 * 60_000
@@ -23,7 +29,10 @@ export const RETRY_AFTER_MAX_MS = 60 * 60_000
 // between the provider call and the result write is retried by the alarm.
 export const SEND_LEASE_MS = 60_000
 const STORAGE_BATCH = 128
+// storage.list() is always paged so a large object never loads at once.
+export const LIST_PAGE_SIZE = 1000
 
+// An authorized grant with its target already opened (pushToken is plaintext).
 export interface SubscriptionInput {
   deviceId: string
   platform: Platform
@@ -35,7 +44,6 @@ export interface SubscriptionInput {
   issuedAt: number
   expiresAt: number
   grantNonce: string
-  grantSignature: string
 }
 
 export interface EventInput {
@@ -125,17 +133,32 @@ export class HostChannel implements DurableObject {
       else if (request.method === "POST" && parts.length === 1 && parts[0] === "revoke") op = "revoke"
       else return errorResponse("not_found")
 
+      if (!HEX32_RE.test(nonce)) return errorResponse("unauthorized")
+      // Device revokes use their own nonce namespace, so nobody can pre-claim
+      // a host nonce through the unauthenticated-by-host revoke route.
+      if (op === "revoke") return await this.revoke(nonce, (await request.json()) as RevokeInput)
+
       // Replay cache first: a nonce seen in the last 10 minutes is rejected
       // before any rate-limit or state change.
-      if (!HEX32_RE.test(nonce) || (await this.state.storage.get(`nonce:${nonce}`)) !== undefined) {
-        return errorResponse("unauthorized")
+      if ((await this.state.storage.get(`nonce:${nonce}`)) !== undefined) return errorResponse("unauthorized")
+
+      // Requests that cannot change anything are answered from reads alone:
+      // no nonce, rate-limit window or alarm is written (spec §13), so any
+      // self-minted host key costs this object nothing.
+      let event: EventInput | undefined
+      if (op === "event") {
+        event = (await request.json()) as EventInput
+        if (await this.eventIsNoop(event)) {
+          return jsonResponse({ eventId: event.eventId, matched: 0, results: [] }, 202)
+        }
+      } else if (op === "unsubscribe" && (await this.state.storage.get(`sub:${parts[1]}`)) === undefined) {
+        return jsonResponse({ ok: true })
       }
-      if (op !== "revoke") {
-        const bucket: RateBucket = op === "subscribe" ? "subscriptions" : op === "event" ? "events" : "deletes"
-        const retryAfter = await this.consumeRate(bucket)
-        if (retryAfter !== null) return errorResponse("rate_limited", { retryAfterSeconds: retryAfter })
-      }
-      await this.rememberNonce(nonce)
+
+      const bucket: RateBucket = op === "subscribe" ? "subscriptions" : op === "event" ? "events" : "deletes"
+      const retryAfter = await this.consumeRate(bucket)
+      if (retryAfter !== null) return errorResponse("rate_limited", { retryAfterSeconds: retryAfter })
+      await this.rememberNonce(`nonce:${nonce}`)
 
       switch (op) {
         case "subscribe":
@@ -143,9 +166,7 @@ export class HostChannel implements DurableObject {
         case "unsubscribe":
           return await this.unsubscribe(parts[1])
         case "event":
-          return await this.event((await request.json()) as EventInput)
-        case "revoke":
-          return await this.revoke((await request.json()) as RevokeInput)
+          return await this.event(event as EventInput)
       }
     } catch (err) {
       console.error(`HostChannel error: ${err instanceof Error ? err.message : String(err)}`)
@@ -164,34 +185,11 @@ export class HostChannel implements DurableObject {
     const nowMs = Date.now()
     const nowSec = Math.floor(nowMs / 1000)
 
-    // §5.1 grant rules. `host` is bound by putting the authenticated signer's
-    // hostId into the canonical string; the token by hashing the submitted one.
-    if (input.expiresAt <= input.issuedAt || input.expiresAt - input.issuedAt > MAX_GRANT_LIFETIME_SECONDS) {
-      return errorResponse("forbidden", { message: "grant lifetime must be positive and at most 48h" })
-    }
-    if (input.expiresAt <= nowSec) return errorResponse("forbidden", { message: "grant expired" })
-    if (input.issuedAt > nowSec + SIGNATURE_WINDOW_SECONDS) {
-      return errorResponse("forbidden", { message: "grant issued in the future" })
-    }
+    // §5.1 / §5.3: a grant issued at or before the device's revocation point
+    // (same second included) can no longer register.
     const revocation = await this.state.storage.get<{ at: number }>(`revoked:${input.deviceId}`)
-    if (revocation && input.issuedAt < revocation.at) {
+    if (revocation && input.issuedAt <= revocation.at) {
       return errorResponse("forbidden", { message: "grant issued before device revocation" })
-    }
-    const signed = grantSigningString({
-      host: hostId,
-      device: input.deviceId,
-      platform: input.platform,
-      environment: input.platform === "ios" ? input.apnsEnvironment ?? "production" : "none",
-      tokenSha256: await sha256Hex(input.pushToken),
-      agent: input.agent,
-      thread: input.threadId,
-      turn: input.turnId,
-      issued: input.issuedAt,
-      expires: input.expiresAt,
-      nonce: input.grantNonce,
-    })
-    if (!(await verifyEd25519(input.deviceId, input.grantSignature, signed))) {
-      return errorResponse("forbidden", { message: "grant signature invalid" })
     }
 
     const idx = indexKey(input)
@@ -261,21 +259,37 @@ export class HostChannel implements DurableObject {
     return jsonResponse({ ok: true })
   }
 
-  private async revoke(input: RevokeInput): Promise<Response> {
-    const subs = await this.state.storage.list<Subscription>({ prefix: "sub:" })
-    let revoked = 0
-    for (const sub of subs.values()) {
-      if (sub.deviceId !== input.deviceId) continue
-      await this.removeSubscription(sub, "failed")
-      revoked++
-    }
+  private async revoke(nonce: string, input: RevokeInput): Promise<Response> {
+    if ((await this.state.storage.get(`rnonce:${nonce}`)) !== undefined) return errorResponse("unauthorized")
+    const retryAfter = await this.consumeRate("revokes")
+    if (retryAfter !== null) return errorResponse("rate_limited", { retryAfterSeconds: retryAfter })
+
     const key = `revoked:${input.deviceId}`
     const previous = await this.state.storage.get<{ at: number }>(key)
+    const subs: Subscription[] = []
+    for await (const [, sub] of this.scan<Subscription>("sub:")) {
+      if (sub.deviceId === input.deviceId) subs.push(sub)
+    }
+    if (!previous && subs.length === 0 && (await this.countRevocations()) >= MAX_UNSEEN_REVOCATIONS) {
+      return errorResponse("rate_limited", { retryAfterSeconds: UNSEEN_REVOCATION_RETRY_AFTER_SECONDS })
+    }
+    await this.rememberNonce(`rnonce:${nonce}`)
+
+    for (const sub of subs) await this.removeSubscription(sub, "failed")
+    const revoked = subs.length
     const at = Math.max(previous?.at ?? 0, input.timestamp)
     const record = { at, exp: at * 1000 + REVOCATION_TTL_MS }
     await this.state.storage.put(key, record)
     await this.ensureAlarm(record.exp)
     return jsonResponse({ revoked })
+  }
+
+  private async countRevocations(): Promise<number> {
+    let count = 0
+    for await (const _ of this.scan("revoked:")) {
+      if (++count >= MAX_UNSEEN_REVOCATIONS) break
+    }
+    return count
   }
 
   // Deletes the subscription, its index entry and its pending retries; the
@@ -286,8 +300,7 @@ export class HostChannel implements DurableObject {
     if ((await this.state.storage.get<string>(idx)) === sub.subscriptionId) keys.push(idx)
     const now = Date.now()
     const finalized: Record<string, DeliveryRecord> = {}
-    const retries = await this.state.storage.list<PendingDelivery>({ prefix: "retry:" })
-    for (const [key, pending] of retries) {
+    for await (const [key, pending] of this.scan<PendingDelivery>("retry:")) {
       if (pending.subscriptionId !== sub.subscriptionId) continue
       keys.push(key)
       finalized[`evt:${pending.eventId}|${sub.subscriptionId}`] = deliveryRecord(pendingState, pending.attempts, null, now)
@@ -297,15 +310,24 @@ export class HostChannel implements DurableObject {
   }
 
   private async removeSubscriptionsWithToken(platform: Platform, pushToken: string): Promise<void> {
-    const subs = await this.state.storage.list<Subscription>({ prefix: "sub:" })
-    for (const sub of subs.values()) {
-      if (sub.platform === platform && sub.pushToken === pushToken) {
-        await this.removeSubscription(sub, "invalid_token")
-      }
+    const matching: Subscription[] = []
+    for await (const [, sub] of this.scan<Subscription>("sub:")) {
+      if (sub.platform === platform && sub.pushToken === pushToken) matching.push(sub)
     }
+    for (const sub of matching) await this.removeSubscription(sub, "invalid_token")
   }
 
   // --- events ------------------------------------------------------------------
+
+  // Nothing to deliver and nothing to report: no subscription for this turn
+  // and no earlier delivery of this eventId.
+  private async eventIsNoop(input: EventInput): Promise<boolean> {
+    const [matches, prior] = await Promise.all([
+      this.state.storage.list({ prefix: turnPrefix(input.agent, input.threadId, input.turnId), limit: 1 }),
+      this.state.storage.list({ prefix: `evt:${input.eventId}|`, limit: 1 }),
+    ])
+    return matches.size === 0 && prior.size === 0
+  }
 
   private async event(input: EventInput): Promise<Response> {
     const nowSec = Math.floor(Date.now() / 1000)
@@ -314,17 +336,17 @@ export class HostChannel implements DurableObject {
 
     // Earlier deliveries of this eventId (subscriptions are deleted once sent).
     const priorPrefix = `evt:${input.eventId}|`
-    const prior = await this.state.storage.list<DeliveryRecord>({ prefix: priorPrefix })
-    for (const [key, record] of prior) {
+    for await (const [key, record] of this.scan<DeliveryRecord>(priorPrefix)) {
       const subscriptionId = key.slice(priorPrefix.length)
       seen.add(subscriptionId)
       results.push({ subscriptionId, state: record.state === "sent" ? "duplicate" : record.state })
     }
 
-    const matches = await this.state.storage.list<string>({
-      prefix: turnPrefix(input.agent, input.threadId, input.turnId),
-    })
-    for (const subscriptionId of matches.values()) {
+    const matches: string[] = []
+    for await (const [, subscriptionId] of this.scan<string>(turnPrefix(input.agent, input.threadId, input.turnId))) {
+      matches.push(subscriptionId)
+    }
+    for (const subscriptionId of matches) {
       if (seen.has(subscriptionId)) continue
       const sub = await this.state.storage.get<Subscription>(`sub:${subscriptionId}`)
       if (!sub || sub.expiresAt <= nowSec) continue
@@ -394,9 +416,12 @@ export class HostChannel implements DurableObject {
 
   private async processDueRetries(): Promise<void> {
     const now = Date.now()
-    const retries = await this.state.storage.list<PendingDelivery>({ prefix: "retry:" })
-    for (const [key, pending] of retries) {
-      if (pending.nextAt > now) continue
+    const due: Array<[string, PendingDelivery]> = []
+    for await (const entry of this.scan<PendingDelivery>("retry:")) {
+      if (entry[1].nextAt <= now) due.push(entry)
+    }
+    const blocked = blockedHostIds(this.env)
+    for (const [key, pending] of due) {
       try {
         const sub = await this.state.storage.get<Subscription>(`sub:${pending.subscriptionId}`)
         if (!sub || sub.expiresAt * 1000 <= now) {
@@ -405,6 +430,12 @@ export class HostChannel implements DurableObject {
             deliveryRecord("failed", pending.attempts, null, now)
           )
           await this.state.storage.delete(key)
+          continue
+        }
+        if (blocked.has(sub.hostId)) {
+          // §5.4: blocking a host also stops its queued retries.
+          console.log(`retry ${pending.eventId} ${sub.subscriptionId} stopped: host blocked`)
+          await this.removeSubscription(sub, "failed")
           continue
         }
         await this.deliver(sub, pending)
@@ -418,51 +449,80 @@ export class HostChannel implements DurableObject {
   // --- housekeeping ------------------------------------------------------------
 
   // Drops expired records and re-arms the alarm for the next expiry or retry.
+  // One paged pass over the whole object; an index entry is dropped when its
+  // subscription is gone or expired (looked up per page, since "idx:" sorts
+  // before "sub:").
   private async cleanup(): Promise<void> {
     const now = Date.now()
-    const entries = await this.state.storage.list<unknown>()
-    const expired: string[] = []
-    const liveSubs = new Set<string>()
     let next: number | null = null
     const consider = (at: number) => {
       if (next === null || at < next) next = at
     }
 
-    for (const [key, value] of entries) {
-      if (!key.startsWith("sub:")) continue
-      const sub = value as Subscription
-      if (sub.expiresAt * 1000 <= now) {
-        expired.push(key)
-      } else {
-        liveSubs.add(sub.subscriptionId)
-        consider(sub.expiresAt * 1000)
+    for await (const page of this.pages()) {
+      const expired: string[] = []
+      const indexes: Array<[string, string]> = []
+      for (const [key, value] of page) {
+        if (key.startsWith("sub:")) {
+          const sub = value as Subscription
+          if (sub.expiresAt * 1000 <= now) expired.push(key)
+          else consider(sub.expiresAt * 1000)
+        } else if (key.startsWith("idx:")) {
+          indexes.push([key, value as string])
+        } else if (key.startsWith("retry:")) {
+          consider((value as PendingDelivery).nextAt)
+        } else if (key.startsWith("rl:")) {
+          const stamps = (value as number[]).filter((t) => now - t < RATE_WINDOW_MS)
+          if (stamps.length === 0) expired.push(key)
+          else consider(stamps[stamps.length - 1] + RATE_WINDOW_MS)
+        } else {
+          const exp = (value as { exp?: unknown } | null)?.exp
+          if (typeof exp !== "number") continue
+          if (exp <= now) expired.push(key)
+          else consider(exp)
+        }
       }
-    }
-    for (const [key, value] of entries) {
-      if (key.startsWith("sub:")) continue
-      if (key.startsWith("idx:")) {
-        if (!liveSubs.has(value as string)) expired.push(key)
-      } else if (key.startsWith("retry:")) {
-        consider((value as PendingDelivery).nextAt)
-      } else if (key.startsWith("rl:")) {
-        const stamps = (value as number[]).filter((t) => now - t < RATE_WINDOW_MS)
-        if (stamps.length === 0) expired.push(key)
-        else consider(stamps[stamps.length - 1] + RATE_WINDOW_MS)
-      } else {
-        const exp = (value as { exp?: unknown } | null)?.exp
-        if (typeof exp !== "number") continue
-        if (exp <= now) expired.push(key)
-        else consider(exp)
+      for (let i = 0; i < indexes.length; i += STORAGE_BATCH) {
+        const batch = indexes.slice(i, i + STORAGE_BATCH)
+        const subs = await this.state.storage.get<Subscription>(batch.map(([, id]) => `sub:${id}`))
+        for (const [key, id] of batch) {
+          const sub = subs.get(`sub:${id}`)
+          if (!sub || sub.expiresAt * 1000 <= now) expired.push(key)
+        }
       }
+      await this.deleteKeys(expired)
     }
 
-    await this.deleteKeys(expired)
     if (next !== null) await this.ensureAlarm(next)
   }
 
-  private async rememberNonce(nonce: string): Promise<void> {
+  // Pages of at most LIST_PAGE_SIZE entries in key order. Keys of a page
+  // already yielded may be deleted by the caller; paging resumes after the
+  // page's last key either way.
+  private async *pages<T = unknown>(prefix?: string): AsyncGenerator<Map<string, T>> {
+    let startAfter: string | undefined
+    for (;;) {
+      const options: DurableObjectListOptions = { limit: LIST_PAGE_SIZE }
+      if (prefix !== undefined) options.prefix = prefix
+      if (startAfter !== undefined) options.startAfter = startAfter
+      const page = await this.state.storage.list<T>(options)
+      if (page.size === 0) return
+      let last: string | undefined
+      for (const key of page.keys()) last = key
+      yield page
+      if (page.size < LIST_PAGE_SIZE) return
+      startAfter = last
+    }
+  }
+
+  private async *scan<T = unknown>(prefix: string): AsyncGenerator<[string, T]> {
+    for await (const page of this.pages<T>(prefix)) yield* page
+  }
+
+  // `key` is `nonce:<hex>` (host requests) or `rnonce:<hex>` (device revokes).
+  private async rememberNonce(key: string): Promise<void> {
     const exp = Date.now() + HOST_NONCE_TTL_MS
-    await this.state.storage.put(`nonce:${nonce}`, { exp })
+    await this.state.storage.put(key, { exp })
     await this.ensureAlarm(exp)
   }
 

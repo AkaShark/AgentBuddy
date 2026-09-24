@@ -27,9 +27,13 @@ new_sqlite_classes = ["HostChannel"]
 
 # Secrets (set with `wrangler secret put`, never committed): APNS_TEAM_ID,
 # APNS_KEY_ID, APNS_PRIVATE_KEY, FCM_PROJECT_ID, FCM_CLIENT_EMAIL,
-# FCM_PRIVATE_KEY, and the optional DEBUG_PUSH_ADMIN_TOKEN.
+# FCM_PRIVATE_KEY, PUSH_TARGET_SEAL_KEY (required by POST /v2/subscriptions),
+# and the optional DEBUG_PUSH_ADMIN_TOKEN.
+# Optional var PUSH_AUDIENCE overrides the signed `aud` (default: request origin).
 [vars]
 APNS_TOPIC = "com.akashark.agentbuddy"
+# Never commit "true": enable per deploy with
+# `npx wrangler deploy --var DEBUG_PUSH_ENABLED:true` (see README).
 DEBUG_PUSH_ENABLED = "false"
 LEGACY_KEEPALIVE_ENABLED = "true"
 BLOCKED_HOST_IDS = ""

@@ -4,6 +4,8 @@ const assert = require("node:assert/strict");
 const h = require("./support/harness");
 
 const worker = h.load("index").default;
+const { HOST_IP_RATE_LIMIT_PER_MINUTE } = h.load("v2");
+const { ipBucket } = h.load("rate-limiter");
 const { HOST_A, HOST_B, DEVICE_A, DEVICE_B } = h;
 
 beforeEach(() => {
@@ -65,8 +67,10 @@ test("bad signatures are rejected: wrong key, claimed host, tampered body/path/m
     h.hostRequest(HOST_A, "POST", "/v2/events", event, { signer: HOST_B }),
     h.hostRequest(HOST_B, "POST", "/v2/events", event, { hostId: HOST_A.id }),
     h.hostRequest(HOST_A, "POST", "/v2/events", event, { signedBody: JSON.stringify({ ...event, type: "failed" }) }),
-    h.hostRequest(HOST_A, "POST", "/v2/events", event, { signature: HOST_A.sign(["agentbuddy-push-host-v1", "POST", "/v2/subscriptions", String(h.clock.sec), "00".repeat(16), h.sha256(JSON.stringify(event))].join("\n")), nonce: "00".repeat(16) }),
-    h.hostRequest(HOST_A, "POST", "/v2/events", event, { signature: HOST_A.sign(["agentbuddy-push-host-v1", "PUT", "/v2/events", String(h.clock.sec), "11".repeat(16), h.sha256(JSON.stringify(event))].join("\n")), nonce: "11".repeat(16) }),
+    h.hostRequest(HOST_A, "POST", "/v2/events", event, { signature: HOST_A.sign(h.hostCanonical("POST", "/v2/subscriptions", h.clock.sec, "00".repeat(16), JSON.stringify(event))), nonce: "00".repeat(16) }),
+    h.hostRequest(HOST_A, "POST", "/v2/events", event, { signature: HOST_A.sign(h.hostCanonical("PUT", "/v2/events", h.clock.sec, "11".repeat(16), JSON.stringify(event))), nonce: "11".repeat(16) }),
+    // The v1 string (no aud line) is no longer accepted.
+    h.hostRequest(HOST_A, "POST", "/v2/events", event, { signature: HOST_A.sign(["agentbuddy-push-host-v1", "POST", "/v2/events", String(h.clock.sec), "22".repeat(16), h.sha256(JSON.stringify(event))].join("\n")), nonce: "22".repeat(16) }),
   ];
   for (const request of cases) await expectError(await worker.fetch(request, env), 401, "unauthorized");
   assert.equal(channels.size, 0);
@@ -102,6 +106,7 @@ test("a replayed host nonce is rejected and does not re-dispatch", async () => {
 
 test("replay cache entries expire after 10 minutes (the signature window still applies)", async () => {
   const { env, channel } = h.makeEnv();
+  assert.equal((await subscribe(env, HOST_A)).status, 201);
   const nonce = h.randHex(16);
   assert.equal((await worker.fetch(h.hostRequest(HOST_A, "POST", "/v2/events", h.makeEvent(), { nonce }), env)).status, 202);
   assert.ok(channel(HOST_A.id).map.has(`nonce:${nonce}`));
@@ -163,11 +168,10 @@ test("subscription input validation returns bad_request", async () => {
     { deviceId: "zz".repeat(32) },
     { deviceId: DEVICE_A.id.toUpperCase() },
     { platform: "web" },
-    { pushToken: "not-hex" },
-    { pushToken: "a".repeat(201) },
-    { pushToken: 42 },
-    { platform: "android", pushToken: "has space", apnsEnvironment: undefined },
-    { platform: "android", pushToken: "x".repeat(4097), apnsEnvironment: undefined },
+    { sealedTarget: undefined },
+    { sealedTarget: 42 },
+    { sealedTarget: "" },
+    { sealedTarget: "A".repeat(8193) },
     { platform: "android", pushToken: h.ANDROID_TOKEN, apnsEnvironment: "production" },
     { apnsEnvironment: undefined },
     { apnsEnvironment: "development" },
@@ -177,6 +181,10 @@ test("subscription input validation returns bad_request", async () => {
     { threadId: "" },
     { threadId: "thread\nturn=x" },
     { threadId: "é".repeat(65) },
+    // Lone surrogates (LOW-1): not well-formed, rejected before any canonical string.
+    { threadId: "\ud800" },
+    { threadId: "thread-\udc00" },
+    { turnId: "\udbff\udbff" },
     { turnId: "t".repeat(129) },
     { turnId: 5 },
     { issuedAt: "1790300000" },
@@ -190,6 +198,15 @@ test("subscription input validation returns bad_request", async () => {
     const response = await worker.fetch(h.hostRequest(HOST_A, "POST", "/v2/subscriptions", body), env);
     await expectError(response, 400, "bad_request");
   }
+  // A clear-text pushToken is not part of the v2 body: it is ignored, and
+  // without a sealedTarget the request is still invalid.
+  const cleartext = { ...h.makeGrant(DEVICE_A, HOST_A.id), pushToken: h.IOS_TOKEN, sealedTarget: undefined };
+  await expectError(await worker.fetch(h.hostRequest(HOST_A, "POST", "/v2/subscriptions", cleartext), env), 400, "bad_request");
+  // Well-formed surrogate pairs (e.g. emoji) are fine.
+  const emoji = await worker.fetch(h.hostRequest(HOST_A, "POST", "/v2/subscriptions", h.makeGrant(DEVICE_A, HOST_A.id, { threadId: "thread-\u{1F600}" })), env);
+  assert.equal(emoji.status, 201);
+  assert.deepEqual(channel(HOST_A.id).keys("sub:").length, 1);
+  await worker.fetch(h.hostRequest(HOST_A, "DELETE", `/v2/subscriptions/${(await emoji.json()).subscriptionId}`), env);
   const badSignature = { ...h.makeGrant(DEVICE_A, HOST_A.id), grantSignature: "ab".repeat(32) };
   await expectError(await worker.fetch(h.hostRequest(HOST_A, "POST", "/v2/subscriptions", badSignature), env), 400, "bad_request");
   for (const raw of ["{not json", "[]", "null", '"string"']) {
@@ -211,6 +228,8 @@ test("event input validation returns bad_request", async () => {
     { occurredAt: "now" },
     { agent: "codex|x" },
     { threadId: "x\ry" },
+    { threadId: "\ud83d" },
+    { turnId: "\ude00-turn" },
     { turnId: "" },
   ];
   for (const fields of invalid) {
@@ -228,6 +247,10 @@ test("bodies over 16 KB are rejected with payload_too_large", async () => {
   const big = JSON.stringify({ ...h.makeEvent(), padding: "x".repeat(16 * 1024) });
   await expectError(await worker.fetch(h.hostRequest(HOST_A, "POST", "/v2/events", big), env), 413, "payload_too_large");
 
+  // Bodies are only read for requests with well-formed auth headers (the
+  // signature itself is checked after the bounded read).
+  const authHeaders = Object.fromEntries(h.hostRequest(HOST_A, "POST", "/v2/subscriptions", "").headers);
+
   // Streaming body without Content-Length: the limit applies while reading.
   let pulls = 0;
   const stream = new ReadableStream({
@@ -237,20 +260,20 @@ test("bodies over 16 KB are rejected with payload_too_large", async () => {
       if (pulls > 100) controller.close();
     },
   });
-  const streamed = new Request("https://proxy/v2/subscriptions", {
+  const streamed = new Request(`${h.AUD}/v2/subscriptions`, {
     method: "POST",
     duplex: "half",
-    headers: { "x-agentbuddy-host": HOST_A.id },
+    headers: authHeaders,
     body: stream,
   });
   await expectError(await worker.fetch(streamed, env), 413, "payload_too_large");
   assert.ok(pulls < 10, "stopped reading shortly after the limit");
 
   // Declared Content-Length over the limit fails without reading.
-  const declared = new Request("https://proxy/v2/events", {
+  const declared = new Request(`${h.AUD}/v2/events`, {
     method: "POST",
     duplex: "half",
-    headers: { "content-length": String(16 * 1024 + 1) },
+    headers: { ...authHeaders, "content-length": String(16 * 1024 + 1) },
     body: new ReadableStream({ pull() {} }),
   });
   await expectError(await worker.fetch(declared, env), 413, "payload_too_large");
@@ -294,17 +317,22 @@ test("per-host rate limit: 60 subscription registrations per minute", async () =
 
 test("per-host rate limit: 120 events per minute", async () => {
   const { env } = h.makeEnv();
+  // Events that match nothing write nothing (and so do not count); a reported
+  // event with a delivery record does.
+  assert.equal((await subscribe(env, HOST_A)).status, 201);
+  const event = h.makeEvent();
   for (let i = 0; i < 120; i++) {
-    const response = await worker.fetch(h.hostRequest(HOST_A, "POST", "/v2/events", h.makeEvent()), env);
+    const response = await worker.fetch(h.hostRequest(HOST_A, "POST", "/v2/events", event), env);
     assert.equal(response.status, 202);
+    assert.equal((await response.json()).results[0].state, i === 0 ? "sent" : "duplicate");
   }
-  const limited = await worker.fetch(h.hostRequest(HOST_A, "POST", "/v2/events", h.makeEvent()), env);
+  const limited = await worker.fetch(h.hostRequest(HOST_A, "POST", "/v2/events", event), env);
   assert.equal(limited.status, 429);
   assert.equal((await limited.json()).error, "rate_limited");
   assert.ok(Number(limited.headers.get("retry-after")) >= 1);
 });
 
-test("device revoke is rate limited per IP", async () => {
+test("device revoke is rate limited per IP (IPv6 per /64)", async () => {
   const { env } = h.makeEnv();
   for (let i = 0; i < 10; i++) {
     const response = await worker.fetch(h.revokeRequest(h.makeRevoke(DEVICE_B, HOST_A.id), "198.51.100.1"), env);
@@ -316,4 +344,92 @@ test("device revoke is rate limited per IP", async () => {
   assert.ok(Number(limited.headers.get("retry-after")) >= 1);
   const otherIp = await worker.fetch(h.revokeRequest(h.makeRevoke(DEVICE_B, HOST_A.id), "198.51.100.2"), env);
   assert.equal(otherIp.status, 200);
+
+  // Rotating addresses inside one /64 does not reset the budget.
+  for (let i = 0; i < 10; i++) {
+    const response = await worker.fetch(h.revokeRequest(h.makeRevoke(DEVICE_B, HOST_A.id), `2001:db8:5:6::${(i + 1).toString(16)}`), env);
+    assert.equal(response.status, 200);
+  }
+  await expectError(await worker.fetch(h.revokeRequest(h.makeRevoke(DEVICE_B, HOST_A.id), "2001:db8:5:6:ffff:ffff:ffff:ffff"), env), 429, "rate_limited");
+  assert.equal((await worker.fetch(h.revokeRequest(h.makeRevoke(DEVICE_B, HOST_A.id), "2001:db8:5:7::1"), env)).status, 200);
+});
+
+test("wrong aud is rejected: host signature, grant and origin; PUSH_AUDIENCE overrides the origin", async () => {
+  const { env, channel } = h.makeEnv();
+  const other = "https://other.example.test";
+  // Host request signed for another Worker origin.
+  await expectError(await worker.fetch(h.hostRequest(HOST_A, "POST", "/v2/events", h.makeEvent(), { aud: other }), env), 401, "unauthorized");
+  // Correctly signed for AUD but delivered to another origin.
+  await expectError(await worker.fetch(h.hostRequest(HOST_A, "POST", "/v2/events", h.makeEvent(), { origin: other }), env), 401, "unauthorized");
+  // Grant signed by the device for another Worker origin.
+  const grant = h.makeGrant(DEVICE_A, HOST_A.id, {}, { aud: other });
+  await expectError(await worker.fetch(h.hostRequest(HOST_A, "POST", "/v2/subscriptions", grant), env), 403, "forbidden");
+  // Revoke signed for another Worker origin.
+  const revoke = h.makeRevoke(DEVICE_A, HOST_A.id, {}, DEVICE_A, other);
+  await expectError(await worker.fetch(h.revokeRequest(revoke), env), 401, "unauthorized");
+  assert.deepEqual(channel(HOST_A.id).keys("sub:"), []);
+
+  // Behind a proxy/route: PUSH_AUDIENCE is the public origin the signers use.
+  const proxied = h.makeEnv({ PUSH_AUDIENCE: `${h.AUD}/` }).env;
+  const viaInternal = { origin: "https://internal.example.test" };
+  const sub = await worker.fetch(h.hostRequest(HOST_A, "POST", "/v2/subscriptions", h.makeGrant(DEVICE_A, HOST_A.id), viaInternal), proxied);
+  assert.equal(sub.status, 201);
+  const event = await worker.fetch(h.hostRequest(HOST_A, "POST", "/v2/events", h.makeEvent(), viaInternal), proxied);
+  assert.equal((await event.json()).matched, 1);
+  await expectError(await worker.fetch(h.hostRequest(HOST_A, "POST", "/v2/events", h.makeEvent(), { ...viaInternal, aud: viaInternal.origin }), proxied), 401, "unauthorized");
+});
+
+test("per-IP limit on host-signed routes runs before the body is read or a signature verified", async () => {
+  const { env, channels } = h.makeEnv();
+  const ip = "198.51.100.40";
+  const event = h.makeEvent();
+  for (let i = 0; i < HOST_IP_RATE_LIMIT_PER_MINUTE; i++) {
+    // Self-minted "host" keys with bad signatures still spend the IP budget.
+    const response = await worker.fetch(h.hostRequest(HOST_A, "POST", "/v2/events", event, { ip, signer: HOST_B }), env);
+    assert.equal(response.status, 401);
+  }
+  const request = h.hostRequest(HOST_A, "POST", "/v2/events", event, { ip });
+  const limited = await worker.fetch(request, env);
+  await expectError(limited, 429, "rate_limited");
+  assert.ok(Number(limited.headers.get("retry-after")) >= 1);
+  assert.equal(request.bodyUsed, false, "the body of a rate-limited request is never read");
+  // Same /64 shares the bucket; another address is unaffected.
+  await expectError(await worker.fetch(h.hostRequest(HOST_A, "POST", "/v2/subscriptions", h.makeGrant(DEVICE_A, HOST_A.id), { ip }), env), 429, "rate_limited");
+  assert.equal((await worker.fetch(h.hostRequest(HOST_A, "POST", "/v2/events", h.makeEvent(), { ip: "198.51.100.41" }), env)).status, 202);
+  assert.equal(channels.size, 1, "only the accepted request reached a HostChannel");
+
+  const v6 = h.makeEnv().env;
+  for (let i = 0; i < HOST_IP_RATE_LIMIT_PER_MINUTE; i++) {
+    const address = `2001:db8:aa:bb:${i.toString(16)}::1`;
+    assert.equal((await worker.fetch(h.hostRequest(HOST_A, "DELETE", `/v2/subscriptions/sub_${"0".repeat(32)}`, undefined, { ip: address }), v6)).status, 200);
+  }
+  await expectError(await worker.fetch(h.hostRequest(HOST_A, "POST", "/v2/events", h.makeEvent(), { ip: "2001:db8:aa:bb:ffff::2" }), v6), 429, "rate_limited");
+  assert.equal((await worker.fetch(h.hostRequest(HOST_A, "POST", "/v2/events", h.makeEvent(), { ip: "2001:db8:aa:bc::1" }), v6)).status, 202);
+});
+
+test("client IP buckets: IPv4 as is, IPv6 by /64, IPv4-mapped as IPv4", () => {
+  const cases = [
+    ["203.0.113.9", "203.0.113.9"],
+    [" 203.0.113.9 ", "203.0.113.9"],
+    ["2001:db8:1:2:3:4:5:6", "2001:db8:1:2::/64"],
+    ["2001:0DB8:0001:0002::1", "2001:db8:1:2::/64"],
+    ["2001:db8:1:2::", "2001:db8:1:2::/64"],
+    ["2001:db8::", "2001:db8:0:0::/64"],
+    ["::", "0:0:0:0::/64"],
+    ["::1", "0:0:0:0::/64"],
+    ["fe80::1%en0", "fe80:0:0:0::/64"],
+    ["::ffff:203.0.113.9", "203.0.113.9"],
+    ["::ffff:cb00:7109", "203.0.113.9"],
+    ["64:ff9b::203.0.113.9", "64:ff9b:0:0::/64"],
+    ["", "unknown"],
+    ["garbage", "invalid"],
+    ["300.1.1.1", "invalid"],
+    ["1:2:3:4:5:6:7:8:9", "invalid"],
+    ["1:2:3:4:5:6:7", "invalid"],
+    ["2001:db8::1::2", "invalid"],
+    ["2001:db8::g", "invalid"],
+    ["::ffff:300.1.1.1", "invalid"],
+    ["a".repeat(65), "invalid"],
+  ];
+  for (const [input, expected] of cases) assert.equal(ipBucket(input), expected, input);
 });

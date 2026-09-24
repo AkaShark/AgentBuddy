@@ -2,12 +2,14 @@
 // one provider send per request, no registrations or alarms.
 import { DebugPushRequest, sendDebugPush } from "./alerts"
 import { decodeUtf8, errorResponse, jsonResponse, MAX_V2_BODY_BYTES, readBodyLimited } from "./http"
-import { checkRateLimit } from "./rate-limiter"
+import { checkRateLimit, clientIpBucket } from "./rate-limiter"
 import { HEX64_RE, randomHex, sha256Hex } from "./signing"
 import { Env } from "./types"
 import { hasControlChars, isRecord, isRoutingId, pushTokenError } from "./validation"
 
 export const DEBUG_RATE_LIMIT_PER_MINUTE = 20
+// Per client IP bucket, before the admin token is checked (spec §13).
+export const DEBUG_IP_RATE_LIMIT_PER_MINUTE = 30
 export const MIN_DEBUG_ADMIN_TOKEN_LENGTH = 32
 const DEBUG_RATE_LIMIT_KEY = "debug-push:global"
 const MAX_TITLE_CHARS = 64
@@ -101,9 +103,16 @@ function parseDebugRequest(raw: unknown): DebugPushRequest | string {
 export async function handleDebugPush(request: Request, env: Env): Promise<Response> {
   if (!debugPushEnabled(env) || request.method !== "POST") return errorResponse("not_found")
   try {
+    const ipRetryAfter = await checkRateLimit(
+      env.RATE_LIMITER,
+      `debug-ip:${clientIpBucket(request)}`,
+      DEBUG_IP_RATE_LIMIT_PER_MINUTE
+    )
+    if (ipRetryAfter !== null) return errorResponse("rate_limited", { retryAfterSeconds: ipRetryAfter })
     if (!(await isAuthorized(request, env.DEBUG_PUSH_ADMIN_TOKEN as string))) {
       return errorResponse("unauthorized")
     }
+    // The global budget is only spent by authorized requests.
     const retryAfter = await checkRateLimit(env.RATE_LIMITER, DEBUG_RATE_LIMIT_KEY, DEBUG_RATE_LIMIT_PER_MINUTE)
     if (retryAfter !== null) return errorResponse("rate_limited", { retryAfterSeconds: retryAfter })
 

@@ -2,6 +2,7 @@
 // The exact byte layout is a cross-implementation contract with the host
 // (alleycat) and the mobile client; see
 // docs/superpowers/specs/2026-09-24-host-push-notifications-design.md §5 and §12.
+import { Env } from "./types"
 
 export const SIGNATURE_WINDOW_SECONDS = 300
 
@@ -36,23 +37,39 @@ export function withinSignatureWindow(timestampSeconds: number, nowSeconds: numb
   return Math.abs(nowSeconds - timestampSeconds) <= SIGNATURE_WINDOW_SECONDS
 }
 
+// §5: every v2 string is bound to the Worker origin (`scheme://host[:port]`),
+// so a signature captured at one deployment cannot be replayed at another.
+// PUSH_AUDIENCE overrides it when the public URL differs from request.url;
+// an unparsable override is used verbatim and simply matches no signer.
+export function workerAudience(request: Request, env: Pick<Env, "PUSH_AUDIENCE">): string {
+  const override = env.PUSH_AUDIENCE?.trim()
+  if (!override) return new URL(request.url).origin
+  try {
+    return new URL(override).origin
+  } catch {
+    return override
+  }
+}
+
 // §5.2 — every host → Worker request.
 export function hostRequestSigningString(
+  aud: string,
   method: string,
   path: string,
   timestamp: string | number,
   nonce: string,
   bodySha256: string
 ): string {
-  return ["agentbuddy-push-host-v1", method, path, String(timestamp), nonce, bodySha256].join("\n")
+  return ["agentbuddy-push-host-v2", aud, method, path, String(timestamp), nonce, bodySha256].join("\n")
 }
 
 export interface GrantFields {
+  aud: string
   host: string
   device: string
   platform: "ios" | "android"
   environment: "sandbox" | "production" | "none"
-  tokenSha256: string
+  targetSha256: string
   agent: string
   thread: string
   turn: string
@@ -61,15 +78,17 @@ export interface GrantFields {
   nonce: string
 }
 
-// §5.1 — device grant authorizing one subscription.
+// §5.1 — device grant authorizing one subscription; target_sha256 is the
+// SHA-256 of the sealedTarget ASCII string (§5.5).
 export function grantSigningString(g: GrantFields): string {
   return [
-    "agentbuddy-push-grant-v1",
+    "agentbuddy-push-grant-v2",
+    `aud=${g.aud}`,
     `host=${g.host}`,
     `device=${g.device}`,
     `platform=${g.platform}`,
     `environment=${g.environment}`,
-    `token_sha256=${g.tokenSha256}`,
+    `target_sha256=${g.targetSha256}`,
     `agent=${g.agent}`,
     `thread=${g.thread}`,
     `turn=${g.turn}`,
@@ -80,6 +99,7 @@ export function grantSigningString(g: GrantFields): string {
 }
 
 export interface RevokeFields {
+  aud: string
   host: string
   device: string
   scope: "all"
@@ -90,7 +110,8 @@ export interface RevokeFields {
 // §5.3 — device-signed revocation of all its subscriptions on one host.
 export function revokeSigningString(r: RevokeFields): string {
   return [
-    "agentbuddy-push-revoke-v1",
+    "agentbuddy-push-revoke-v2",
+    `aud=${r.aud}`,
     `host=${r.host}`,
     `device=${r.device}`,
     `scope=${r.scope}`,

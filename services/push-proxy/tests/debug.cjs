@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const h = require("./support/harness");
 
 const worker = h.load("index").default;
+const { DEBUG_IP_RATE_LIMIT_PER_MINUTE, DEBUG_RATE_LIMIT_PER_MINUTE } = h.load("debug");
 
 const ADMIN_TOKEN = "0123456789abcdef".repeat(4); // 64 chars, like `openssl rand -hex 32`
 const HOST_ID = h.HOST_A.id;
@@ -22,8 +23,9 @@ function enabledEnv(vars = {}) {
   return ctx;
 }
 
-function debugRequest(body, token = ADMIN_TOKEN, extraHeaders = {}) {
+function debugRequest(body, token = ADMIN_TOKEN, extraHeaders = {}, ip) {
   const headers = { ...extraHeaders };
+  if (ip) headers["cf-connecting-ip"] = ip;
   if (token !== null) headers.authorization = `Bearer ${token}`;
   return new Request("https://proxy/debug/push", {
     method: "POST",
@@ -73,7 +75,32 @@ test("a wrong or missing admin token is unauthorized and calls no provider", asy
     assert.deepEqual(await response.json(), { error: "unauthorized" });
   }
   assert.equal(h.fetchMock.calls.length, 0);
-  assert.equal(limiters.size, 0, "unauthorized requests do not consume the debug budget");
+  assert.equal(limiters.has("debug-push:global"), false, "unauthorized requests do not consume the global debug budget");
+  assert.deepEqual([...limiters.keys()], ["debug-ip:unknown"], "only the pre-auth per-IP bucket was used");
+});
+
+test("the per-IP limit applies before the admin token is checked", async () => {
+  const { env, limiters } = enabledEnv();
+  const ip = "198.51.100.9";
+  for (let i = 0; i < DEBUG_IP_RATE_LIMIT_PER_MINUTE; i++) {
+    const response = await worker.fetch(debugRequest(iosAlert, "wrong-token", {}, ip), env);
+    assert.equal(response.status, 401);
+  }
+  // Now even the right token from that address is refused, before auth.
+  const limited = await worker.fetch(debugRequest(iosAlert, ADMIN_TOKEN, {}, ip), env);
+  assert.equal(limited.status, 429);
+  assert.deepEqual(await limited.json(), { error: "rate_limited" });
+  assert.ok(Number(limited.headers.get("retry-after")) >= 1);
+  assert.equal(h.fetchMock.calls.length, 0);
+  assert.equal(limiters.has("debug-push:global"), false);
+
+  // Another address still works; an IPv6 /64 shares one bucket.
+  assert.equal((await worker.fetch(debugRequest(iosAlert, ADMIN_TOKEN, {}, "198.51.100.10"), env)).status, 200);
+  for (let i = 0; i < DEBUG_IP_RATE_LIMIT_PER_MINUTE; i++) {
+    await worker.fetch(debugRequest(iosAlert, "wrong-token", {}, `2001:db8:9:9::${(i + 1).toString(16)}`), env);
+  }
+  assert.equal((await worker.fetch(debugRequest(iosAlert, ADMIN_TOKEN, {}, "2001:db8:9:9:ffff::1"), env)).status, 429);
+  assert.ok(DEBUG_IP_RATE_LIMIT_PER_MINUTE > DEBUG_RATE_LIMIT_PER_MINUTE, "one operator address can reach the global limit");
 });
 
 test("iOS alert: exactly one APNs call with routing keys; response shape", async () => {

@@ -43,6 +43,46 @@ export class RateLimiter implements DurableObject {
   }
 }
 
+const IPV4_RE = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/
+
+// Rate-limit bucket for a client address (spec §13): an IPv4 address as is,
+// an IPv6 address by its /64 prefix (one subscriber usually owns a whole /64),
+// IPv4-mapped IPv6 as the IPv4 address. Anything unparsable shares "invalid".
+export function ipBucket(ip: string): string {
+  const value = ip.trim().toLowerCase()
+  if (value === "") return "unknown"
+  if (value.length > 64) return "invalid"
+  const v4 = IPV4_RE.exec(value)
+  if (v4) return v4.slice(1).some((part) => Number(part) > 255) ? "invalid" : v4.slice(1).map(Number).join(".")
+  if (!value.includes(":")) return "invalid"
+
+  let address = value.split("%")[0]
+  const tail = /(\d{1,3}(?:\.\d{1,3}){3})$/.exec(address)
+  if (tail) {
+    const octets = tail[1].split(".").map(Number)
+    if (octets.some((octet) => octet > 255)) return "invalid"
+    address = address.slice(0, -tail[1].length) +
+      `${((octets[0] << 8) | octets[1]).toString(16)}:${((octets[2] << 8) | octets[3]).toString(16)}`
+  }
+  const halves = address.split("::")
+  if (halves.length > 2) return "invalid"
+  const head = halves[0] ? halves[0].split(":") : []
+  const rest = halves.length === 2 && halves[1] ? halves[1].split(":") : []
+  const missing = 8 - head.length - rest.length
+  if (halves.length === 1 ? missing !== 0 : missing < 1) return "invalid"
+  const groups = [...head, ...new Array<string>(halves.length === 2 ? missing : 0).fill("0"), ...rest]
+  if (groups.some((group) => !/^[0-9a-f]{1,4}$/.test(group))) return "invalid"
+  const words = groups.map((group) => parseInt(group, 16))
+  if (words.slice(0, 5).every((word) => word === 0) && words[5] === 0xffff) {
+    return [words[6] >> 8, words[6] & 0xff, words[7] >> 8, words[7] & 0xff].join(".")
+  }
+  return `${words.slice(0, 4).map((word) => word.toString(16)).join(":")}::/64`
+}
+
+export function clientIpBucket(request: Request): string {
+  return ipBucket(request.headers.get("cf-connecting-ip") ?? "")
+}
+
 // Returns null when allowed, otherwise the Retry-After seconds.
 export async function checkRateLimit(
   namespace: DurableObjectNamespace,

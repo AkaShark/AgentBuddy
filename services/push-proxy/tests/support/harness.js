@@ -39,6 +39,15 @@ after(() => { Date.now = realNow; });
 const sha256 = (value) => nodeCrypto.createHash("sha256").update(value).digest("hex");
 const randHex = (bytes) => nodeCrypto.randomBytes(bytes).toString("hex");
 
+// Spec §12: every v2 string carries the Worker origin; test requests are sent
+// to this origin so the Worker's default audience (request origin) matches.
+const AUD = "https://push.example.test";
+
+// Spec §12 test-only Worker seal key (never the production key), kid 1.
+const TEST_SEAL_PRIVATE = "03".repeat(32);
+const TEST_SEAL_PUBLIC = "5dfedd3b6bd47f6fa28ee15d969d5bb0ea53774d488bdaf9df1c6e0124b3ef22";
+const TEST_SEAL_KEY = `1:${TEST_SEAL_PRIVATE}`;
+
 function ed25519FromSeed(seedHex) {
   const privateKey = nodeCrypto.createPrivateKey({
     key: Buffer.concat([Buffer.from("302e020100300506032b657004220420", "hex"), Buffer.from(seedHex, "hex")]),
@@ -75,6 +84,7 @@ function fakeStorage() {
   const ctx = {
     map,
     alarm: null,
+    listCalls: [],
     storage: {
       async get(key) {
         if (Array.isArray(key)) return new Map(key.filter((k) => map.has(k)).map((k) => [k, clone(map.get(k))]));
@@ -88,8 +98,18 @@ function fakeStorage() {
         if (Array.isArray(key)) return key.filter((k) => map.delete(k)).length;
         return map.delete(key);
       },
+      // Durable Object list(): prefix, start (inclusive), startAfter, end
+      // (exclusive), reverse and limit, in key order.
       async list(options = {}) {
-        const selected = [...map.keys()].filter((k) => !options.prefix || k.startsWith(options.prefix)).sort();
+        ctx.listCalls.push({ ...options });
+        let selected = [...map.keys()]
+          .filter((k) => !options.prefix || k.startsWith(options.prefix))
+          .filter((k) => options.start === undefined || k >= options.start)
+          .filter((k) => options.startAfter === undefined || k > options.startAfter)
+          .filter((k) => options.end === undefined || k < options.end)
+          .sort();
+        if (options.reverse) selected.reverse();
+        if (options.limit !== undefined) selected = selected.slice(0, options.limit);
         return new Map(selected.map((k) => [k, clone(map.get(k))]));
       },
       async deleteAll() { map.clear(); },
@@ -115,6 +135,7 @@ function makeEnv(vars = {}) {
     FCM_PROJECT_ID: "agentbuddy-test",
     FCM_CLIENT_EMAIL: "svc@agentbuddy-test.iam.gserviceaccount.com",
     FCM_PRIVATE_KEY: keys().fcm,
+    PUSH_TARGET_SEAL_KEY: TEST_SEAL_KEY,
     ...vars,
   };
   const channel = (name) => {
@@ -184,35 +205,68 @@ function captureLogs() {
   return { lines, restore() { Object.assign(console, originals); } };
 }
 
-function hostCanonical(method, pathname, timestamp, nonce, bodyText) {
-  return ["agentbuddy-push-host-v1", method, pathname, String(timestamp), nonce, sha256(bodyText)].join("\n");
+function hostCanonical(method, pathname, timestamp, nonce, bodyText, aud = AUD) {
+  return ["agentbuddy-push-host-v2", aud, method, pathname, String(timestamp), nonce, sha256(bodyText)].join("\n");
 }
 
 // Builds a host-signed request. `opts` can override timestamp, nonce, the
-// signer, the claimed hostId, the signature, extra/omitted headers.
+// signer, the claimed hostId, the signature, the signed `aud`, the request
+// origin, the client IP and extra/omitted headers.
 function hostRequest(host, method, pathname, body, opts = {}) {
   const bodyText = body === undefined ? "" : typeof body === "string" ? body : JSON.stringify(body);
   const timestamp = String(opts.timestamp ?? clock.sec);
   const nonce = opts.nonce ?? randHex(16);
-  const signature = opts.signature ?? (opts.signer ?? host).sign(hostCanonical(method, pathname, timestamp, nonce, opts.signedBody ?? bodyText));
+  const signature = opts.signature ?? (opts.signer ?? host).sign(hostCanonical(method, pathname, timestamp, nonce, opts.signedBody ?? bodyText, opts.aud ?? AUD));
   const headers = {
     "x-agentbuddy-host": opts.hostId ?? host.id,
     "x-agentbuddy-timestamp": timestamp,
     "x-agentbuddy-nonce": nonce,
     "x-agentbuddy-signature": signature,
+    ...(opts.ip ? { "cf-connecting-ip": opts.ip } : {}),
     ...(opts.headers ?? {}),
   };
   for (const name of opts.omit ?? []) delete headers[name];
-  return new Request(`https://proxy${pathname}`, { method, headers, body: body === undefined ? undefined : bodyText });
+  return new Request(`${opts.origin ?? AUD}${pathname}`, { method, headers, body: body === undefined ? undefined : bodyText });
 }
 
-// A device grant body for POST /v2/subscriptions. `sign` overrides the values
-// placed in the canonical string (to simulate mismatches) and may set `signer`.
-function makeGrant(device, hostId, fields = {}, sign = {}) {
+const X25519_PKCS8_PREFIX = Buffer.from("302e020100300506032b656e04220420", "hex");
+const X25519_SPKI_PREFIX = Buffer.from("302a300506032b656e032100", "hex");
+const x25519Private = (hex) => nodeCrypto.createPrivateKey({ key: Buffer.concat([X25519_PKCS8_PREFIX, Buffer.from(hex, "hex")]), format: "der", type: "pkcs8" });
+const x25519PublicRaw = (key) => nodeCrypto.createPublicKey(key).export({ format: "der", type: "spki" }).subarray(12);
+
+// Seals a push target exactly like the phone (spec §5.5), independently of the
+// Worker code. Options override any input: `ephemeralPrivate` / `nonce` (hex)
+// make it deterministic, `aad`, `kid`, `version`, `workerPublic`, `plaintext`
+// (string or raw Buffer).
+function sealTarget(opts) {
+  const eph = opts.ephemeralPrivate ? x25519Private(opts.ephemeralPrivate) : nodeCrypto.generateKeyPairSync("x25519").privateKey;
+  const epk = x25519PublicRaw(eph);
+  const workerPublic = Buffer.from(opts.workerPublic ?? TEST_SEAL_PUBLIC, "hex");
+  const shared = nodeCrypto.diffieHellman({
+    privateKey: eph,
+    publicKey: nodeCrypto.createPublicKey({ key: Buffer.concat([X25519_SPKI_PREFIX, workerPublic]), format: "der", type: "spki" }),
+  });
+  const key = Buffer.from(nodeCrypto.hkdfSync("sha256", shared, Buffer.concat([epk, workerPublic]), Buffer.from("agentbuddy-push-target-v1"), 32));
+  const nonce = opts.nonce ? Buffer.from(opts.nonce, "hex") : nodeCrypto.randomBytes(12);
+  const plaintext = opts.plaintext ?? JSON.stringify({
+    v: 1, platform: opts.platform, token: opts.token, apnsEnvironment: opts.apnsEnvironment, deviceId: opts.deviceId, hostId: opts.hostId,
+  });
+  const cipher = nodeCrypto.createCipheriv("aes-256-gcm", key, nonce);
+  cipher.setAAD(Buffer.from(opts.aad ?? `${opts.hostId}|${opts.deviceId}`, "utf8"));
+  const plaintextBytes = Buffer.isBuffer(plaintext) ? plaintext : Buffer.from(plaintext, "utf8");
+  const ciphertext = Buffer.concat([cipher.update(plaintextBytes), cipher.final(), cipher.getAuthTag()]);
+  return Buffer.concat([Buffer.from([opts.version ?? 1, opts.kid ?? 1]), epk, nonce, ciphertext]).toString("base64url");
+}
+
+// A device grant body for POST /v2/subscriptions. `fields.pushToken` is the
+// token sealed into `sealedTarget` (it is not sent in clear). `sign` overrides
+// the values placed in the canonical string (to simulate mismatches) and may
+// set `signer`; `seal` overrides the sealed target's inputs.
+function makeGrant(device, hostId, fields = {}, sign = {}, seal = {}) {
+  const { pushToken = IOS_TOKEN, ...rest } = fields;
   const body = {
     deviceId: device.id,
     platform: "ios",
-    pushToken: IOS_TOKEN,
     apnsEnvironment: "production",
     agent: "codex",
     threadId: "thread-1",
@@ -220,14 +274,25 @@ function makeGrant(device, hostId, fields = {}, sign = {}) {
     issuedAt: clock.sec,
     expiresAt: clock.sec + 86400,
     grantNonce: randHex(16),
-    ...fields,
+    ...rest,
   };
+  if (!("sealedTarget" in rest)) {
+    body.sealedTarget = sealTarget({
+      platform: body.platform,
+      token: pushToken,
+      apnsEnvironment: body.platform === "ios" ? body.apnsEnvironment : null,
+      deviceId: body.deviceId,
+      hostId,
+      ...seal,
+    });
+  }
   const s = {
+    aud: AUD,
     host: hostId,
     device: body.deviceId,
     platform: body.platform,
     environment: body.platform === "ios" ? body.apnsEnvironment : "none",
-    token: body.pushToken,
+    target: body.sealedTarget,
     agent: body.agent,
     thread: body.threadId,
     turn: body.turnId,
@@ -237,12 +302,13 @@ function makeGrant(device, hostId, fields = {}, sign = {}) {
     ...sign,
   };
   const canonical = [
-    "agentbuddy-push-grant-v1",
+    "agentbuddy-push-grant-v2",
+    `aud=${s.aud}`,
     `host=${s.host}`,
     `device=${s.device}`,
     `platform=${s.platform}`,
     `environment=${s.environment}`,
-    `token_sha256=${sha256(String(s.token))}`,
+    `target_sha256=${sha256(String(s.target))}`,
     `agent=${s.agent}`,
     `thread=${s.thread}`,
     `turn=${s.turn}`,
@@ -254,10 +320,11 @@ function makeGrant(device, hostId, fields = {}, sign = {}) {
   return body;
 }
 
-function makeRevoke(device, hostId, fields = {}, signer = device) {
+function makeRevoke(device, hostId, fields = {}, signer = device, aud = AUD) {
   const body = { hostId, deviceId: device.id, scope: "all", timestamp: clock.sec, nonce: randHex(16), ...fields };
   const canonical = [
-    "agentbuddy-push-revoke-v1",
+    "agentbuddy-push-revoke-v2",
+    `aud=${aud}`,
     `host=${body.hostId}`,
     `device=${body.deviceId}`,
     `scope=${body.scope}`,
@@ -282,7 +349,7 @@ function makeEvent(fields = {}) {
 }
 
 function revokeRequest(body, ip = "203.0.113.7") {
-  return new Request("https://proxy/v2/subscriptions/revoke", {
+  return new Request(`${AUD}/v2/subscriptions/revoke`, {
     method: "POST",
     headers: { "cf-connecting-ip": ip },
     body: typeof body === "string" ? body : JSON.stringify(body),
@@ -294,6 +361,12 @@ module.exports = {
   clock,
   sha256,
   randHex,
+  AUD,
+  TEST_SEAL_PRIVATE,
+  TEST_SEAL_PUBLIC,
+  TEST_SEAL_KEY,
+  sealTarget,
+  hostCanonical,
   ed25519FromSeed,
   HOST_A,
   DEVICE_A,

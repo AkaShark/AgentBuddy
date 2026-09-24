@@ -150,18 +150,17 @@ async function fcmSend(env: Env, message: unknown): Promise<ProviderResult> {
 
   const body = (await resp.json().catch(() => ({}))) as FcmErrorBody
   const details = Array.isArray(body.error?.details) ? body.error.details : []
-  const errorCode = details.map((d) => d.errorCode).find((c): c is string => typeof c === "string") ?? null
+  const errorCode = details.map((d) => d?.errorCode).find((c): c is string => typeof c === "string") ?? null
   const status = typeof body.error?.status === "string" ? body.error.status : null
-  const errorMessage = typeof body.error?.message === "string" ? body.error.message : ""
+  // google.rpc.BadRequest detail naming the token field.
   const tokenField = details.some((d) =>
-    Array.isArray(d.fieldViolations) && d.fieldViolations.some((v) => v.field === "message.token")
+    Array.isArray(d?.fieldViolations) && d.fieldViolations.some((v) => v?.field === "message.token")
   )
   const invalidArgument = errorCode === "INVALID_ARGUMENT" || status === "INVALID_ARGUMENT"
-  const tokenError =
-    errorCode === "UNREGISTERED" ||
-    status === "NOT_FOUND" ||
-    resp.status === 404 ||
-    (invalidArgument && (tokenField || /registration token/i.test(errorMessage)))
+  // Spec §13: only UNREGISTERED, or INVALID_ARGUMENT that names message.token,
+  // means the token is dead. A bare 404 / NOT_FOUND (e.g. a wrong project) is
+  // not proof, so it is a permanent failure that keeps the subscription's peers.
+  const tokenError = errorCode === "UNREGISTERED" || (invalidArgument && tokenField)
   return { kind: "response", status: resp.status, reason: errorCode ?? status, tokenError, retryAfterSeconds }
 }
 
