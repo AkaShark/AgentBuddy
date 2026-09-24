@@ -21,6 +21,15 @@ beforeEach(() => {
 });
 
 describe("Pairing", () => {
+  it("shows the daemon fingerprint instead of fragments of the pairing token", async () => {
+    const { rerender } = render(<Pairing running={true} installed={true} tokenShort="fingerprint-123" />);
+    await screen.findByText("studio");
+    expect(screen.getByText("fingerprint-123")).toBeInTheDocument();
+    expect(screen.queryByText("tokABC…1234")).toBeNull();
+    rerender(<Pairing running={true} installed={true} tokenShort="fingerprint-456" />);
+    expect(screen.getByText("fingerprint-456")).toBeInTheDocument();
+    expect(screen.queryByText("fingerprint-123")).toBeNull();
+  });
   it("renders a QR code from the raw payload and shows host details", async () => {
     const { container } = render(<Pairing running={true} installed={true} />);
     await waitFor(() => expect(container.querySelector("svg")).not.toBeNull());

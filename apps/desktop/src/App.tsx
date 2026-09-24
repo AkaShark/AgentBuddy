@@ -36,7 +36,7 @@ export default function App() {
         ) : page === "overview" ? (
           <Overview state={state} busy={busy} run={run} onInstalled={() => setPage("pairing")} />
         ) : page === "pairing" ? (
-          <Pairing running={state.running} installed={state.install.kind === "installed"} />
+          <Pairing running={state.running} installed={state.install.kind === "installed"} tokenShort={state.status?.token_short} />
         ) : page === "agents" ? (
           <Agents agents={state.status?.agents ?? []} busy={busy} run={run} />
         ) : (

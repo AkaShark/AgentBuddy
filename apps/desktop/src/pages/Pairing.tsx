@@ -3,7 +3,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { host, describeError, type PairPayload } from "../lib/host";
 
-export function Pairing({ running, installed }: { running: boolean; installed: boolean }) {
+export function Pairing({ running, installed, tokenShort }: { running: boolean; installed: boolean; tokenShort?: string | null }) {
   const [payload, setPayload] = useState<PairPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -52,7 +52,7 @@ export function Pairing({ running, installed }: { running: boolean; installed: b
             <code>{payload.node_id.slice(0, 12)}…</code>
             <span className="muted">token 指纹</span>
             <code>
-              {payload.token.slice(0, 6)}…{payload.token.slice(-4)}
+              {tokenShort ?? "—"}
             </code>
             <span className="muted">操作</span>
             <span className="row">
