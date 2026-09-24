@@ -63,10 +63,20 @@ pub async fn run_mutating_seq(
     state: &AppState,
     cmds: Vec<Subcommand>,
 ) -> Result<(), HostError> {
+    run_mutating_seq_with(state, cmds, |cmd| async move {
+        sidecar::run(app, cmd).await.map(|_| ())
+    }).await
+}
+
+async fn run_mutating_seq_with<F, Fut>(state: &AppState, cmds: Vec<Subcommand>, mut runner: F) -> Result<(), HostError>
+where
+    F: FnMut(Subcommand) -> Fut,
+    Fut: std::future::Future<Output = Result<(), HostError>>,
+{
     let _guard = state.mutation.lock().await;
     for cmd in cmds {
         debug_assert!(cmd.is_mutating());
-        sidecar::run(app, cmd).await?;
+        runner(cmd).await?;
     }
     Ok(())
 }
@@ -103,24 +113,41 @@ mod tests {
 
     #[tokio::test]
     async fn mutating_commands_are_serialized() {
-        // Two tasks race for the mutation lock; the second must observe the first finished.
-        let state = std::sync::Arc::new(AppState::default());
-        let order = std::sync::Arc::new(std::sync::Mutex::new(Vec::<&'static str>::new()));
-        let (s1, o1) = (state.clone(), order.clone());
-        let t1 = tokio::spawn(async move {
-            let _g = s1.mutation.lock().await;
-            o1.lock().unwrap().push("a-start");
-            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-            o1.lock().unwrap().push("a-end");
+        let state = AppState::default();
+        let order = Mutex::new(Vec::new());
+        let (entered_tx, entered_rx) = tokio::sync::oneshot::channel();
+        let (release_tx, release_rx) = tokio::sync::oneshot::channel();
+        let mut entered_tx = Some(entered_tx);
+        let mut release_rx = Some(release_rx);
+        let first = run_mutating_seq_with(&state, install_sequence(), |cmd| {
+            let signal = entered_tx.take();
+            let release = release_rx.take();
+            let order = &order;
+            async move {
+                order.lock().unwrap().push(cmd);
+                if let Some(signal) = signal { signal.send(()).unwrap(); }
+                if let Some(release) = release { release.await.unwrap(); }
+                Ok(())
+            }
         });
-        tokio::time::sleep(std::time::Duration::from_millis(5)).await;
-        let (s2, o2) = (state.clone(), order.clone());
-        let t2 = tokio::spawn(async move {
-            let _g = s2.mutation.lock().await;
-            o2.lock().unwrap().push("b-start");
-        });
-        let _ = tokio::join!(t1, t2);
-        assert_eq!(*order.lock().unwrap(), vec!["a-start", "a-end", "b-start"]);
+        let second = async {
+            entered_rx.await.unwrap();
+            let mut competing = Box::pin(run_mutating_seq_with(&state, vec![Subcommand::Rotate], |cmd| {
+                order.lock().unwrap().push(cmd);
+                async { Ok(()) }
+            }));
+            // Poll the real runner path while install is paused; it must wait
+            // for the complete install + restart sequence, not just install.
+            std::future::poll_fn(|cx| {
+                assert!(std::future::Future::poll(competing.as_mut(), cx).is_pending());
+                std::task::Poll::Ready(())
+            }).await;
+            release_tx.send(()).unwrap();
+            competing.await.unwrap();
+        };
+        let (result, ()) = tokio::join!(first, second);
+        result.unwrap();
+        assert_eq!(*order.lock().unwrap(), vec![Subcommand::Install, Subcommand::Restart, Subcommand::Rotate]);
     }
 
     #[test]
