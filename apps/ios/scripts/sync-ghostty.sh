@@ -20,7 +20,6 @@ PATCH_DIR="$REPO_DIR/patches/ghostty"
 
 PATCH_FILES=(
     "$PATCH_DIR/litter-mobile-embed.patch"
-    "$PATCH_DIR/wuffs-package-hash.patch"
 )
 
 SYNC_MODE="${1:---preserve-current}"
