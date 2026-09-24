@@ -1,8 +1,8 @@
 import Foundation
 
 actor PushProxyClient {
-    // [baozi-fork] Self-hosted push proxy (Cloudflare Worker, baozi-kris99 account — legacy Baozi infra, needs an AgentBuddy-owned proxy).
-    static let baseURL = URL(string: "https://baozi-push-proxy.baozi-kris99.workers.dev")!
+    // AgentBuddy-owned Cloudflare Worker shared by iOS and Android.
+    static let baseURL = URL(string: "https://agentbuddy-push-proxy.aaksharker.workers.dev")!
 
     struct RegisterBody: Encodable {
         let platform: String

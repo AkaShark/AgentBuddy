@@ -7,7 +7,7 @@ import java.net.URL
 
 class PushProxyClient {
     companion object {
-        const val BASE_URL = "https://baozi-push-proxy.baozi-kris99.workers.dev"
+        const val BASE_URL = "https://agentbuddy-push-proxy.aaksharker.workers.dev"
     }
 
     fun register(

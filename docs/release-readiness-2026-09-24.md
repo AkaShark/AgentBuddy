@@ -16,7 +16,7 @@
 
 运行：https://github.com/AkaShark/AgentBuddy/actions/runs/35973836528
 
-- 首次运行基于 `9f8d928`。最新修复版本 `3dc92ff` 已再次触发构建：https://github.com/AkaShark/AgentBuddy/actions/runs/35979742072 ，仍保持草稿。
+- 首次运行基于 `9f8d928`。最新修复版本 `3dc92ff` 已再次触发构建：https://github.com/AkaShark/AgentBuddy/actions/runs/35979742072 ，仍保持草稿。该运行现已结束，两个架构构建均为 cancelled，未完成签名包验收。
 - 两个架构的 sidecar 编译已成功。
 - 草稿 `desktop-dev-1` 已创建，未发布。
 - 两份 AgentBuddy.zip 已提交 Apple 公证，检查时均为 In Progress。CI 尚未结束。
@@ -65,10 +65,10 @@
 1. 等待 Apple 公证和 CI，验收两个 DMG；包含最新修复后重建，再完成 Mac/手机 QA。
 2. Cmd+Q 已通过 computer use 实际 RED/GREEN 验证：旧包直接退出，新包显示提示，确认后退出，再次退出不重复提示。调试包构建通过；尚需正式签名包 QA。
 3. 9.12 原文被截断；当前两个指定文件无 `clich`，需要确认实际意图。build-rust.sh 中已不存在的 uniffi_shared.rs 输入已在 `3dc92ff` 移除，bash -n 通过；未更改实际递归源码哈希逻辑。
-4. Apple 浏览器连接已恢复，APNs 已完成。Cloudflare CLI 未登录；OAuth 页面已打开，因页面要求接受条款，等待用户确认或自行登录。
-5. Cloudflare Worker 部署尚未执行，Apple/Firebase 凭据均已齐备，当前只缺 Cloudflare 登录授权；两个移动端推送 URL 尚未替换。
+4. APNs、Firebase、Cloudflare 授权已完成，六项 APNs/FCM 凭据已上传为 Worker secrets，未进入 Git。
+5. Cloudflare Worker 已部署至 `https://agentbuddy-push-proxy.aaksharker.workers.dev`，版本 `6a28792f-5051-47a8-b820-1433f9087703`；iOS/Android 推送 URL 同步切换。两平台假 token 注册均返回有效 ID，注销返回 JSON 并清理测试注册；尚未做真机 APNs/FCM 送达验收。
 6. Firebase Android 配置已完成并通过 `:app:processDebugGoogleServices :app:testDebugUnitTest -Plitter.enableGhosttyAndroid=false`（42 项任务，13 执行、29 缓存）。Play 签名及服务账号仍待准备。
 7. Android rootfs 仓库选择、品牌素材目录、正式隐私和支持页面 URL 等待用户回复；未替换美术或商店链接。
 8. 工作区原有/并行产生的 Ghostty 脚本与 patches 改动和两个脏子模块保留，未纳入本次提交，也未推子模块。
 
-- Firebase 服务账号就绪后，推送 Worker 的 `tsc --noEmit` 检查通过；尚未上传凭据或部署，等待 Cloudflare 登录。
+- 推送注销原先返回纯文本 `ok`，Android 会按 JSON 解析失败；`e6bc9ea` 修复为 JSON 并透传响应头。新增回归测试先复现失败后通过；Worker `npm test`、`tsc --noEmit` 均通过。Android URL 切换后单元测试通过（42 项任务，5 执行、37 缓存）。初始公开域名 TLS 连接失败，域名生效后在线注册/注销验收通过。
