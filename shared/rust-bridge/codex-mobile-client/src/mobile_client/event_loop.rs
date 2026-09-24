@@ -39,6 +39,7 @@ impl MobileClient {
         let app_store = Arc::clone(&self.app_store);
         let widget_waiters = Arc::clone(&self.widget_waiters);
         let saved_apps_directory = Arc::clone(&self.saved_apps_directory);
+        let lag_recovery = Arc::clone(&self.lag_recovery);
         Self::spawn_detached(async move {
             loop {
                 let event = events.recv().await;
@@ -163,6 +164,10 @@ impl MobileClient {
                             "event reader lagged server_id={} skipped={}",
                             server_id, skipped
                         );
+                        // Dropped notifications never reached the processor,
+                        // so the store is stale for this server until an
+                        // authoritative refresh re-fetches its threads.
+                        lag_recovery.trigger(Some(server_id.as_str()));
                     }
                 }
             }
@@ -306,12 +311,53 @@ impl MobileClient {
     where
         R: serde::de::DeserializeOwned,
     {
+        let wire_method = client_request_wire_method(&request);
+        let value = self
+            .request_value_for_server_runtime(server_id, runtime_kind, request)
+            .await
+            .map_err(|error| error.to_string())?;
+        let (parsed, legacy_permission_profile) =
+            deserialize_typed_response_with_legacy_flag(&value);
+        if legacy_permission_profile {
+            // v0.124 remotes never support turn pagination — mark the
+            // capability off as soon as we recognise the legacy shape so
+            // downstream code paths (load_thread_turns_page) short-circuit
+            // instead of waiting for the runtime -32601 probe.
+            self.app_store
+                .set_server_supports_turn_pagination(server_id, false);
+        }
+        parsed.map_err(|e| {
+            let error = format_typed_rpc_deserialization_error(wire_method, &e, &value);
+            warn!("{error}\nraw payload: {value}");
+            error
+        })
+    }
+
+    /// Like `request_typed_for_server`, but returns the raw response and keeps
+    /// the typed `RpcError`, so a caller can tell a server rejection
+    /// (`RpcError::Server`) from an ambiguous transport failure.
+    pub(super) async fn request_value_for_server(
+        &self,
+        server_id: &str,
+        request: upstream::ClientRequest,
+    ) -> Result<serde_json::Value, RpcError> {
+        let runtime_kind = self.runtime_for_request(server_id, &request);
+        self.request_value_for_server_runtime(server_id, runtime_kind, request)
+            .await
+    }
+
+    async fn request_value_for_server_runtime(
+        &self,
+        server_id: &str,
+        runtime_kind: AgentRuntimeKind,
+        request: upstream::ClientRequest,
+    ) -> Result<serde_json::Value, RpcError> {
         let mut request = request;
         self.normalize_model_selection_for_request(server_id, runtime_kind.clone(), &mut request);
         self.recorder.record_request(server_id, &request);
         let wire_method = client_request_wire_method(&request);
         let started_at = Instant::now();
-        let session = self.get_session(server_id).map_err(|e| e.to_string())?;
+        let session = self.get_session(server_id)?;
         info!(
             "server request start server_id={} runtime={:?} method={}",
             server_id, runtime_kind, wire_method
@@ -329,7 +375,7 @@ impl MobileClient {
                     started_at.elapsed().as_millis(),
                     error
                 );
-                error.to_string()
+                error
             })?;
         info!(
             "server request ok server_id={} runtime={:?} method={} duration_ms={}",
@@ -339,21 +385,7 @@ impl MobileClient {
             started_at.elapsed().as_millis()
         );
         self.app_store.note_server_direct_request_success(server_id);
-        let (parsed, legacy_permission_profile) =
-            deserialize_typed_response_with_legacy_flag(&value);
-        if legacy_permission_profile {
-            // v0.124 remotes never support turn pagination — mark the
-            // capability off as soon as we recognise the legacy shape so
-            // downstream code paths (load_thread_turns_page) short-circuit
-            // instead of waiting for the runtime -32601 probe.
-            self.app_store
-                .set_server_supports_turn_pagination(server_id, false);
-        }
-        parsed.map_err(|e| {
-            let error = format_typed_rpc_deserialization_error(wire_method, &e, &value);
-            warn!("{error}\nraw payload: {value}");
-            error
-        })
+        Ok(value)
     }
 
     fn runtime_for_request(

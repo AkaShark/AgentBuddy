@@ -1555,6 +1555,7 @@ mod tests {
                 local_overlay_items: Vec::new(),
                 queued_follow_ups: Vec::new(),
                 queued_follow_up_drafts: Vec::new(),
+                queued_follow_up_dispatch: None,
                 active_turn_id: None,
                 context_tokens_used: None,
                 model_context_window: None,

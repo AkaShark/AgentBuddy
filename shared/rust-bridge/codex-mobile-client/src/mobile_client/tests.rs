@@ -221,6 +221,7 @@ mod mobile_client_tests {
                 text: "follow-up".to_string(),
             }],
             queued_follow_up_drafts: Vec::new(),
+            queued_follow_up_dispatch: None,
             active_turn_id: Some("turn-1".to_string()),
             context_tokens_used: Some(12_345),
             model_context_window: Some(200_000),
@@ -298,6 +299,7 @@ mod mobile_client_tests {
             local_overlay_items: Vec::new(),
             queued_follow_ups: Vec::new(),
             queued_follow_up_drafts: Vec::new(),
+            queued_follow_up_dispatch: None,
             active_turn_id: None,
             context_tokens_used: None,
             model_context_window: None,
@@ -1671,5 +1673,122 @@ mod mobile_client_tests {
 
         assert_eq!(preview.kind, AppQueuedFollowUpKind::PendingSteer);
         assert_eq!(preview.text, "Please try the same search again.");
+    }
+
+    #[tokio::test]
+    async fn queued_follow_up_autosend_routes_to_thread_runtime() {
+        let client = MobileClient::new();
+        let server_id = "srv";
+        let key = ThreadKey {
+            server_id: server_id.to_string(),
+            thread_id: "thread-pi".to_string(),
+        };
+        let config = make_server_config(server_id);
+        client
+            .app_store
+            .upsert_server(&config, ServerHealthSnapshot::Connected);
+        client
+            .app_store
+            .upsert_thread_snapshot(ThreadSnapshot::from_info(
+                server_id,
+                make_thread_info(&key.thread_id),
+            ));
+        client.note_thread_runtime(key.clone(), "pi".to_string());
+
+        let codex_requests = Arc::new(StdMutex::new(Vec::<String>::new()));
+        let pi_turn_starts = Arc::new(StdMutex::new(Vec::<upstream::TurnStartParams>::new()));
+        let codex_handler: TestRequestHandler = {
+            let codex_requests = Arc::clone(&codex_requests);
+            Arc::new(move |request| {
+                codex_requests
+                    .lock()
+                    .expect("codex request log lock should not be poisoned")
+                    .push(request.method().to_string());
+                Err(RpcError::Deserialization(
+                    "codex runtime must not receive a pi thread follow-up".to_string(),
+                ))
+            })
+        };
+        let pi_handler: TestRequestHandler = {
+            let pi_turn_starts = Arc::clone(&pi_turn_starts);
+            Arc::new(move |request| match request {
+                upstream::ClientRequest::TurnStart { params, .. } => {
+                    pi_turn_starts
+                        .lock()
+                        .expect("pi request log lock should not be poisoned")
+                        .push(params);
+                    Ok(json!({ "turn": { "id": "turn-pi" } }))
+                }
+                other => Err(RpcError::Deserialization(format!(
+                    "unexpected request in test: {}",
+                    other.method()
+                ))),
+            })
+        };
+        let session = Arc::new(ServerSession::test_stub_with_runtime_handlers(
+            config,
+            vec![
+                ("codex".to_string(), codex_handler),
+                ("pi".to_string(), pi_handler),
+            ],
+        ));
+        client
+            .sessions
+            .write()
+            .expect("sessions lock should not be poisoned")
+            .insert(server_id.to_string(), session);
+
+        let inputs = vec![upstream::UserInput::Text {
+            text: "queued follow up".to_string(),
+            text_elements: Vec::new(),
+        }];
+        client
+            .send_queued_follow_up_turn(&key, inputs.clone())
+            .await
+            .expect("queued follow-up should reach the pi runtime");
+
+        assert!(
+            codex_requests
+                .lock()
+                .expect("codex request log lock should not be poisoned")
+                .is_empty()
+        );
+        let pi_turn_starts = pi_turn_starts
+            .lock()
+            .expect("pi request log lock should not be poisoned");
+        assert_eq!(pi_turn_starts.len(), 1);
+        assert_eq!(pi_turn_starts[0].thread_id, key.thread_id);
+        assert_eq!(pi_turn_starts[0].input, inputs);
+    }
+
+    #[test]
+    fn threads_to_resubscribe_selects_active_and_loaded_threads() {
+        let reducer = AppStoreReducer::new();
+        let key = |server_id: &str, thread_id: &str| ThreadKey {
+            server_id: server_id.to_string(),
+            thread_id: thread_id.to_string(),
+        };
+
+        let mut loaded = ThreadSnapshot::from_info("srv", make_thread_info("loaded"));
+        loaded.initial_turns_loaded = true;
+        reducer.upsert_thread_snapshot(loaded);
+        reducer.upsert_thread_snapshot(ThreadSnapshot::from_info(
+            "srv",
+            make_thread_info("never-opened"),
+        ));
+        reducer
+            .upsert_thread_snapshot(ThreadSnapshot::from_info("srv", make_thread_info("active")));
+        let mut other_server = ThreadSnapshot::from_info("other", make_thread_info("loaded"));
+        other_server.initial_turns_loaded = true;
+        reducer.upsert_thread_snapshot(other_server);
+        reducer.set_active_thread(Some(key("srv", "active")));
+
+        let keys = threads_to_resubscribe(&reducer.snapshot(), "srv");
+
+        assert_eq!(keys, vec![key("srv", "active"), key("srv", "loaded")]);
+        assert_eq!(
+            threads_to_resubscribe(&reducer.snapshot(), "other"),
+            vec![key("other", "loaded")]
+        );
     }
 }

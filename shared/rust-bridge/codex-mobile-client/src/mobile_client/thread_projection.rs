@@ -47,6 +47,9 @@ pub fn copy_thread_runtime_fields(source: &ThreadSnapshot, target: &mut ThreadSn
     if target.queued_follow_up_drafts.is_empty() {
         target.queued_follow_up_drafts = source.queued_follow_up_drafts.clone();
     }
+    if target.queued_follow_up_dispatch.is_none() {
+        target.queued_follow_up_dispatch = source.queued_follow_up_dispatch.clone();
+    }
     target.context_tokens_used = source.context_tokens_used;
     target.model_context_window = source.model_context_window;
     target.rate_limits = source.rate_limits.clone();

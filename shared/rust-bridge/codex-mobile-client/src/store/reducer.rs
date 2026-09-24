@@ -39,8 +39,8 @@ use super::boundary::{
 use super::snapshot::{
     AppConnectionProgressSnapshot, AppLifecyclePhaseSnapshot, AppQueuedFollowUpPreview,
     AppSnapshot, AppTerminalSessionPhase, AppVoiceSessionSnapshot, PendingServerMutatingCommand,
-    QueuedFollowUpDraft, ServerHealthSnapshot, ServerMutatingCommandKind, ServerSnapshot,
-    ServerTransportDiagnostics, TerminalSessionSnapshot, ThreadSnapshot,
+    QueuedFollowUpDispatch, QueuedFollowUpDraft, ServerHealthSnapshot, ServerMutatingCommandKind,
+    ServerSnapshot, ServerTransportDiagnostics, TerminalSessionSnapshot, ThreadSnapshot,
 };
 use super::updates::{AppStoreUpdateRecord, ThreadStreamingDeltaKind};
 use super::voice::{VoiceDerivedUpdate, VoiceRealtimeState};
@@ -864,15 +864,95 @@ impl AppStoreReducer {
     pub(crate) fn remove_thread_follow_up_draft(&self, key: &ThreadKey, preview_id: &str) {
         if self
             .mutate_thread_with_result(key, |thread| {
-                thread
-                    .queued_follow_up_drafts
-                    .retain(|draft| draft.preview.id != preview_id);
-                sync_thread_follow_up_projection(thread);
+                remove_queued_follow_up_by_id(thread, preview_id)
             })
-            .is_some()
+            .unwrap_or(false)
         {
             self.emit_thread_metadata_changed(key);
         }
+    }
+
+    /// Claims the head queued follow-up for autosend after `completed_turn_id`
+    /// finished, marking it dispatched. Returns `None` when the thread is
+    /// busy or has nothing queued, when a draft was already dispatched for
+    /// this completion (a duplicate `TurnCompleted`), or while an earlier
+    /// dispatch still awaits its `turn/start` answer.
+    pub(crate) fn claim_queued_follow_up_dispatch(
+        &self,
+        key: &ThreadKey,
+        completed_turn_id: &str,
+    ) -> Option<QueuedFollowUpDraft> {
+        self.mutate_thread_with_result(key, |thread| {
+            if thread.active_turn_id.is_some() {
+                return None;
+            }
+            if let Some(dispatch) = thread.queued_follow_up_dispatch.as_ref()
+                && (dispatch.awaiting_start || dispatch.after_turn_id == completed_turn_id)
+            {
+                return None;
+            }
+            let draft = thread.queued_follow_up_drafts.first()?.clone();
+            thread.queued_follow_up_dispatch = Some(QueuedFollowUpDispatch {
+                preview_id: draft.preview.id.clone(),
+                after_turn_id: completed_turn_id.to_string(),
+                awaiting_start: true,
+            });
+            Some(draft)
+        })
+        .flatten()
+    }
+
+    /// `turn/start` accepted the dispatched draft: dequeue it by id, even if
+    /// the matching `TurnStarted` never arrives.
+    pub(crate) fn complete_queued_follow_up_dispatch(&self, key: &ThreadKey, preview_id: &str) {
+        if self
+            .mutate_thread_with_result(key, |thread| {
+                if let Some(dispatch) = thread.queued_follow_up_dispatch.as_mut()
+                    && dispatch.preview_id == preview_id
+                {
+                    dispatch.awaiting_start = false;
+                }
+                remove_queued_follow_up_by_id(thread, preview_id)
+            })
+            .unwrap_or(false)
+        {
+            self.emit_thread_metadata_changed(key);
+        }
+    }
+
+    /// The server rejected `turn/start` for the dispatched draft: forget the
+    /// dispatch so the draft, still queued, is retried by a later
+    /// `TurnCompleted`.
+    pub(crate) fn release_queued_follow_up_dispatch(&self, key: &ThreadKey, preview_id: &str) {
+        self.mutate_thread_with_result(key, |thread| {
+            if thread
+                .queued_follow_up_dispatch
+                .as_ref()
+                .is_some_and(|dispatch| dispatch.preview_id == preview_id)
+            {
+                thread.queued_follow_up_dispatch = None;
+            }
+        });
+    }
+
+    /// `turn/start` for the dispatched draft failed ambiguously (transport
+    /// error, timeout): the server may have started the turn anyway. Keep the
+    /// dispatch and the draft, but stop awaiting the answer, so the turn's
+    /// `TurnStarted` / user message still dequeues the draft by id, a
+    /// duplicate `TurnCompleted` for the same turn cannot re-send it, and a
+    /// completion of a different turn retries it if it never started.
+    pub(crate) fn mark_queued_follow_up_dispatch_unconfirmed(
+        &self,
+        key: &ThreadKey,
+        preview_id: &str,
+    ) {
+        self.mutate_thread_with_result(key, |thread| {
+            if let Some(dispatch) = thread.queued_follow_up_dispatch.as_mut()
+                && dispatch.preview_id == preview_id
+            {
+                dispatch.awaiting_start = false;
+            }
+        });
     }
 
     /// Atomically transitions a queued follow-up draft from `Message` to
@@ -1528,7 +1608,7 @@ impl AppStoreReducer {
             UiEvent::TurnStarted { key, turn_id } => {
                 if self
                     .mutate_thread_with_result(key, |thread| {
-                        remove_first_queued_follow_up(thread);
+                        dequeue_dispatched_follow_up(thread);
                         thread.active_turn_id = Some(turn_id.clone());
                         thread.active_plan_progress = None;
                         thread.pending_plan_implementation_turn_id = None;
@@ -2343,6 +2423,13 @@ impl AppStoreReducer {
         }
     }
 
+    /// Ask platform subscribers to reload the whole snapshot. Used after
+    /// recovering from dropped upstream/UI events, where per-thread updates
+    /// alone may not cover every piece of state that went stale.
+    pub(crate) fn emit_full_resync(&self) {
+        self.emit(AppStoreUpdateRecord::FullResync);
+    }
+
     fn clear_thread_update_caches(&self, key: &ThreadKey) {
         self.last_thread_state_updates
             .write()
@@ -2529,7 +2616,7 @@ impl AppStoreReducer {
                 && matches!(&item.content, HydratedConversationItemContent::User(_));
             upsert_item(thread, item);
             if clears_queued_follow_up {
-                remove_first_queued_follow_up(thread);
+                dequeue_dispatched_follow_up(thread);
             }
             (
                 mutation,
@@ -3473,6 +3560,9 @@ fn preserve_queued_follow_ups(source: &ThreadSnapshot, target: &mut ThreadSnapsh
     if target.queued_follow_up_drafts.is_empty() {
         target.queued_follow_up_drafts = source.queued_follow_up_drafts.clone();
     }
+    if target.queued_follow_up_dispatch.is_none() {
+        target.queued_follow_up_dispatch = source.queued_follow_up_dispatch.clone();
+    }
 }
 
 fn sync_thread_follow_up_projection(thread: &mut ThreadSnapshot) {
@@ -3483,15 +3573,30 @@ fn sync_thread_follow_up_projection(thread: &mut ThreadSnapshot) {
         .collect();
 }
 
-pub(crate) fn remove_first_queued_follow_up(thread: &mut ThreadSnapshot) {
-    if !thread.queued_follow_up_drafts.is_empty() {
-        thread.queued_follow_up_drafts.remove(0);
+/// Idempotent: returns whether a draft was actually removed.
+fn remove_queued_follow_up_by_id(thread: &mut ThreadSnapshot, preview_id: &str) -> bool {
+    let before = thread.queued_follow_up_drafts.len();
+    thread
+        .queued_follow_up_drafts
+        .retain(|draft| draft.preview.id != preview_id);
+    let removed = thread.queued_follow_up_drafts.len() != before;
+    if removed {
         sync_thread_follow_up_projection(thread);
+    }
+    removed
+}
+
+/// The dispatched follow-up's turn started (`TurnStarted`, or its user
+/// message arrived): dequeue that draft by id. Other drafts are never
+/// touched — a turn with no dispatch (a direct send, a steer) or one whose
+/// dispatched draft the user already deleted leaves the queue as is.
+fn dequeue_dispatched_follow_up(thread: &mut ThreadSnapshot) {
+    let Some(dispatch) = thread.queued_follow_up_dispatch.as_mut() else {
         return;
-    }
-    if !thread.queued_follow_ups.is_empty() {
-        thread.queued_follow_ups.remove(0);
-    }
+    };
+    dispatch.awaiting_start = false;
+    let preview_id = dispatch.preview_id.clone();
+    remove_queued_follow_up_by_id(thread, &preview_id);
 }
 
 fn is_duplicate_overlay_item(
@@ -5188,7 +5293,7 @@ mod tests {
     }
 
     #[test]
-    fn turn_started_consumes_first_queued_follow_up_preview() {
+    fn turn_started_consumes_only_the_dispatched_queued_follow_up() {
         let reducer = AppStoreReducer::new();
         let key = ThreadKey {
             server_id: "srv".to_string(),
@@ -5213,6 +5318,32 @@ mod tests {
             },
         );
 
+        // A turn the autosend path did not start (e.g. a direct send) must
+        // not consume a queued draft.
+        reducer.apply_ui_event(&UiEvent::TurnStarted {
+            key: key.clone(),
+            turn_id: "turn-direct".to_string(),
+        });
+        let queued_ids = |reducer: &AppStoreReducer| {
+            reducer
+                .thread_snapshot(&key)
+                .expect("thread exists")
+                .queued_follow_ups
+                .into_iter()
+                .map(|preview| preview.id)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(queued_ids(&reducer), vec!["queued-1", "queued-2"]);
+        reducer.apply_ui_event(&UiEvent::TurnCompleted {
+            key: key.clone(),
+            turn_id: "turn-direct".to_string(),
+            error: None,
+        });
+
+        let dispatched = reducer
+            .claim_queued_follow_up_dispatch(&key, "turn-direct")
+            .expect("idle thread dispatches the head draft");
+        assert_eq!(dispatched.preview.id, "queued-1");
         reducer.apply_ui_event(&UiEvent::TurnStarted {
             key: key.clone(),
             turn_id: "turn-2".to_string(),
@@ -5566,7 +5697,7 @@ mod tests {
     }
 
     #[test]
-    fn user_turn_boundary_item_consumes_stale_queued_follow_up_preview() {
+    fn user_turn_boundary_item_consumes_dispatched_queued_follow_up_once() {
         let reducer = AppStoreReducer::new();
         let key = ThreadKey {
             server_id: "srv".to_string(),
@@ -5574,35 +5705,53 @@ mod tests {
         };
         reducer
             .upsert_thread_snapshot(ThreadSnapshot::from_info("srv", make_thread_info("thread")));
-        reducer.enqueue_thread_follow_up_preview(
-            &key,
-            AppQueuedFollowUpPreview {
-                id: "queued-1".to_string(),
-                kind: crate::store::snapshot::AppQueuedFollowUpKind::Message,
-                text: "queued follow-up".to_string(),
-            },
-        );
+        for (id, text) in [("queued-1", "queued follow-up"), ("queued-2", "second")] {
+            reducer.enqueue_thread_follow_up_preview(
+                &key,
+                AppQueuedFollowUpPreview {
+                    id: id.to_string(),
+                    kind: crate::store::snapshot::AppQueuedFollowUpKind::Message,
+                    text: text.to_string(),
+                },
+            );
+        }
+        let user_item = |id: &str| HydratedConversationItem {
+            id: id.to_string(),
+            content: HydratedConversationItemContent::User(
+                crate::conversation_uniffi::HydratedUserMessageData {
+                    text: "queued follow-up".to_string(),
+                    image_data_uris: Vec::new(),
+                },
+            ),
+            source_turn_id: Some("turn-2".to_string()),
+            source_turn_index: None,
+            timestamp: None,
+            is_from_user_turn_boundary: true,
+        };
+        let queued_ids = |reducer: &AppStoreReducer| {
+            reducer
+                .thread_snapshot(&key)
+                .expect("thread exists")
+                .queued_follow_ups
+                .into_iter()
+                .map(|preview| preview.id)
+                .collect::<Vec<_>>()
+        };
 
-        reducer.apply_item_update(
-            &key,
-            HydratedConversationItem {
-                id: "user-1".to_string(),
-                content: HydratedConversationItemContent::User(
-                    crate::conversation_uniffi::HydratedUserMessageData {
-                        text: "queued follow-up".to_string(),
-                        image_data_uris: Vec::new(),
-                    },
-                ),
-                source_turn_id: Some("turn-2".to_string()),
-                source_turn_index: None,
-                timestamp: None,
-                is_from_user_turn_boundary: true,
-            },
-        );
+        // A user message nothing was dispatched for (a direct send or a
+        // steer) leaves the queue alone.
+        reducer.apply_item_update(&key, user_item("user-direct"));
+        assert_eq!(queued_ids(&reducer), vec!["queued-1", "queued-2"]);
 
-        let snapshot = reducer.snapshot();
-        let thread = snapshot.threads.get(&key).expect("thread exists");
-        assert!(thread.queued_follow_ups.is_empty());
+        reducer
+            .claim_queued_follow_up_dispatch(&key, "turn-1")
+            .expect("idle thread dispatches the head draft");
+        // The dispatched turn's user message dequeues that draft; the same
+        // item applied again (started + completed) must not dequeue another.
+        reducer.apply_item_update(&key, user_item("user-1"));
+        reducer.apply_item_update(&key, user_item("user-1"));
+
+        assert_eq!(queued_ids(&reducer), vec!["queued-2"]);
     }
 
     // ── SW-R3: streaming dynamic tool call argument deltas ───────────

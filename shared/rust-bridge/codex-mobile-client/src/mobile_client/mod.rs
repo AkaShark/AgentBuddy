@@ -117,6 +117,11 @@ pub struct MobileClient {
     /// session exits or the caller explicitly closes it.
     pub(crate) terminal_sessions:
         Arc<StdMutex<HashMap<String, Arc<crate::terminal::TerminalSession>>>>,
+    /// Debounced store recovery shared by the UI-event store listener and
+    /// the per-server upstream event readers: when either broadcast lags
+    /// (events dropped), it re-fetches affected threads authoritatively and
+    /// asks platforms for a `FullResync`.
+    lag_recovery: Arc<StoreLagRecovery>,
 }
 
 /// State for a single in-flight guided SSH connect.
@@ -696,9 +701,11 @@ impl MobileClient {
         let event_processor = Arc::new(EventProcessor::new());
         let app_store = Arc::new(AppStoreReducer::new());
         let sessions = Arc::new(RwLock::new(HashMap::new()));
+        let lag_recovery = StoreLagRecovery::new(Arc::clone(&app_store));
         spawn_store_listener(
             Arc::clone(&app_store),
             Arc::clone(&sessions),
+            Arc::clone(&lag_recovery),
             event_processor.subscribe(),
         );
         Self {
@@ -721,6 +728,7 @@ impl MobileClient {
             ssh_bootstrap_flows: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
             alleycat_restart_targets: Arc::new(StdMutex::new(HashMap::new())),
             terminal_sessions: Arc::new(StdMutex::new(HashMap::new())),
+            lag_recovery,
         }
     }
 
@@ -3310,19 +3318,16 @@ impl MobileClient {
         preview_id: &str,
     ) -> Result<(), RpcError> {
         self.get_session(&key.server_id)?;
-        let thread = self.snapshot_thread(key)?;
-        let next_drafts = thread
-            .queued_follow_up_drafts
-            .into_iter()
-            .filter(|draft| draft.preview.id != preview_id)
-            .collect::<Vec<_>>();
+        self.snapshot_thread(key)?;
 
         let direct_command_id = self.app_store.begin_server_mutating_command(
             &key.server_id,
             ServerMutatingCommandKind::DeleteQueuedFollowUp,
             &key.thread_id,
         );
-        self.app_store.set_thread_follow_up_drafts(key, next_drafts);
+        // Remove by id under the store lock: rewriting the whole list from an
+        // earlier snapshot could resurrect a draft autosend just dequeued.
+        self.app_store.remove_thread_follow_up_draft(key, preview_id);
         self.app_store
             .finish_server_mutating_command_success(&key.server_id, &direct_command_id);
         Ok(())
@@ -3963,24 +3968,7 @@ pub(super) fn run_post_reconnect_resubscribe(app_store: Arc<AppStoreReducer>, se
         };
         client.clear_direct_resume_markers_for_server(&server_id);
 
-        let snapshot = app_store.snapshot();
-        let mut keys_to_resume: Vec<ThreadKey> = Vec::new();
-        if let Some(active) = snapshot.active_thread.as_ref()
-            && active.server_id == server_id
-        {
-            keys_to_resume.push(active.clone());
-        }
-        for (key, thread) in snapshot.threads.iter() {
-            if key.server_id != server_id {
-                continue;
-            }
-            if keys_to_resume.iter().any(|k| k == key) {
-                continue;
-            }
-            if !thread.items.is_empty() || thread.initial_turns_loaded {
-                keys_to_resume.push(key.clone());
-            }
-        }
+        let keys_to_resume = threads_to_resubscribe(&app_store.snapshot(), &server_id);
 
         if keys_to_resume.is_empty() {
             debug!(
@@ -4018,4 +4006,28 @@ pub(super) fn run_post_reconnect_resubscribe(app_store: Arc<AppStoreReducer>, se
             }
         }
     });
+}
+
+/// Threads on `server_id` whose store state must be re-fetched
+/// authoritatively after the client may have missed events for them: the
+/// active thread first, then every thread that already had turns loaded.
+pub(super) fn threads_to_resubscribe(snapshot: &AppSnapshot, server_id: &str) -> Vec<ThreadKey> {
+    let mut keys: Vec<ThreadKey> = Vec::new();
+    if let Some(active) = snapshot.active_thread.as_ref()
+        && active.server_id == server_id
+    {
+        keys.push(active.clone());
+    }
+    for (key, thread) in snapshot.threads.iter() {
+        if key.server_id != server_id {
+            continue;
+        }
+        if keys.iter().any(|k| k == key) {
+            continue;
+        }
+        if !thread.items.is_empty() || thread.initial_turns_loaded {
+            keys.push(key.clone());
+        }
+    }
+    keys
 }

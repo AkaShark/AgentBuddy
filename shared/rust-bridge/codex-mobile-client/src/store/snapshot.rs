@@ -218,6 +218,8 @@ pub struct ThreadSnapshot {
     pub local_overlay_items: Vec<HydratedConversationItem>,
     pub queued_follow_ups: Vec<AppQueuedFollowUpPreview>,
     pub(crate) queued_follow_up_drafts: Vec<QueuedFollowUpDraft>,
+    /// The most recent queued follow-up autosent with `turn/start`.
+    pub(crate) queued_follow_up_dispatch: Option<QueuedFollowUpDispatch>,
     pub active_turn_id: Option<String>,
     pub context_tokens_used: Option<u64>,
     pub model_context_window: Option<u64>,
@@ -262,6 +264,21 @@ pub(crate) struct QueuedFollowUpDraft {
     pub source_message_json: Option<serde_json::Value>,
 }
 
+/// Tracks the queued follow-up draft the autosend path handed to
+/// `turn/start`, so a duplicate `TurnCompleted` cannot send twice and the
+/// draft is dequeued by id rather than by queue position.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct QueuedFollowUpDispatch {
+    /// Preview id of the dispatched draft.
+    pub preview_id: String,
+    /// Turn whose completion triggered the dispatch. Another `TurnCompleted`
+    /// for the same turn must not dispatch the next draft.
+    pub after_turn_id: String,
+    /// `turn/start` has not answered yet and the turn has not been seen
+    /// starting; no other draft may be dispatched meanwhile.
+    pub awaiting_start: bool,
+}
+
 impl ThreadSnapshot {
     pub fn from_info(server_id: &str, info: ThreadInfo) -> Self {
         let key = ThreadKey {
@@ -281,6 +298,7 @@ impl ThreadSnapshot {
             local_overlay_items: Vec::new(),
             queued_follow_ups: Vec::new(),
             queued_follow_up_drafts: Vec::new(),
+            queued_follow_up_dispatch: None,
             active_turn_id: None,
             context_tokens_used: None,
             model_context_window: None,
