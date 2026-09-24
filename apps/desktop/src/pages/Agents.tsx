@@ -8,6 +8,19 @@ interface Props {
   run: (fn: () => Promise<void>) => Promise<void>;
 }
 
+function SettingInput({ label, value, busy, save, numeric = false }: {
+  label: string; value: string; busy: boolean; save: (value: string) => Promise<void>; numeric?: boolean;
+}) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  return <input aria-label={label} value={draft} disabled={busy}
+    type={numeric ? "number" : "text"} min={numeric ? 1 : undefined} max={numeric ? 65535 : undefined}
+    onChange={(e) => setDraft(e.target.value)}
+    onBlur={(e) => {
+      if (draft.trim() && draft !== value && e.currentTarget.checkValidity()) void save(draft.trim());
+    }} onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }} />;
+}
+
 /** `available` comes from the daemon (binary found); `enabled` and the
  *  configured binary come from host.toml via agent_settings. */
 export function Agents({ agents, busy, run }: Props) {
@@ -71,7 +84,8 @@ export function Agents({ agents, busy, run }: Props) {
                   />
                 </td>
                 <td className="row">
-                  <code>{s?.bin ?? a.name}</code>
+                  <SettingInput label={`${a.display_name} 路径`} value={s?.bin ?? a.name} busy={busy || !s}
+                    save={(path) => change(() => host.setAgentBin(a.name, path))} />
                   <button disabled={busy} onClick={() => void pick(a)}>
                     选择…
                   </button>
@@ -81,6 +95,14 @@ export function Agents({ agents, busy, run }: Props) {
           })}
         </tbody>
       </table>
+      {agents.some((a) => a.name === "codex") && <details>
+        <summary>Codex 高级设置</summary>
+        <p className="muted">留空保留当前配置；输入后离开输入框即可保存。</p>
+        <label>host <SettingInput label="Codex host" value={settings.codex?.host ?? ""} busy={busy || !settings.codex}
+          save={(value) => change(() => host.setCodexEndpoint(value, null))} /></label>
+        <label>port <SettingInput label="Codex port" value={settings.codex?.port?.toString() ?? ""} busy={busy || !settings.codex} numeric
+          save={(value) => change(() => host.setCodexEndpoint(null, Number(value)))} /></label>
+      </details>}
     </>
   );
 }

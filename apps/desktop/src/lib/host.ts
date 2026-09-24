@@ -52,6 +52,8 @@ export interface PairPayload {
 export interface AgentSettings {
   enabled: boolean;
   bin: string | null;
+  host?: string | null;
+  port?: number | null;
 }
 
 export type HostErrorKind =
@@ -85,6 +87,7 @@ export const host = {
   setAgentEnabled: (name: string, enabled: boolean) =>
     invoke<void>("agent_set_enabled", { name, enabled }),
   setAgentBin: (name: string, path: string) => invoke<void>("agent_set_bin", { name, path }),
+  setCodexEndpoint: (host: string | null, port: number | null) => invoke<void>("codex_set_endpoint", { host, port }),
   logsTail: (lines: number) => invoke<string[]>("logs_tail", { lines }),
   logsFollowStart: () => invoke<void>("logs_follow_start"),
   logsFollowStop: () => invoke<void>("logs_follow_stop"),

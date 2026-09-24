@@ -30,7 +30,7 @@ export default function App() {
       <Nav page={page} onSelect={setPage} />
       <main className="page">
         {unreachable && <span className="badge warn">无法连接控制通道</span>}
-        <ErrorBanner error={error ?? state?.status_error ?? null} appVersion={state?.app_version} />
+        <ErrorBanner error={error ?? state?.status_error ?? null} appVersion={state?.app_version} daemonVersion={state?.status?.version} />
         {state === null ? (
           <p className="muted">正在读取主机状态…</p>
         ) : page === "overview" ? (

@@ -153,6 +153,23 @@ pub async fn agent_set_bin(
 }
 
 #[tauri::command]
+pub async fn codex_set_endpoint(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    host: Option<String>,
+    port: Option<u16>,
+) -> Result<(), HostError> {
+    let current = current_status(&app).await?;
+    let path = PathBuf::from(&current.config_path);
+    let text = config::read_or_empty(&path)?;
+    config::write_atomic(&path, &config::set_codex_endpoint(&text, host.as_deref(), port)?)?;
+    match reload_after_config_write(current.is_running()) {
+        Some(cmd) => run_mutating(&app, &state, cmd).await,
+        None => Ok(()),
+    }
+}
+
+#[tauri::command]
 pub async fn logs_tail(app: AppHandle, lines: u32) -> Result<Vec<String>, HostError> {
     logs::tail(&app, lines).await
 }

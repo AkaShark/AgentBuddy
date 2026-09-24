@@ -47,6 +47,7 @@ pub fn run() {
             commands::agent_settings,
             commands::agent_set_enabled,
             commands::agent_set_bin,
+            commands::codex_set_endpoint,
             commands::logs_tail,
             commands::logs_follow_start,
             commands::logs_follow_stop,

@@ -23,6 +23,20 @@ beforeEach(() => {
 });
 
 describe("Agents", () => {
+  it("saves a manually entered executable and Codex network settings", async () => {
+    render(<Agents agents={agents} busy={false} run={async (f) => f()} />);
+    const path = await screen.findByLabelText("Codex 路径");
+    fireEvent.change(path, { target: { value: "/custom/codex" } });
+    fireEvent.blur(path);
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith("agent_set_bin", { name: "codex", path: "/custom/codex" }));
+    fireEvent.change(screen.getByLabelText("Codex host"), { target: { value: "127.0.0.2" } });
+    fireEvent.blur(screen.getByLabelText("Codex host"));
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith("codex_set_endpoint", { host: "127.0.0.2", port: null }));
+    fireEvent.change(screen.getByLabelText("Codex port"), { target: { value: "9000" } });
+    fireEvent.blur(screen.getByLabelText("Codex port"));
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith("codex_set_endpoint", { host: null, port: 9000 }));
+  });
+
   it("shows availability and the enabled flag from host.toml, and toggles it", async () => {
     render(<Agents agents={agents} busy={false} run={async (f) => f()} />);
     expect(screen.getByText("Codex")).toBeInTheDocument();

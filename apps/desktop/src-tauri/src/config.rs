@@ -13,6 +13,8 @@ use crate::error::HostError;
 pub struct AgentSettings {
     pub enabled: bool,
     pub bin: Option<String>,
+    pub host: Option<String>,
+    pub port: Option<u16>,
 }
 
 fn bin_key(agent: &str) -> &'static str {
@@ -60,6 +62,17 @@ pub fn set_agent_bin(text: &str, agent: &str, bin: &str) -> Result<String, HostE
     Ok(doc.to_string())
 }
 
+pub fn set_codex_endpoint(text: &str, host: Option<&str>, port: Option<u16>) -> Result<String, HostError> {
+    if host.is_some_and(|h| h.trim().is_empty() || h.chars().any(char::is_whitespace)) || port == Some(0) {
+        return Err(HostError::config_invalid("host must be nonempty without whitespace; port must be 1–65535"));
+    }
+    let mut doc = parse(text)?;
+    let table = agent_table(&mut doc, "codex")?;
+    if let Some(host) = host { table.insert("host", value(host)); }
+    if let Some(port) = port { table.insert("port", value(i64::from(port))); }
+    Ok(doc.to_string())
+}
+
 pub fn read_agent_settings(text: &str) -> Result<BTreeMap<String, AgentSettings>, HostError> {
     let doc = parse(text)?;
     let mut out = BTreeMap::new();
@@ -68,7 +81,9 @@ pub fn read_agent_settings(text: &str) -> Result<BTreeMap<String, AgentSettings>
             let Some(t) = item.as_table_like() else { continue };
             let enabled = t.get("enabled").and_then(Item::as_bool).unwrap_or(true);
             let bin = t.get(bin_key(name)).and_then(Item::as_str).map(str::to_owned);
-            out.insert(name.to_owned(), AgentSettings { enabled, bin });
+            let host = t.get("host").and_then(Item::as_str).map(str::to_owned);
+            let port = t.get("port").and_then(Item::as_integer).and_then(|p| u16::try_from(p).ok());
+            out.insert(name.to_owned(), AgentSettings { enabled, bin, host, port });
         }
     }
     Ok(out)
@@ -108,6 +123,18 @@ mod tests {
     use super::*;
 
     const HOST: &str = include_str!("../tests/fixtures/host.toml");
+
+    #[test]
+    fn codex_endpoint_changes_preserve_unrelated_config_and_validate_input() {
+        let out = set_codex_endpoint(HOST, Some("127.0.0.2"), Some(9000)).unwrap();
+        let doc = parse(&out).unwrap();
+        assert_eq!(doc["agents"]["codex"]["host"].as_str(), Some("127.0.0.2"));
+        assert_eq!(doc["agents"]["codex"]["port"].as_integer(), Some(9000));
+        assert_eq!(doc["token"].as_str(), Some("abc123"));
+        assert!(out.contains("# keep codex on"));
+        assert!(set_codex_endpoint(HOST, Some(""), None).is_err());
+        assert!(set_codex_endpoint(HOST, None, Some(0)).is_err());
+    }
 
     #[test]
     fn edits_inline_agent_tables_without_losing_other_settings() {
@@ -172,9 +199,9 @@ mod tests {
     #[test]
     fn read_agent_settings_reports_enabled_and_binary_per_agent() {
         let m = read_agent_settings(HOST).unwrap();
-        assert_eq!(m["codex"], AgentSettings { enabled: true, bin: Some("codex".into()) });
-        assert_eq!(m["claude"], AgentSettings { enabled: false, bin: Some("claude".into()) });
-        assert_eq!(m["shell"], AgentSettings { enabled: true, bin: Some("/bin/zsh".into()) });
+        assert_eq!(m["codex"], AgentSettings { enabled: true, bin: Some("codex".into()), host: Some("127.0.0.1".into()), port: Some(8390) });
+        assert_eq!(m["claude"], AgentSettings { enabled: false, bin: Some("claude".into()), host: None, port: None });
+        assert_eq!(m["shell"], AgentSettings { enabled: true, bin: Some("/bin/zsh".into()), host: None, port: None });
         assert!(read_agent_settings("").unwrap().is_empty());
     }
 
