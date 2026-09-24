@@ -81,19 +81,24 @@ Worker 不运行 AI 任务、不轮询主机、不接收对话内容。事件里
 
 ## 5. 信任关系
 
-目标：主机必须经授权才能登记订阅和上报事件；主机只能给自己名下的订阅发通知；App 里不打包任何全局秘密；知道 threadId 不等于有权限；支持撤销和防重放。
+目标：主机必须经授权才能登记订阅和上报事件；主机只能给自己名下的订阅发通知；App 里不打包任何全局秘密；知道 threadId 不等于有权限；推送 token 不交给主机；支持撤销和防重放。
+
+> 协议版本：本节所有签名串都是 v2。v1 草案把明文推送 token 交给主机，只在 grant 里绑定 token 的哈希；安全审查证明任何拿到过 token 的主机都能自造一把「设备」密钥继续推送，撤销对它无效。v2 改为密封投递目标（§5.5），并在所有签名串里加入 `aud`。
+
+`aud` 是 Worker 的 origin（`scheme://host[:port]`，不带结尾斜杠），例如 `https://agentbuddy-push-proxy.aaksharker.workers.dev`。签名方使用它实际调用的 Worker 地址；Worker 用 `new URL(request.url).origin` 比对。这样在一个 Worker 部署截获的签名不能拿到另一个部署重放。
 
 ### 5.1 设备授权（grant）
 
 手机为每个订阅生成一份 grant，用**设备 iroh 私钥**签名。待签字符串（UTF-8，`\n` 分隔，最后一行后没有换行）：
 
 ```
-agentbuddy-push-grant-v1
+agentbuddy-push-grant-v2
+aud=<worker origin>
 host=<hostId>
 device=<deviceId>
 platform=<ios|android>
 environment=<sandbox|production|none>
-token_sha256=<sha256(pushToken) 小写 hex>
+target_sha256=<sha256(sealedTarget 的 ASCII 字符串) 小写 hex>
 agent=<agent>
 thread=<threadId>
 turn=<turnId>
@@ -102,31 +107,33 @@ expires=<unix 秒>
 nonce=<32 位 hex>
 ```
 
-签名是 64 字节 Ed25519，编码为 128 位小写 hex。Worker 用 `deviceId` 当公钥验签，并检查：`host` 等于请求签名方；`sha256(pushToken)` 一致；`issued` 不早于该设备的撤销时间点；`expires - issued ≤ 48h` 且未过期；`nonce` 未被用过（用过的 grant nonce 保存到过期为止）。
+签名是 64 字节 Ed25519，编码为 128 位小写 hex。Worker 用 `deviceId` 当公钥验签，并检查：`aud` 等于自己的 origin；`host` 等于请求签名方；`sha256(sealedTarget)` 一致，且解封后的目标里 `deviceId`、`hostId`、`platform`、`apnsEnvironment` 与请求一致；`issued` **严格晚于**该设备的撤销时间点、且不晚于 now + 300 秒；`expires - issued ≤ 48h` 且未过期；`nonce` 未被用过（用过的 grant nonce 保存到过期为止）。
 
-效果：主机拿不到设备签名就登记不了订阅，也就不能把任意 token 拿来推送；设备私钥是每台手机自己的，不是共享秘密。
+效果：主机只转发一个它解不开、也换不掉的密文；没有设备签名就登记不了订阅；设备私钥是每台手机自己的，不是共享秘密。
 
 ### 5.2 主机请求签名
 
 主机对 Worker 的每个请求都用 **host 私钥**签名：
 
 ```
-agentbuddy-push-host-v1
+agentbuddy-push-host-v2
+<worker origin>
 <METHOD>
 <path，不含 query>
-<unix 秒>
-<nonce，32 位 hex>
+<unix 秒，十进制，无前导零>
+<nonce，32 位小写 hex，CSPRNG 生成>
 <sha256(body) 小写 hex>
 ```
 
-请求头：`X-AgentBuddy-Host: <hostId>`、`X-AgentBuddy-Timestamp`、`X-AgentBuddy-Nonce`、`X-AgentBuddy-Signature: <128 位 hex>`。Worker 拒绝时间偏差超过 300 秒的请求，nonce 在主机 DO 里保存 10 分钟防重放。
+请求头：`X-AgentBuddy-Host: <hostId>`、`X-AgentBuddy-Timestamp`、`X-AgentBuddy-Nonce`、`X-AgentBuddy-Signature: <128 位 hex>`。Worker 拒绝时间偏差超过 300 秒的请求，nonce 在主机 DO 里保存 10 分钟防重放。**主机每次重试都必须重新生成 timestamp、nonce 和签名**（Worker 在处理前就记下 nonce，原样重发会得到 401）。
 
 ### 5.3 设备撤销
 
 手机可以不经过主机，直接用设备私钥撤销（尽力而为，网络不通时由到期兜底）：
 
 ```
-agentbuddy-push-revoke-v1
+agentbuddy-push-revoke-v2
+aud=<worker origin>
 host=<hostId>
 device=<deviceId>
 scope=all
@@ -134,21 +141,34 @@ timestamp=<unix 秒>
 nonce=<32 位 hex>
 ```
 
-`scope=all` 删除该设备在该主机下的全部订阅，并记录撤销时间点，此前签发的 grant 不能再用来登记。
+`scope=all` 删除该设备在该主机下的全部订阅，并记录撤销时间点，此前（含同一秒）签发的 grant 不能再用来登记。撤销的 nonce 与主机请求的 nonce 分开存放（外人不能借撤销接口预占主机的 nonce）。手机不会在撤销的同一秒内签发新 grant。
 
 ### 5.4 其他
 
-- **重放**：主机请求有时间窗 + nonce；grant nonce 一次性；事件按 `eventId + subscriptionId` 去重。
-- **主机凭据撤销**：管理员可以把 hostId 加进 Worker 变量 `BLOCKED_HOST_IDS`（逗号分隔）立即封禁；手机可以按上面的方式撤销对某主机的全部订阅。主机换身份（重新配对）后，旧 hostId 的订阅自然失效。
+- **重放**：所有签名串带 `aud`；主机请求有时间窗 + nonce；grant nonce 一次性；事件按 `eventId + subscriptionId` 去重。
+- **主机凭据撤销**：管理员可以把 hostId 加进 Worker 变量 `BLOCKED_HOST_IDS`（逗号分隔）立即封禁，封禁同时停止该主机排队中的重试；手机可以按上面的方式撤销对某主机的全部订阅。主机换身份（重新配对）后，旧 hostId 的订阅自然失效。
 - **通知里的 ID 只用于定位**：App 打开后仍然通过正常的 alleycat 连接和 token 鉴权读取数据。
-- **威胁模型边界**：任何人都能生成一对密钥冒充「主机」调用 Worker，但没有设备 grant 就登记不了订阅，也就推送不到任何设备。
+- **威胁模型边界**：任何人都能生成一对密钥冒充「主机」调用 Worker，但没有设备 grant 和对应的密封目标就登记不了订阅，也就推送不到任何设备。主机签名路由和撤销接口都有按 IP（IPv6 按 /64）的限流，没有订阅的主机上报事件不会写入任何状态。
+
+### 5.5 密封投递目标（sealed target）
+
+推送 token 只在手机和 Worker 之间可见。Worker 持有一把静态 X25519 私钥（Secret `PUSH_TARGET_SEAL_KEY`，带 1 字节 key id），对应的公钥内置在手机的共享 Rust 里（主机无法替换）。
+
+- 手机生成临时 X25519 密钥对 `(esk, epk)`，`shared = X25519(esk, workerPk)`。
+- `key = HKDF-SHA256(ikm = shared, salt = epk ‖ workerPk, info = "agentbuddy-push-target-v1", L = 32)`。
+- 明文：`{"v":1,"platform":"ios","token":"<push token>","apnsEnvironment":"production","deviceId":"<deviceId>","hostId":"<hostId>"}`（Android 的 `apnsEnvironment` 为 `null`）。
+- AAD：UTF-8 字符串 `<hostId>|<deviceId>`。
+- AES-256-GCM，12 字节随机 nonce，密文后接 16 字节 tag。
+- `sealedTarget = base64url 无填充( 0x01 版本 ‖ kid ‖ epk(32) ‖ nonce(12) ‖ ciphertext+tag )`。
+
+Worker 按 kid 选私钥（轮换时同时保留新旧两把），解封失败、AAD 不匹配或明文字段与请求不一致一律 403。主机把 `sealedTarget` 当作不透明字符串存储和转发，永远拿不到明文 token。
 
 ## 6. alleycat（主机端）
 
 ### 6.1 协议（v1 增量）
 
 - `ListAgents` 响应新增可选字段 `host: { features: ["push.v1"], push: { enabled, agents: ["codex", …] } }`。`agents` 只列出当前运行模式下能观察终态的 agent（Codex 在 Stdio 模式下不列出）。老主机没有这个字段 → 手机判定不支持。
-- 新 op `push_subscribe { v, token, agent, thread_id, turn_id, target: { platform, push_token, apns_environment? }, grant: { device_id, issued, expires, nonce, signature } }`。主机检查 `grant.device_id == 连接的 remote_id`、agent 支持推送、字段长度；然后持久化订阅，交给 watcher，并排入「登记订阅」outbox 项。响应 `push: { subscription: "pending" | "registered", terminal: null | { type, occurred_at } }`。如果订阅时 turn 已经结束，主机立即生成事件。
+- 新 op `push_subscribe { v, token, agent, thread_id, turn_id, target: { platform, apns_environment?, sealed }, grant: { device_id, issued, expires, nonce, signature } }`。`target.sealed` 是 §5.5 的密封目标，主机不解析。主机检查 `grant.device_id == 连接的 remote_id`、agent 支持推送、字段格式（见 §13）；然后持久化订阅，交给 watcher，并排入「登记订阅」outbox 项。响应 `push: { subscription: "pending" | "registered", terminal: null | { type, occurred_at } }`。如果订阅时 turn 已经结束，主机立即生成事件。
 - 新 op `push_unsubscribe { v, token, agent?, thread_id?, turn_id?, all? }`：只作用于这个设备（按连接 remote_id）自己的订阅，排入撤销 outbox 项。
 - 所有新 op 都像 `restart_agent` 一样：写一个响应帧后关流。
 
@@ -189,8 +209,8 @@ nonce=<32 位 hex>
 
 ```json
 {
-  "deviceId": "<64 hex>", "platform": "ios", "pushToken": "<hex>",
-  "apnsEnvironment": "production", "agent": "codex",
+  "deviceId": "<64 hex>", "platform": "ios", "apnsEnvironment": "production",
+  "sealedTarget": "<base64url>", "agent": "codex",
   "threadId": "0199…", "turnId": "0199…",
   "issuedAt": 1790300000, "expiresAt": 1790386400,
   "grantNonce": "<32 hex>", "grantSignature": "<128 hex>"
@@ -330,31 +350,54 @@ nonce=<32 位 hex>
 | `APNS_TEAM_ID`、`APNS_KEY_ID`、`APNS_PRIVATE_KEY` | Secret（已有） | APNs JWT |
 | `FCM_PROJECT_ID`、`FCM_CLIENT_EMAIL`、`FCM_PRIVATE_KEY` | Secret（已有） | FCM OAuth |
 | `DEBUG_PUSH_ADMIN_TOKEN` | Secret（新增，可选） | 调试接口管理员 token |
+| `PUSH_TARGET_SEAL_KEY` | Secret（新增，必需） | 解封投递目标的 X25519 私钥，格式 `<kid>:<64 位 hex>`，轮换期间可用逗号分隔多把 |
 | `APNS_TOPIC` | 变量 | 默认 `com.akashark.agentbuddy` |
 | `DEBUG_PUSH_ENABLED` | 变量 | 默认 `false` |
 | `LEGACY_KEEPALIVE_ENABLED` | 变量 | 默认 `true`，停旧链路时改为 `false` |
 | `BLOCKED_HOST_IDS` | 变量 | 逗号分隔的封禁 hostId，默认空 |
 
-## 12. 签名测试向量
+## 12. 签名与密封测试向量（v2）
 
-主机（alleycat Rust）、Worker（TypeScript）、手机（Rust）三处实现都必须用下面这组向量写单元测试。Ed25519 是确定性签名，三边应当算出完全相同的结果。字符串里的 `\n` 表示换行，末尾没有换行。
+主机（alleycat Rust）、Worker（TypeScript）、手机（Rust）三处实现都必须用下面这组向量写单元测试。Ed25519 是确定性签名，三边应当算出完全相同的结果。密封使用的是**测试专用**的 Worker 密钥，不是生产密钥。字符串里的 `\n` 表示换行，末尾没有换行。
 
+- aud：`https://push.example.test`
 - 主机 seed：`0101010101010101010101010101010101010101010101010101010101010101` → hostId `8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c`
 - 设备 seed：`0202020202020202020202020202020202020202020202020202020202020202` → deviceId `8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394`
+
+**密封目标**（测试 Worker 私钥 `0303030303030303030303030303030303030303030303030303030303030303`，公钥 `5dfedd3b6bd47f6fa28ee15d969d5bb0ea53774d488bdaf9df1c6e0124b3ef22`，kid `1`；临时私钥 `0404040404040404040404040404040404040404040404040404040404040404`，临时公钥 `ac01b2209e86354fb853237b5de0f4fab13c7fcbf433a61c019369617fecf10b`；GCM nonce `050505050505050505050505`）
+
+- X25519 shared：`40e47a3f525bdcac491d418978d7db5af623ac7afe7623c6d78a5d4fce9d0f63`
+- HKDF key：`defc170b9433ff2d066c943ce0cc4d508d0f384468635ee35355a6847269928d`
+- 明文：`{"v":1,"platform":"ios","token":"a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1","apnsEnvironment":"production","deviceId":"8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394","hostId":"8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"}`
+- AAD：`8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c|8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394`
+- sealedTarget：`AQGsAbIgnoY1T7hTI3td4PT6sTx_y_QzphwBk2lhf-zxCwUFBQUFBQUFBQUFBZ-odLYTYW6QLwzbORXVqxoBYANUa4EtrUQcvhO-SD6OJtfJpKJt7AB1O9_WrnlX9wxFfUOQylFkMm8ji3OikI9ZvU_wZHaKZN_Mw5iiKA9ThUZYktapcYlLgIb3bFGgQ4_UHttBPnCwqeBa45g0BTJQO33TxFOrTfbK8HkwaDUeG1NPZGxxgDDKI6YdUyR2YDwE4xdNqIM1WIXyg8b0l0ZoFXhpNpBil2Utqj7hSPCUsIFPHGvGJENgkeIM_hWXuwfK_KOP598o6DflDBF60r9C5N-VnaaY1YxF_VkW2-ySG5tjwNtJ2Pyd6UbAwr_wDDh3t9IXNpuWi4W_nUudMfy_znge2419AjQmS42j6jSjXIiiPP9cmbvJi3hx4wyO2TrEifIPigtxn7SG3g`
+- sha256(sealedTarget)：`3f40a3fbd4fe15e4a6a69c92c3ea5a264f483efa20e82f0fc4826a2734b58fa1`
+
+**设备 grant**（pushToken `a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1`）
+
+- 待签字符串：`agentbuddy-push-grant-v2\naud=https://push.example.test\nhost=8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c\ndevice=8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394\nplatform=ios\nenvironment=production\ntarget_sha256=3f40a3fbd4fe15e4a6a69c92c3ea5a264f483efa20e82f0fc4826a2734b58fa1\nagent=codex\nthread=thread-1\nturn=turn-1\nissued=1790300000\nexpires=1790386400\nnonce=ffeeddccbbaa99887766554433221100`
+- 签名：`40206a5b444e0c4beb95208ceb7c10f6d613ff68f0c9402ccc789c9a71017de9a1beb291f7c4ff488f3d72193fa4731113d6b84693a5c3d4636195277205bf05`
 
 **主机请求**（`POST /v2/events`，timestamp `1790300000`，nonce `00112233445566778899aabbccddeeff`）
 
 - body：`{"eventId":"evt_0123456789abcdef0123456789abcdef","agent":"codex","threadId":"thread-1","turnId":"turn-1","type":"completed","reason":null,"occurredAt":1790300000}`
 - sha256(body)：`b0afc6ab15f7ae40138b3efcecfd209cb704f96abcb25f14807ed800b72732b3`
-- 待签字符串：`agentbuddy-push-host-v1\nPOST\n/v2/events\n1790300000\n00112233445566778899aabbccddeeff\nb0afc6ab15f7ae40138b3efcecfd209cb704f96abcb25f14807ed800b72732b3`
-- 签名：`d5ce9808b8bc3c1a19fefa8da077fd42b53180b2e9eb1e7d4672beb0cefeb169af22c08cc88a46ac9d57df17ca8b21a359390598ea96bd9d1f6fd1aad9077f03`
-
-**设备 grant**（pushToken `a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1`）
-
-- 待签字符串：`agentbuddy-push-grant-v1\nhost=8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c\ndevice=8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394\nplatform=ios\nenvironment=production\ntoken_sha256=3490f80401886d12f3861ec190f5c16419b26345497a92bc4530e22f5d8b4295\nagent=codex\nthread=thread-1\nturn=turn-1\nissued=1790300000\nexpires=1790386400\nnonce=ffeeddccbbaa99887766554433221100`
-- 签名：`c0bb8f6643304b84ad574ee0797e698f53a6b3eb9abcb4a08d98f5bc691530f705e36f138f28dcf2f8df271c59372d475d8d17171ec03dda91b0e62cd721200e`
+- 待签字符串：`agentbuddy-push-host-v2\nhttps://push.example.test\nPOST\n/v2/events\n1790300000\n00112233445566778899aabbccddeeff\nb0afc6ab15f7ae40138b3efcecfd209cb704f96abcb25f14807ed800b72732b3`
+- 签名：`d3040154598d4426ae08efa11f69365fa37cf164458b05eb56e219c694f679bca6356a2dd8dd7f2151e3663c20dc7d354b71109fd8ab9d8dc8a693d8af1c2b05`
 
 **设备撤销**
 
-- 待签字符串：`agentbuddy-push-revoke-v1\nhost=8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c\ndevice=8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394\nscope=all\ntimestamp=1790300000\nnonce=0f0e0d0c0b0a09080706050403020100`
-- 签名：`8a989a6ca6e9d3cd37bdbfd3ff3b4aa94482e27c0613a03d51a27e51a13f072e1ae39c460e1651601846b43d4a4c6d1cc6923fddaac36ad776892e598b12bf03`
+- 待签字符串：`agentbuddy-push-revoke-v2\naud=https://push.example.test\nhost=8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c\ndevice=8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394\nscope=all\ntimestamp=1790300000\nnonce=0f0e0d0c0b0a09080706050403020100`
+- 签名：`8ebac8fa199a1349c15d693b27a835f6a26d3aad210fe152f52470a78a1e2391d86d0fd2091059482df3d63236c24a934e5c8e0c3ffdc883ef0f91e6c7f34f0e`
+
+## 13. 安全补充规则（来自 2026-09-24 安全审查）
+
+- **ID 格式**：`agent` 匹配 `[A-Za-z0-9._-]{1,64}`；`threadId` / `turnId` 非空、UTF-8 编码后不超过 128 字节、不含控制字符、不含未配对的 UTF-16 代理项。手机在签 grant 前、主机在持久化前、Worker 在拼签名串前都要校验，不合规时手机把该 turn 标为 Unsupported。
+- **nonce**：主机和手机的 nonce 一律用 CSPRNG 生成。
+- **token 视同秘密**：主机不再接触明文 token；手机和 Worker 都不记录完整 token。
+- **限流**：主机签名路由在验签前按 IP（IPv6 /64）限流；撤销接口按 IP 与目标 hostId 双重限流；调试接口在鉴权前按 IP 限流；每个 DO 对「从未见过的设备」的撤销记录设上限；清理任务分页遍历存储。
+- **没有订阅的主机**上报事件时，直接返回 `matched: 0`，不写任何状态。
+- **FCM 失效判定**只认 `UNREGISTERED`，或带 token 字段违规信息的 `INVALID_ARGUMENT`；不能把任意 404 当成 token 失效。
+- **HTTP 客户端**（手机直连撤销、调试脚本）不跟随重定向，并且要求 HTTPS（loopback 除外）。
+- **手机每台主机的订阅上限** 64 个；冷启动后没有主机记录时，解除配对仍从 `alleycat:<hostId>` 推出 hostId，向 Worker 发设备签名的撤销。
+- **已知可靠性缺口**：主机回复 `pending` 时手机就视为 Subscribed 并跳过本地通知；如果 Worker 之后拒绝了这份 grant（时钟偏差、撤销、限流），这一次会没有通知。
