@@ -1,7 +1,11 @@
+import { handleDebugPush } from "./debug"
+import { isLegacyKeepaliveEnabled } from "./durable-object"
 import { ContentState, Env, RegisterRequest } from "./types"
+import { handleV2 } from "./v2"
 
 export { PushRegistration } from "./durable-object"
 export { RateLimiter } from "./rate-limiter"
+export { HostChannel } from "./host-channel"
 
 const DEFAULT_INTERVAL_SECONDS = 30
 const MIN_INTERVAL_SECONDS = 10
@@ -124,7 +128,15 @@ export default {
     const url = new URL(request.url)
     const parts = url.pathname.split("/").filter(Boolean)
 
+    if (parts[0] === "v2") return handleV2(request, env, url, parts)
+    if (parts.length === 2 && parts[0] === "debug" && parts[1] === "push") {
+      return handleDebugPush(request, env)
+    }
+
     if (request.method === "POST" && parts.length === 1 && parts[0] === "register") {
+      // Legacy keepalive retired: answer once with 410 so old clients stop,
+      // without touching the rate limiter or creating a registration.
+      if (!isLegacyKeepaliveEnabled(env)) return json({ error: "legacy_push_retired" }, 410)
       const ip = request.headers.get("cf-connecting-ip") ?? "unknown"
       const limitId = env.RATE_LIMITER.idFromName(ip)
       const limiter = env.RATE_LIMITER.get(limitId)

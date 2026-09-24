@@ -3,7 +3,7 @@ import { Env } from "./types"
 
 let cachedJWT: { token: string; expires: number } | null = null
 
-async function generateAPNsJWT(env: Env): Promise<string> {
+export async function generateAPNsJWT(env: Env): Promise<string> {
   const now = Math.floor(Date.now() / 1000)
   if (cachedJWT && now < cachedJWT.expires) return cachedJWT.token
 
@@ -33,7 +33,12 @@ async function generateAPNsJWT(env: Env): Promise<string> {
   return token
 }
 
-function apnsHost(environment: "production" | "sandbox"): string {
+// Drop the cached provider token after APNs rejects it (403 Expired/InvalidProviderToken).
+export function clearAPNsJWTCache(): void {
+  cachedJWT = null
+}
+
+export function apnsHost(environment: "production" | "sandbox"): string {
   return environment === "production"
     ? "https://api.push.apple.com"
     : "https://api.sandbox.push.apple.com"

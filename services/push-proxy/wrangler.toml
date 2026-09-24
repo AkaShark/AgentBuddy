@@ -9,6 +9,7 @@ workers_dev = true
 bindings = [
   { name = "PUSH_REGISTRATION", class_name = "PushRegistration" },
   { name = "RATE_LIMITER", class_name = "RateLimiter" },
+  { name = "HOST_CHANNEL", class_name = "HostChannel" },
 ]
 
 [[migrations]]
@@ -19,4 +20,16 @@ new_sqlite_classes = ["PushRegistration"]
 tag = "v2"
 new_sqlite_classes = ["RateLimiter"]
 
+# v2 push protocol: one HostChannel object per host (idFromName(hostId)).
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["HostChannel"]
+
+# Secrets (set with `wrangler secret put`, never committed): APNS_TEAM_ID,
+# APNS_KEY_ID, APNS_PRIVATE_KEY, FCM_PROJECT_ID, FCM_CLIENT_EMAIL,
+# FCM_PRIVATE_KEY, and the optional DEBUG_PUSH_ADMIN_TOKEN.
 [vars]
+APNS_TOPIC = "com.akashark.agentbuddy"
+DEBUG_PUSH_ENABLED = "false"
+LEGACY_KEEPALIVE_ENABLED = "true"
+BLOCKED_HOST_IDS = ""

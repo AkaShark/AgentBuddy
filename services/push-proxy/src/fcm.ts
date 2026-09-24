@@ -3,7 +3,7 @@ import { ContentState, Env } from "./types"
 
 let cachedAccessToken: { token: string; expires: number } | null = null
 
-async function getFCMAccessToken(env: Env): Promise<string> {
+export async function getFCMAccessToken(env: Env): Promise<string> {
   const now = Math.floor(Date.now() / 1000)
   if (cachedAccessToken && now < cachedAccessToken.expires) return cachedAccessToken.token
 
@@ -51,6 +51,11 @@ async function getFCMAccessToken(env: Env): Promise<string> {
 
   cachedAccessToken = { token: data.access_token, expires: now + 55 * 60 }
   return data.access_token
+}
+
+// Drop the cached OAuth access token after FCM rejects it with 401.
+export function clearFCMAccessTokenCache(): void {
+  cachedAccessToken = null
 }
 
 export async function sendFCMPush(

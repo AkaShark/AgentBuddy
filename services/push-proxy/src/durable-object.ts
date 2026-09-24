@@ -13,6 +13,12 @@ interface StoredRegistration {
   contentState?: ContentState
 }
 
+// LEGACY_KEEPALIVE_ENABLED defaults to "true"; only an explicit "false" retires
+// the legacy 30s silent-push path.
+export function isLegacyKeepaliveEnabled(env: Pick<Env, "LEGACY_KEEPALIVE_ENABLED">): boolean {
+  return (env.LEGACY_KEEPALIVE_ENABLED ?? "true").trim().toLowerCase() !== "false"
+}
+
 export class PushRegistration implements DurableObject {
   private state: DurableObjectState
   private env: Env
@@ -51,6 +57,11 @@ export class PushRegistration implements DurableObject {
   }
 
   async alarm(): Promise<void> {
+    if (!isLegacyKeepaliveEnabled(this.env)) {
+      // Legacy path retired: drop the registration and do not re-arm.
+      await this.state.storage.deleteAll()
+      return
+    }
     const reg = await this.state.storage.get<StoredRegistration>("reg")
     if (!reg) return
 
