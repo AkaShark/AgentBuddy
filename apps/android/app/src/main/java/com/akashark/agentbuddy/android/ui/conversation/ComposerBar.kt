@@ -125,10 +125,10 @@ internal data class SlashInvocation(val command: SlashCommand, val args: String?
 data class ActiveTaskSummary(val progress: String, val label: String)
 
 private val SLASH_COMMANDS = listOf(
-    SlashCommand("计划", "切换协作模式"),
+    SlashCommand("plan", "切换协作模式"),
     SlashCommand("model", "更改模型或推理强度"),
     SlashCommand("new", "开始新会话"),
-    SlashCommand("分叉", "分叉此对话"),
+    SlashCommand("fork", "分叉此对话"),
     SlashCommand("rename", "重命名此会话"),
     SlashCommand("review", "开始代码评审"),
     SlashCommand("goal", "设置或管理线程目标"),
@@ -353,7 +353,7 @@ fun ComposerBar(
 
     fun dispatchSlashCommand(commandName: String, args: String?): Boolean {
         when (commandName) {
-            "计划" -> onOpenCollaborationModePicker?.invoke()
+            "plan" -> onOpenCollaborationModePicker?.invoke()
             "model" -> onToggleModelSelector?.invoke()
             "new" -> onShowDirectoryPicker?.invoke()
             "resume" -> onNavigateToSessions?.invoke()
@@ -368,7 +368,7 @@ fun ComposerBar(
                     onSlashError?.invoke(e.message ?: "更新目标失败")
                 }
             }
-            "分叉" -> scope.launch {
+            "fork" -> scope.launch {
                 try {
                     val cwd = appModel.snapshot.value?.threads?.find { it.key == threadKey }?.info?.cwd
                     val newKey = appModel.client.forkThread(

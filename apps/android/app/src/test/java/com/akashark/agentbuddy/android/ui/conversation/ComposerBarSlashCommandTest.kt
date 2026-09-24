@@ -25,6 +25,25 @@ class ComposerBarSlashCommandTest {
     }
 
     @Test
+    fun parseSlashCommandInvocationUsesEnglishIosCommandNames() {
+        // Wire/command names must stay English and match iOS ComposerSlashCommand.
+        val commands = listOf(
+            "/plan", "/model", "/permissions", "/experimental", "/skills", "/review",
+            "/goal", "/rename", "/new", "/fork", "/resume",
+        )
+
+        val parsed = commands.mapNotNull(::parseSlashCommandInvocation)
+
+        assertEquals(commands.map { it.removePrefix("/") }, parsed.map { it.command.name })
+    }
+
+    @Test
+    fun parseSlashCommandInvocationRejectsTranslatedCommandNames() {
+        assertNull(parseSlashCommandInvocation("/计划"))
+        assertNull(parseSlashCommandInvocation("/分叉"))
+    }
+
+    @Test
     fun parseSlashCommandInvocationRejectsUnknownCommands() {
         assertNull(parseSlashCommandInvocation("/definitely-not-real"))
     }

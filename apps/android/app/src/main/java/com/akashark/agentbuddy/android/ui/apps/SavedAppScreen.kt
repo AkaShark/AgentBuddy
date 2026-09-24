@@ -524,6 +524,7 @@ private fun AppModeWebView(
     // the widget HTML through `window._setContent` after `onPageFinished`.
     val shell = remember(payload.stateJson, app.schemaVersion) {
         wrapWidgetHtml(
+            context = context,
             widgetHtml = "",
             appState = AppStateInjection(
                 stateJson = payload.stateJson,

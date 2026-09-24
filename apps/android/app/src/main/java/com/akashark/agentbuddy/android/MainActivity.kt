@@ -1,10 +1,14 @@
 package com.akashark.agentbuddy.android
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
@@ -17,6 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
@@ -41,11 +46,24 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_NOTIFICATION_SERVER_ID = "agentbuddy.notification.serverId"
         const val EXTRA_NOTIFICATION_THREAD_ID = "agentbuddy.notification.threadId"
         const val EXTRA_OPEN_PET_SETTINGS = "agentbuddy.openPetSettings"
+        private const val KEY_NOTIFICATION_PERMISSION_REQUESTED = "notification_permission_requested"
+
+        /**
+         * Set when the previous Activity instance was destroyed for a
+         * configuration change (rotation, dark mode, ...) and deliberately
+         * kept its [AppModel.start] reference alive, so the recreated
+         * instance must not start it a second time.
+         */
+        private var appModelRetainedAcrossConfigChange = false
     }
 
     private var appModel: AppModel? = null
     private val lifecycleController = AppLifecycleController()
     private var openPetSettingsRequest by mutableStateOf(0)
+    private val notificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            LLog.i("MainActivity", "POST_NOTIFICATIONS granted=$granted")
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Must be called before super.onCreate to hand off the system splash
@@ -62,7 +80,11 @@ class MainActivity : ComponentActivity() {
         try {
             appModel = AppModel.init(this)
             WallpaperManager.initialize(this)
-            appModel?.start()
+            if (appModelRetainedAcrossConfigChange) {
+                appModelRetainedAcrossConfigChange = false
+            } else {
+                appModel?.start()
+            }
         } catch (e: Exception) {
             LLog.e("MainActivity", "AppModel.start() failed", e)
         }
@@ -122,6 +144,7 @@ class MainActivity : ComponentActivity() {
 
         handleNotificationIntent(intent)
         consumeOverlayNavigationIntent(intent)
+        requestNotificationPermissionOnce()
     }
 
     override fun onResume() {
@@ -147,6 +170,13 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        // A configuration change recreates the Activity immediately; keep the
+        // connection and the AppModel subscription alive across it.
+        if (isChangingConfigurations && appModel != null) {
+            appModelRetainedAcrossConfigChange = true
+            super.onDestroy()
+            return
+        }
         // Best-effort graceful shutdown of the iroh endpoint before the
         // Activity is fully destroyed. `runBlocking` keeps the close
         // handshake bounded so we don't ANR if the network stack is
@@ -193,6 +223,24 @@ class MainActivity : ComponentActivity() {
             openPetSettingsRequest += 1
             intent.removeExtra(EXTRA_OPEN_PET_SETTINGS)
         }
+    }
+
+    /**
+     * Android 13+ requires a runtime grant for POST_NOTIFICATIONS. Ask once
+     * (remembered in prefs) so a denial is not re-prompted on every launch;
+     * the request is async and does not block startup.
+     */
+    private fun requestNotificationPermissionOnce() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+        val prefs = getSharedPreferences("agentbuddy_push", MODE_PRIVATE)
+        if (prefs.getBoolean(KEY_NOTIFICATION_PERMISSION_REQUESTED, false)) return
+        prefs.edit().putBoolean(KEY_NOTIFICATION_PERMISSION_REQUESTED, true).apply()
+        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 
     private fun loadPushToken() {

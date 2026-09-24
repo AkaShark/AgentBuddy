@@ -38,7 +38,7 @@ class WidgetBridge(
     }
 
     /**
-     * Fired by the shell's morphdom `<script onload>` once `window._morphReady`
+     * Fired by the shell's post-morphdom `<script>` once `window._morphReady`
      * flips to `true` and any buffered content has been flushed. Host code
      * uses this to know the WebView is ready for `evaluateJavascript` pushes.
      */

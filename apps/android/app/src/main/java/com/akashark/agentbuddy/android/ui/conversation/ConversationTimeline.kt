@@ -1511,7 +1511,7 @@ private fun WidgetRow(
                     }
                     loadDataWithBaseURL(
                         "https://widget.local/",
-                        wrapWidgetHtml(""),
+                        wrapWidgetHtml(ctx, ""),
                         "text/html",
                         "utf-8",
                         null,
@@ -1832,6 +1832,7 @@ data class AppStateInjection(
  * is available synchronously to user widget scripts on first render.
  */
 internal fun wrapWidgetHtml(
+    context: android.content.Context,
     widgetHtml: String,
     appState: AppStateInjection? = null,
 ): String {
@@ -1843,7 +1844,7 @@ internal fun wrapWidgetHtml(
     val body = widgetHtml.trim()
     val initialPending = if (body.isEmpty()) "null" else "'${escapeJsString(body)}'"
     val appInjection = appState?.let { buildAppStateInjection(it) } ?: ""
-    return """
+    val shell = """
         <!DOCTYPE html><html><head><meta charset="utf-8">
         <meta name="viewport" content="width=device-width,initial-scale=1.0">
         <style>
@@ -2072,11 +2073,30 @@ internal fun wrapWidgetHtml(
             __postWidgetMessage({_type:'openLink', url: url});
         };
         </script>
-        <script src="https://cdn.jsdelivr.net/npm/morphdom@2.7.4/dist/morphdom-umd.min.js"
-            onload="window._morphReady=true;if(window._pending){window._setContent(window._pending);window._pending=null;}__postWidgetMessage({_type:'ready'});"></script>
+        <script>$MORPHDOM_PLACEHOLDER</script>
+        <script>window._morphReady=true;if(window._pending){window._setContent(window._pending);window._pending=null;}__postWidgetMessage({_type:'ready'});</script>
         </body></html>
     """.trimIndent()
+    // Splice at the last occurrence: the placeholder sits after every
+    // caller-supplied fragment, so user content can never be replaced.
+    val at = shell.lastIndexOf(MORPHDOM_PLACEHOLDER)
+    return shell.replaceRange(at, at + MORPHDOM_PLACEHOLDER.length, morphdomJs(context))
 }
+
+// morphdom 2.7.4 (MIT, see assets/widget/morphdom-LICENSE.txt) is bundled so
+// widgets render offline; it is inlined into the shell because the shell is
+// loaded under an https base URL that cannot reference file:///android_asset.
+private const val MORPHDOM_ASSET_PATH = "widget/morphdom-umd.min.js"
+private const val MORPHDOM_PLACEHOLDER = "/*__MORPHDOM_UMD__*/"
+
+@Volatile
+private var cachedMorphdomJs: String? = null
+
+private fun morphdomJs(context: android.content.Context): String =
+    cachedMorphdomJs ?: context.applicationContext.assets.open(MORPHDOM_ASSET_PATH)
+        .bufferedReader()
+        .use { it.readText() }
+        .also { cachedMorphdomJs = it }
 
 /**
  * JS block providing the `loadAppState` / `saveAppState` bridge consumed by

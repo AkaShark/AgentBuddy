@@ -293,6 +293,11 @@ private val SavedServer.alleycatUdpPort: UShort?
 object SavedServerStore {
     private const val PREFS_NAME = "codex_saved_servers_prefs"
     private const val KEY = "codex_saved_servers"
+    private val changeVersion = java.util.concurrent.atomic.AtomicLong(0)
+
+    /** Bumped on every [save], so callers can cache data derived from [load]. */
+    val version: Long
+        get() = changeVersion.get()
 
     private fun prefs(context: Context): SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -316,6 +321,7 @@ object SavedServerStore {
         val array = JSONArray()
         servers.forEach { array.put(it.toJson()) }
         prefs(context).edit().putString(KEY, array.toString()).apply()
+        changeVersion.incrementAndGet()
     }
 
     fun upsert(context: Context, server: SavedServer) {

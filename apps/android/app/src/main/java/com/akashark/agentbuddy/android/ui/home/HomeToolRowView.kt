@@ -26,7 +26,7 @@ import uniffi.codex_mobile_client.AppToolLogEntry
  * Single tool-log row rendered inside the home session card. Used at zoom 3+.
  *
  * Takes a Rust-derived [AppToolLogEntry] directly; the `tool` field is a
- * short category name (`"Bash"`, `"编辑"`, `"MCP"`, `"Tool"`, `"Explore"`,
+ * short category name (`"Bash"`, `"Edit"`, `"MCP"`, `"Tool"`, `"Explore"`,
  * `"WebSearch"`) and the `detail` is the rolled-up label (for `"Explore"`
  * it's the exploration summary, e.g. `"Explored 3 files"`).
  *
@@ -77,7 +77,7 @@ private fun ToolIcon(tool: String) {
         else -> {
             val glyph = when (tool) {
                 "Bash" -> "$"
-                "编辑" -> "✎"
+                "Edit" -> "✎"
                 "Explore", "WebSearch" -> "⌕"
                 else -> tool.take(1).uppercase()
             }

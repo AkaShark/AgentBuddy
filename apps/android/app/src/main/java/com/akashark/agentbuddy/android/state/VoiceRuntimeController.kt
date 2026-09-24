@@ -509,7 +509,7 @@ class VoiceRuntimeController {
 
             Available servers:
             $serverLines
-            When using the codex tool, you MUST specify the "服务器" parameter.
+            When using the codex tool, you MUST specify the "server" parameter.
             IMPORTANT: Use the local discovery tools for server and session lookup.
             The "local" server has special tools that can see sessions across ALL connected servers in one call.
             After calling list_servers or list_sessions, always give the user a short spoken summary of what you found. Do not stop after the tool result alone.
@@ -530,7 +530,7 @@ class VoiceRuntimeController {
             else -> null
         }
 
-    private fun buildDynamicToolSpecs(): List<AppDynamicToolSpec> = listOf(
+    internal fun buildDynamicToolSpecs(): List<AppDynamicToolSpec> = listOf(
         AppDynamicToolSpec(
             name = "list_servers",
             description = "List all connected servers and their status. After calling this tool, briefly tell the user what you found.",
@@ -540,7 +540,7 @@ class VoiceRuntimeController {
         AppDynamicToolSpec(
             name = "list_sessions",
             description = "List recent sessions/threads on a specific server or all connected servers. After calling this tool, briefly tell the user what you found.",
-            inputSchemaJson = """{"type":"object","properties":{"服务器":{"type":"string","description":"Server name to query. Omit to query all connected servers."}}}""",
+            inputSchemaJson = """{"type":"object","properties":{"server":{"type":"string","description":"Server name to query. Omit to query all connected servers."}}}""",
             deferLoading = false,
         ),
     )

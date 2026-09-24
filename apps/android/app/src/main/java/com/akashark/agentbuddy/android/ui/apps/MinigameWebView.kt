@@ -75,7 +75,7 @@ fun MinigameWebView(
     }
 
     val shell = remember(widgetHtml) {
-        wrapWidgetHtml(widgetHtml = "", appState = null)
+        wrapWidgetHtml(context = context, widgetHtml = "", appState = null)
     }
 
     AndroidView(
