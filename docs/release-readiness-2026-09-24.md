@@ -9,7 +9,8 @@
 - App Store Connect 已建立 **AgentBuddy 搭子**，Apple ID `6815571588`，Bundle ID `com.akashark.agentbuddy`。
 - iOS 主 App、Live Activity、Watch、Watch Complications 四个标识已注册并关联 `group.com.akashark.agentbuddy`；前三个启用 Push。
 - APNs Key 已注册并下载：AgentBuddy Push，Sandbox & Production、Team Scoped，Key ID `686X55267F`。私钥已在本机私有目录校验并设置 0600，未进入 Git。
-- GitHub 已核对七个 Secret 名：MAC_DEVELOPER_ID_CERT_P12_B64、MAC_DEVELOPER_ID_CERT_PASSWORD、ASC_KEY_ID、ASC_ISSUER_ID、ASC_PRIVATE_KEY_P8_B64、IOS_TEAM_ID、IOS_APP_STORE_APP_ID。
+- Firebase 项目 `agentbuddy-45403` 已建立（Spark 免费方案），Android 应用 `com.akashark.agentbuddy.android` 已注册；配置已下载、核对并写入忽略的本地文件和 GOOGLE_SERVICES_JSON_B64。Admin SDK 私钥已准备到最终生成对话框，等待确认。
+- GitHub 已核对七个 Apple Secret 名：MAC_DEVELOPER_ID_CERT_P12_B64、MAC_DEVELOPER_ID_CERT_PASSWORD、ASC_KEY_ID、ASC_ISSUER_ID、ASC_PRIVATE_KEY_P8_B64、IOS_TEAM_ID、IOS_APP_STORE_APP_ID。
 
 ## 桌面发布 CI
 
@@ -53,7 +54,7 @@
 
 ## 缺失 workflow secrets
 
-- Android：ANDROID_UPLOAD_KEYSTORE_B64、LITTER_UPLOAD_STORE_PASSWORD、LITTER_UPLOAD_KEY_ALIAS、LITTER_UPLOAD_KEY_PASSWORD、LITTER_PLAY_SERVICE_ACCOUNT_JSON_B64、GOOGLE_SERVICES_JSON_B64。
+- Android：ANDROID_UPLOAD_KEYSTORE_B64、LITTER_UPLOAD_STORE_PASSWORD、LITTER_UPLOAD_KEY_ALIAS、LITTER_UPLOAD_KEY_PASSWORD、LITTER_PLAY_SERVICE_ACCOUNT_JSON_B64。
 - iOS 商店签名：IOS_DIST_CERT_P12_B64、IOS_DIST_CERT_PASSWORD、IOS_APP_STORE_PROFILE_B64、IOS_LIVE_ACTIVITY_APP_STORE_PROFILE_B64、IOS_WATCH_APP_STORE_PROFILE_B64、IOS_WATCH_COMPLICATIONS_APP_STORE_PROFILE_B64。
 - 旧 Mac 发布通道：MAC_APP_STORE_PROFILE_B64、MAC_DIST_CERT_P12_B64、MAC_DIST_CERT_PASSWORD、MAC_DEVELOPER_ID_PROFILE_B64。
 - 构建缓存：SCCACHE_R2_ACCESS_KEY_ID、SCCACHE_R2_ENDPOINT、SCCACHE_R2_SECRET_ACCESS_KEY。
@@ -66,6 +67,6 @@
 3. 9.12 原文被截断；当前两个指定文件无 `clich`，需要确认实际意图。build-rust.sh 中已不存在的 uniffi_shared.rs 输入已在 `3dc92ff` 移除，bash -n 通过；未更改实际递归源码哈希逻辑。
 4. Apple 浏览器连接已恢复，APNs 已完成。Cloudflare CLI 未登录；OAuth 页面已打开，因页面要求接受条款，等待用户确认或自行登录。
 5. Cloudflare Worker 部署尚未执行，仍需要 Firebase 服务账号和 Cloudflare 登录；两个移动端推送 URL 尚未替换。
-6. Firebase/Play 配置待补充。已确认工作流将 GOOGLE_SERVICES_JSON_B64 解码到 apps/android/app/google-services.json，且该文件已 gitignore。
+6. Firebase Android 配置已完成并通过 `:app:processDebugGoogleServices :app:testDebugUnitTest -Plitter.enableGhosttyAndroid=false`（42 项任务，13 执行、29 缓存）。Play 签名及服务账号仍待准备。
 7. Android rootfs 仓库选择、品牌素材目录、正式隐私和支持页面 URL 等待用户回复；未替换美术或商店链接。
 8. 工作区原有/并行产生的 Ghostty 脚本与 patches 改动和两个脏子模块保留，未纳入本次提交，也未推子模块。
