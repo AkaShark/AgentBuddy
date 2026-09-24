@@ -6,6 +6,7 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import uniffi.codex_mobile_client.AppHostPushSupport
 import uniffi.codex_mobile_client.AppPushPlatform
 import uniffi.codex_mobile_client.ThreadKey
 
@@ -173,5 +174,22 @@ class TurnCompletionPushTest {
             "任务未完成" to "任务失败或已中断，点击查看详情",
             turnNotificationFallbackText(TurnPushKind.FAILED),
         )
+    }
+
+    // --- unsupported host hint ------------------------------------------------
+
+    @Test
+    fun `unsupported host hint shows only for a legacy host with notifications enabled`() {
+        assertTrue(shouldShowUnsupportedHostHint(AppHostPushSupport.UNSUPPORTED_HOST, notificationsEnabled = true, dismissed = false))
+        assertFalse(shouldShowUnsupportedHostHint(AppHostPushSupport.UNSUPPORTED_HOST, notificationsEnabled = true, dismissed = true))
+        assertFalse(shouldShowUnsupportedHostHint(AppHostPushSupport.UNSUPPORTED_HOST, notificationsEnabled = false, dismissed = false))
+        for (support in listOf(AppHostPushSupport.NOT_APPLICABLE, AppHostPushSupport.UNKNOWN, AppHostPushSupport.SUPPORTED)) {
+            assertFalse(shouldShowUnsupportedHostHint(support, notificationsEnabled = true, dismissed = false))
+        }
+    }
+
+    @Test
+    fun `unsupported host hint dismissal is keyed per server`() {
+        assertNotEquals(unsupportedHostHintDismissedKey(serverId), unsupportedHostHintDismissedKey("alleycat:other"))
     }
 }

@@ -26,7 +26,9 @@ use tracing::{debug, info, warn};
 
 use super::seal::{SealError, SealTarget};
 use super::signing::{self, GrantFields};
-use super::{AppApnsEnvironment, AppPushPlatform, AppPushRegistration, AppTurnPushState};
+use super::{
+    AppApnsEnvironment, AppHostPushSupport, AppPushPlatform, AppPushRegistration, AppTurnPushState,
+};
 use crate::alleycat::{
     AlleycatHostInfo, AlleycatPushError, ParsedPairPayload, PushSubscribeArgs, PushSubscribeGrant,
     PushSubscribeOutcome, PushSubscribeTarget, PushUnsubscribeScope,
@@ -688,6 +690,17 @@ impl PushManager {
 
     // ── Queries ──────────────────────────────────────────────────────────
 
+    /// Host-level push capability of `server_id` (no agent or registration
+    /// check; that is [`Self::turn_push_state`]).
+    pub(crate) fn host_push_support(&self, server_id: &str) -> AppHostPushSupport {
+        match self.state().hosts.get(server_id) {
+            Some(record) if record.supports_push() => AppHostPushSupport::Supported,
+            Some(_) => AppHostPushSupport::UnsupportedHost,
+            None if server_id.starts_with("alleycat:") => AppHostPushSupport::Unknown,
+            None => AppHostPushSupport::NotApplicable,
+        }
+    }
+
     /// Push state for `turn_id` (or the thread's active turn when `None`).
     pub(crate) fn turn_push_state(
         &self,
@@ -1341,6 +1354,49 @@ mod tests {
         );
         // The listed agent is eligible on the same host.
         assert_eq!(manager.turn_started(turn(1, "t2", "u2", "claude")).len(), 1);
+    }
+
+    #[test]
+    fn host_push_support_reflects_host_capability() {
+        let backend = FakeBackend::new();
+        let manager = manager_with(&backend);
+        assert_eq!(
+            manager.host_push_support("local"),
+            AppHostPushSupport::NotApplicable
+        );
+        // Alleycat server not listed yet.
+        assert_eq!(
+            manager.host_push_support(&server_id(1)),
+            AppHostPushSupport::Unknown
+        );
+
+        manager.record_host(&server_id(1), record(1, None));
+        assert_eq!(
+            manager.host_push_support(&server_id(1)),
+            AppHostPushSupport::UnsupportedHost
+        );
+
+        let mut disabled = push_host(&["codex"]).unwrap();
+        disabled.push.as_mut().unwrap().enabled = false;
+        manager.record_host(&server_id(1), record(1, Some(disabled)));
+        assert_eq!(
+            manager.host_push_support(&server_id(1)),
+            AppHostPushSupport::UnsupportedHost
+        );
+
+        // Host capability only: supported even with no registration and no
+        // observable agents.
+        manager.record_host(&server_id(1), record(1, push_host(&[])));
+        assert_eq!(
+            manager.host_push_support(&server_id(1)),
+            AppHostPushSupport::Supported
+        );
+
+        manager.server_removed(&server_id(1));
+        assert_eq!(
+            manager.host_push_support(&server_id(1)),
+            AppHostPushSupport::Unknown
+        );
     }
 
     #[test]

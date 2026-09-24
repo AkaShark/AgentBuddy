@@ -166,6 +166,38 @@ final class PushNotificationSupportTests: XCTestCase {
         )
     }
 
+    // MARK: - Unsupported host hint
+
+    func testUnsupportedHostHintOnlyForLegacyHostWithNotificationsAllowed() {
+        XCTAssertTrue(PushNotificationSupport.shouldShowUnsupportedHostHint(
+            support: .unsupportedHost, authorizationStatus: .authorized, dismissed: false
+        ))
+        XCTAssertTrue(PushNotificationSupport.shouldShowUnsupportedHostHint(
+            support: .unsupportedHost, authorizationStatus: .provisional, dismissed: false
+        ))
+        XCTAssertFalse(PushNotificationSupport.shouldShowUnsupportedHostHint(
+            support: .unsupportedHost, authorizationStatus: .authorized, dismissed: true
+        ))
+        XCTAssertFalse(PushNotificationSupport.shouldShowUnsupportedHostHint(
+            support: .unsupportedHost, authorizationStatus: .denied, dismissed: false
+        ))
+        XCTAssertFalse(PushNotificationSupport.shouldShowUnsupportedHostHint(
+            support: .unsupportedHost, authorizationStatus: .notDetermined, dismissed: false
+        ))
+        for support in [AppHostPushSupport.notApplicable, .unknown, .supported] {
+            XCTAssertFalse(PushNotificationSupport.shouldShowUnsupportedHostHint(
+                support: support, authorizationStatus: .authorized, dismissed: false
+            ))
+        }
+    }
+
+    func testUnsupportedHostHintDismissalIsPerServer() {
+        XCTAssertNotEqual(
+            PushNotificationSupport.unsupportedHostHintDismissedKey(serverId: "alleycat:aa"),
+            PushNotificationSupport.unsupportedHostHintDismissedKey(serverId: "alleycat:bb")
+        )
+    }
+
     // MARK: - Helpers
 
     /// A provisioning profile shaped like the real thing: the XML plist

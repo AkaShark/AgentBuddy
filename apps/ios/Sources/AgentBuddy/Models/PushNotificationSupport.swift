@@ -131,6 +131,25 @@ enum PushNotificationSupport {
         }
     }
 
+    // MARK: - Unsupported host hint
+
+    /// UserDefaults key recording that the "update the desktop app" hint was
+    /// dismissed for `serverId`.
+    static func unsupportedHostHintDismissedKey(serverId: String) -> String {
+        "agentbuddy.hostPushHint.dismissed.\(serverId)"
+    }
+
+    /// A host without `push.v1` gets an explicit hint instead of a silent
+    /// keep-alive fallback (§9), but only while the user allows notifications
+    /// and has not dismissed it for that server.
+    static func shouldShowUnsupportedHostHint(
+        support: AppHostPushSupport,
+        authorizationStatus: UNAuthorizationStatus,
+        dismissed: Bool
+    ) -> Bool {
+        support == .unsupportedHost && allowsCompletionPush(authorizationStatus) && !dismissed
+    }
+
     /// One notification per turn, so a repeated post replaces instead of stacking.
     static func localCompletionIdentifier(for key: ThreadKey, turnId: String?) -> String {
         let base = "agentbuddy.turn.\(key.serverId).\(key.threadId)"

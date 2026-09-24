@@ -400,3 +400,6 @@
 
 /* === 任务完成本地通知（主机不上报完成通知时的兜底）=== */
 "Turn completed" = "任务已完成";
+
+/* === 主机不支持完成通知（host push §9）=== */
+"This host doesn't support completion notifications yet. Update the AgentBuddy desktop app to enable them." = "该主机版本不支持完成通知，升级桌面 App 后可用";

@@ -1,6 +1,7 @@
 package com.akashark.agentbuddy.android.push
 
 import java.security.MessageDigest
+import uniffi.codex_mobile_client.AppHostPushSupport
 import uniffi.codex_mobile_client.AppPushPlatform
 import uniffi.codex_mobile_client.AppPushRegistration
 import uniffi.codex_mobile_client.ThreadKey
@@ -135,6 +136,20 @@ fun pushRegistrationFor(token: String?, notificationsEnabled: Boolean): AppPushR
         workerBaseUrl = PUSH_WORKER_BASE_URL,
     )
 }
+
+/** [PUSH_PREFS] key recording that the unsupported-host hint was dismissed for [serverId]. */
+fun unsupportedHostHintDismissedKey(serverId: String): String = "host_push_hint_dismissed:$serverId"
+
+/**
+ * A host without `push.v1` gets an explicit hint instead of a silent
+ * keep-alive fallback (§9), but only while notifications are enabled and
+ * the user has not dismissed it for that server.
+ */
+fun shouldShowUnsupportedHostHint(
+    support: AppHostPushSupport,
+    notificationsEnabled: Boolean,
+    dismissed: Boolean,
+): Boolean = support == AppHostPushSupport.UNSUPPORTED_HOST && notificationsEnabled && !dismissed
 
 private fun Map<String, String>.nonBlank(key: String): String? =
     this[key]?.trim()?.takeIf { it.isNotEmpty() }

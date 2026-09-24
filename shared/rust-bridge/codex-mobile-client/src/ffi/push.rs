@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use super::client::AppClient;
-use crate::push::{AppPushRegistration, AppTurnPushState};
+use crate::push::{AppHostPushSupport, AppPushRegistration, AppTurnPushState};
 use crate::types::ThreadKey;
 
 #[uniffi::export(async_runtime = "tokio")]
@@ -27,6 +27,13 @@ impl AppClient {
     /// notifications".
     pub fn turn_push_state(&self, key: ThreadKey, turn_id: Option<String>) -> AppTurnPushState {
         self.inner.turn_push_state(&key, turn_id.as_deref())
+    }
+
+    /// Whether `server_id`'s host can report turn completions at all.
+    /// Platforms show "update the desktop app to get completion
+    /// notifications" for `UnsupportedHost` (host push design §9).
+    pub fn host_push_support(&self, server_id: String) -> AppHostPushSupport {
+        self.inner.host_push_support(&server_id)
     }
 
     /// Resolve `true` once `server_id` is connected, or `false` after

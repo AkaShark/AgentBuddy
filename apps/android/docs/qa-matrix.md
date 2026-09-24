@@ -19,7 +19,7 @@ Current tests (`app/src/test/java/com/akashark/agentbuddy/android/`):
 - `SavedServerTransportTest` — saved-server direct vs SSH transport choice and legacy migration
 - `HomeDashboardSupportTests`, `SessionsDerivationTests` — home/session workspace labels and cwd normalization
 - `auth/ChatGPTOAuthLoopbackServerTest` — ChatGPT OAuth loopback redirect server
-- `push/TurnCompletionPushTest` — host completion push payload parsing, notification tag (= Worker collapse key), foreground suppression, push registration gating
+- `push/TurnCompletionPushTest` — host completion push payload parsing, notification tag (= Worker collapse key), foreground suppression, push registration gating, unsupported-host hint gating
 - `state/AppComposerPayloadTest` — composer payload → `turn/start` params
 - `state/RealtimeWebRtcTransportTest`, `state/VoiceDynamicToolSpecsTest` — realtime voice transport and dynamic tool specs
 - `state/SnapshotExtensionsTest` — snapshot display helpers (model labels)
@@ -60,7 +60,7 @@ Rust `PushManager` subscribes on `TurnStarted` for alleycat hosts advertising `p
 | Same threadId on two hosts | Separate notifications and routing (tag and routing include the host) |
 | Debug alert (`/debug/push` alert) | Shown in the foreground too, tag `agentbuddy-debug` when no routing keys |
 | Debug background (`/debug/push` background) | No UI; logcat `AgentBuddyFCM: debug background push received` |
-| Legacy host without `push.v1` | No subscription and no silent keepalive fallback |
+| Legacy host without `push.v1` | No subscription and no silent keepalive fallback; while notifications are enabled the conversation screen shows 「该主机版本不支持完成通知，升级桌面 App 后可用」 above the composer (`AppClient.hostPushSupport` = `UNSUPPORTED_HOST`), dismissible per server (SharedPreferences `agentbuddy_push`) |
 
 ## Terminal UX Matrix
 

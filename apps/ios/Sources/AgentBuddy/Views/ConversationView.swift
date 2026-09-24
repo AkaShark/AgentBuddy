@@ -1,6 +1,7 @@
 import SwiftUI
 import PhotosUI
 import UIKit
+import UserNotifications
 import os
 import HairballUI
 
@@ -34,6 +35,7 @@ enum ConversationStreamingViewportPolicy {
 struct ConversationView: View {
     @Environment(AppState.self) private var appState
     @Environment(AppModel.self) private var appModel
+    @Environment(\.scenePhase) private var scenePhase
     let thread: AppThreadSnapshot
     let activeThreadKey: ThreadKey
     let transcript: ConversationTranscriptSnapshot
@@ -56,6 +58,7 @@ struct ConversationView: View {
     @State private var messageActionError: String?
     @State private var hasLoggedFirstRender = false
     @State private var localSendScrollToken = 0
+    @State private var showsUnsupportedHostHint = false
 
     private var items: [ConversationItem] {
         transcript.items
@@ -148,17 +151,24 @@ struct ConversationView: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if minigameOverlay == .idle {
-                ConversationBottomChrome(
-                    pinnedContextItems: pinnedContextItems,
-                    composer: composer,
-                    composerInputText: $composerInputText,
-                    composerAttachedImage: $composerAttachedImage,
-                    onSend: sendMessage,
-                    onFileSearch: searchComposerFiles,
-                    bottomInset: bottomInset,
-                    onOpenConversation: onOpenConversation,
-                    onResumeSessions: onResumeSessions
-                )
+                VStack(spacing: 0) {
+                    if showsUnsupportedHostHint {
+                        UnsupportedHostPushHintView(onDismiss: dismissUnsupportedHostHint)
+                            .padding(.horizontal, 12)
+                            .padding(.bottom, 6)
+                    }
+                    ConversationBottomChrome(
+                        pinnedContextItems: pinnedContextItems,
+                        composer: composer,
+                        composerInputText: $composerInputText,
+                        composerAttachedImage: $composerAttachedImage,
+                        onSend: sendMessage,
+                        onFileSearch: searchComposerFiles,
+                        bottomInset: bottomInset,
+                        onOpenConversation: onOpenConversation,
+                        onResumeSessions: onResumeSessions
+                    )
+                }
             } else {
                 MinigameOverlayView(
                     state: minigameOverlay,
@@ -194,11 +204,47 @@ struct ConversationView: View {
         .onChange(of: thread.initialTurnsLoaded) { _, _ in
             Task { await loadInitialTurnsIfNeeded() }
         }
+        .task(id: UnsupportedHostHintProbe(
+            serverId: activeThreadKey.serverId,
+            health: appModel.snapshot?.serverSnapshot(for: activeThreadKey.serverId)?.health,
+            isActive: scenePhase == .active
+        )) {
+            await refreshUnsupportedHostHint()
+        }
     }
 
     private func loadInitialTurnsIfNeeded() async {
         guard !thread.initialTurnsLoaded else { return }
         await appModel.loadInitialTurnsIfNeeded(threadId: activeThreadKey)
+    }
+
+    /// Re-probed when the server, its health (the host capability is known
+    /// once connected) or the scene phase (permission changed in Settings)
+    /// changes.
+    private func refreshUnsupportedHostHint() async {
+        let serverId = activeThreadKey.serverId
+        let support = appModel.client.hostPushSupport(serverId: serverId)
+        guard support == .unsupportedHost else {
+            showsUnsupportedHostHint = false
+            return
+        }
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        guard !Task.isCancelled else { return }
+        showsUnsupportedHostHint = PushNotificationSupport.shouldShowUnsupportedHostHint(
+            support: support,
+            authorizationStatus: settings.authorizationStatus,
+            dismissed: UserDefaults.standard.bool(
+                forKey: PushNotificationSupport.unsupportedHostHintDismissedKey(serverId: serverId)
+            )
+        )
+    }
+
+    private func dismissUnsupportedHostHint() {
+        UserDefaults.standard.set(
+            true,
+            forKey: PushNotificationSupport.unsupportedHostHintDismissedKey(serverId: activeThreadKey.serverId)
+        )
+        showsUnsupportedHostHint = false
     }
 
     private func sendMessage(
@@ -404,6 +450,42 @@ private extension AppThreadSnapshot {
         if let nickname, !nickname.isEmpty { return nickname }
         if let role, !role.isEmpty { return role }
         return nil
+    }
+}
+
+private struct UnsupportedHostHintProbe: Equatable {
+    let serverId: String
+    let health: AppServerHealth?
+    let isActive: Bool
+}
+
+/// Host push design §9: a host without `push.v1` cannot report completions;
+/// say so instead of silently keeping the app alive.
+private struct UnsupportedHostPushHintView: View {
+    let onDismiss: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "bell.slash")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(AgentBuddyTheme.warning)
+            Text("This host doesn't support completion notifications yet. Update the AgentBuddy desktop app to enable them.")
+                .agentBuddyFont(.caption)
+                .foregroundColor(AgentBuddyTheme.textSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+            Button(action: onDismiss) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(AgentBuddyTheme.textSecondary)
+                    .frame(width: 22, height: 22)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text("Close"))
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .modifier(GlassRectModifier(cornerRadius: 14))
     }
 }
 

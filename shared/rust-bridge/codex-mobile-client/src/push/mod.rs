@@ -75,6 +75,23 @@ pub enum AppTurnPushState {
     Failed,
 }
 
+/// Whether a server's host can report turn completions at all (`push.v1`),
+/// independent of agent and push registration. Platforms surface
+/// `UnsupportedHost` as "update the desktop app" instead of falling back to
+/// a silent keep-alive (host push design §9).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, uniffi::Enum)]
+pub enum AppHostPushSupport {
+    /// Remote push does not apply: local or non-alleycat server.
+    NotApplicable,
+    /// Alleycat server whose host capability is not known yet (not listed
+    /// since launch, or disconnected).
+    Unknown,
+    /// The host advertises `push.v1` with push enabled.
+    Supported,
+    /// The host lacks `push.v1` (older desktop app) or has push disabled.
+    UnsupportedHost,
+}
+
 /// Poll fallback for `await_server_connected` in case a store update is
 /// missed (lagged receiver).
 const SERVER_CONNECTED_POLL_INTERVAL: Duration = Duration::from_millis(250);
@@ -154,6 +171,17 @@ impl crate::MobileClient {
             .unwrap_or_else(|| ("codex".to_string(), None));
         self.push_manager
             .turn_push_state(key, turn_id, active_turn_id.as_deref(), &runtime_kind)
+    }
+
+    /// See [`AppHostPushSupport`].
+    pub(crate) fn host_push_support(&self, server_id: &str) -> AppHostPushSupport {
+        if matches!(
+            self.app_store.server_health_and_locality(server_id),
+            Some((_, true))
+        ) {
+            return AppHostPushSupport::NotApplicable;
+        }
+        self.push_manager.host_push_support(server_id)
     }
 
     /// Lifecycle hook: retry failed subscriptions of active turns.
@@ -281,6 +309,10 @@ mod tests {
             client.turn_push_state(&key, None),
             AppTurnPushState::NotApplicable
         );
+        assert_eq!(
+            client.host_push_support("local"),
+            AppHostPushSupport::NotApplicable
+        );
     }
 
     #[test]
@@ -308,11 +340,19 @@ mod tests {
             client.turn_push_state(&key, None),
             AppTurnPushState::NotApplicable
         );
+        assert_eq!(
+            client.host_push_support(&server_id),
+            AppHostPushSupport::Unknown
+        );
 
         client.record_alleycat_push_host(&server_id, &params, None, HashMap::new());
         assert_eq!(
             client.turn_push_state(&key, None),
             AppTurnPushState::Unsupported
+        );
+        assert_eq!(
+            client.host_push_support(&server_id),
+            AppHostPushSupport::UnsupportedHost
         );
 
         client.record_alleycat_push_host(
@@ -332,11 +372,19 @@ mod tests {
             client.turn_push_state(&key, Some("u")),
             AppTurnPushState::NotApplicable
         );
+        assert_eq!(
+            client.host_push_support(&server_id),
+            AppHostPushSupport::Supported
+        );
 
         client.disconnect_server(&server_id);
         assert_eq!(
             client.turn_push_state(&key, None),
             AppTurnPushState::NotApplicable
+        );
+        assert_eq!(
+            client.host_push_support(&server_id),
+            AppHostPushSupport::Unknown
         );
     }
 

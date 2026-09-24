@@ -35,12 +35,15 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SmallFloatingActionButton
@@ -66,6 +69,13 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.currentStateAsState
+import com.akashark.agentbuddy.android.push.PUSH_PREFS
+import com.akashark.agentbuddy.android.push.PushNotifications
+import com.akashark.agentbuddy.android.push.shouldShowUnsupportedHostHint
+import com.akashark.agentbuddy.android.push.unsupportedHostHintDismissedKey
 import com.akashark.agentbuddy.android.state.contextPercent
 import com.akashark.agentbuddy.android.state.hasActiveTurn
 import com.akashark.agentbuddy.android.state.isActiveStatus
@@ -81,6 +91,7 @@ import com.akashark.agentbuddy.android.ui.WallpaperType
 import com.akashark.agentbuddy.android.ui.isNearListBottom
 import com.akashark.agentbuddy.android.ui.rememberStickyFollowTail
 import kotlinx.coroutines.launch
+import uniffi.codex_mobile_client.AppHostPushSupport
 import uniffi.codex_mobile_client.HydratedConversationItemContent
 import uniffi.codex_mobile_client.AppRenameThreadRequest
 import uniffi.codex_mobile_client.PendingUserInputRequest
@@ -128,6 +139,24 @@ fun ConversationScreen(
     }
     val server = remember(snapshot, threadKey) {
         snapshot?.servers?.find { it.serverId == threadKey.serverId }
+    }
+    // Host push design §9: a host without push.v1 cannot report completions;
+    // say so (dismissible per server) instead of a silent keep-alive. Re-probed
+    // when the server connects (capability known) or the app resumes
+    // (notification permission may have changed).
+    val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
+    val isResumed = lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
+    var showUnsupportedHostHint by remember(threadKey.serverId) { mutableStateOf(false) }
+    LaunchedEffect(threadKey.serverId, server?.health, isResumed) {
+        val support = runCatching { appModel.client.hostPushSupport(threadKey.serverId) }
+            .getOrDefault(AppHostPushSupport.NOT_APPLICABLE)
+        val dismissed = context.getSharedPreferences(PUSH_PREFS, android.content.Context.MODE_PRIVATE)
+            .getBoolean(unsupportedHostHintDismissedKey(threadKey.serverId), false)
+        showUnsupportedHostHint = shouldShowUnsupportedHostHint(
+            support = support,
+            notificationsEnabled = PushNotifications.areEnabled(context),
+            dismissed = dismissed,
+        )
     }
     val items = thread?.hydratedConversationItems ?: emptyList()
     val normalizedActiveTurnId = thread?.activeTurnId?.trim()?.takeIf { it.isNotEmpty() }
@@ -776,6 +805,18 @@ fun ConversationScreen(
                         }
                     }
 
+                    if (showUnsupportedHostHint) {
+                        UnsupportedHostPushHint(
+                            onDismiss = {
+                                context.getSharedPreferences(PUSH_PREFS, android.content.Context.MODE_PRIVATE)
+                                    .edit()
+                                    .putBoolean(unsupportedHostHintDismissedKey(threadKey.serverId), true)
+                                    .apply()
+                                showUnsupportedHostHint = false
+                            },
+                        )
+                    }
+
                     // Inline voice status strip (above composer when voice active)
                     run {
                         val voiceController = remember { com.akashark.agentbuddy.android.state.VoiceRuntimeController.shared }
@@ -1231,6 +1272,40 @@ private fun uniffi.codex_mobile_client.AppThreadSnapshot.composerContextPercent(
 }
 
 private fun conversationBottomAnchorIndex(turnCount: Int): Int = turnCount + 1
+
+@Composable
+private fun UnsupportedHostPushHint(onDismiss: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp)
+            .background(AgentBuddyTheme.surface.copy(alpha = 0.72f), RoundedCornerShape(12.dp))
+            .padding(start = 12.dp, top = 6.dp, bottom = 6.dp, end = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            Icons.Default.NotificationsOff,
+            contentDescription = null,
+            tint = AgentBuddyTheme.warning,
+            modifier = Modifier.size(16.dp),
+        )
+        Text(
+            text = "该主机版本不支持完成通知，升级桌面 App 后可用",
+            color = AgentBuddyTheme.textSecondary,
+            fontSize = AgentBuddyTextStyle.caption.scaled,
+            modifier = Modifier.weight(1f),
+        )
+        IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
+            Icon(
+                Icons.Default.Close,
+                contentDescription = "关闭",
+                tint = AgentBuddyTheme.textSecondary,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+    }
+}
 
 @Composable
 private fun PlanContextBadge(progress: String) {
