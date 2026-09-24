@@ -16,7 +16,7 @@ set -euo pipefail
 # source-correspondence, so a build must never silently rewrite that rev.
 #
 # Set AGENTBUDDY_REFRESH_ALLEYCAT=1 to run the original refresh logic
-# (ls-remote the fork's main, then `cargo update --precise`). The legacy
+# (ls-remote the fork's main, update manifest pins, then `cargo update --precise`). The legacy
 # LITTER_SKIP_ALLEYCAT_UPDATE=1 is still honoured and always wins.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -62,7 +62,26 @@ if [ -z "$ALLEYCAT_MAIN_SHA" ]; then
   exit 1
 fi
 
+update_manifest_pin() {
+  python3 - "$1" "$ALLEYCAT_MAIN_SHA" <<'PYTHON'
+import pathlib
+import re
+import sys
+path = pathlib.Path(sys.argv[1])
+sha = sys.argv[2]
+if not re.fullmatch(r"[0-9a-f]{40}", sha):
+    raise SystemExit("error: invalid Alleycat commit SHA")
+text = path.read_text()
+pattern = r'(?m)^(alleycat[^\n]*git\s*=\s*"https://github.com/AkaShark/alleycat\.git"[^\n]*rev\s*=\s*")[^"]+("[^\n]*)$'
+updated, count = re.subn(pattern, lambda match: match[1] + sha + match[2], text)
+if not count:
+    raise SystemExit(f"error: no Alleycat revision pins found in {path}")
+path.write_text(updated)
+PYTHON
+}
+
 update_shared() {
+  update_manifest_pin "$REPO_DIR/shared/rust-bridge/Cargo.toml"
   echo "==> Resolving shared Rust Alleycat deps to $ALLEYCAT_REPO_LABEL main ($ALLEYCAT_MAIN_SHA)..."
   for package in \
     alleycat-bridge-core \
@@ -79,6 +98,7 @@ update_shared() {
 }
 
 update_kittylitter() {
+  update_manifest_pin "$REPO_DIR/services/kittylitter/Cargo.toml"
   echo "==> Resolving kittylitter Alleycat dep to $ALLEYCAT_REPO_LABEL main ($ALLEYCAT_MAIN_SHA)..."
   cargo update \
     --quiet \
