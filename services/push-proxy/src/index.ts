@@ -43,7 +43,7 @@ export default {
         headers: request.headers,
       })
       const resp = await stub.fetch(doReq)
-      return new Response(resp.body, { status: resp.status })
+      return new Response(resp.body, { status: resp.status, headers: resp.headers })
     }
 
     return json({ error: "not found" }, 404)

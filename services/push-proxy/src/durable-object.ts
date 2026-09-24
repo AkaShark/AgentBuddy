@@ -44,7 +44,7 @@ export class PushRegistration implements DurableObject {
 
     if (request.method === "POST" && url.pathname === "/deregister") {
       await this.state.storage.deleteAll()
-      return new Response("ok")
+      return Response.json({ ok: true })
     }
 
     return new Response("not found", { status: 404 })

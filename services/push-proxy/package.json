@@ -5,6 +5,7 @@
   "license": "GPL-3.0-only WITH LicenseRef-App-Store-Google-Play-Exception",
   "scripts": {
     "dev": "wrangler dev",
+    "test": "node --test tests/*.cjs",
     "deploy": "wrangler deploy",
     "cf-typegen": "wrangler types"
   },
