@@ -57,9 +57,21 @@ jobs:
         with:
           targets: aarch64-apple-ios-macabi,x86_64-apple-ios-macabi,i686-unknown-linux-musl
 
+      - name: Configure sccache
+        run: |
+          if [ -n "${SCCACHE_ENDPOINT:-}" ] && [ -n "${AWS_ACCESS_KEY_ID:-}" ] && [ -n "${AWS_SECRET_ACCESS_KEY:-}" ]; then
+            echo "RUSTC_WRAPPER=sccache" >> "$GITHUB_ENV"
+          else
+            echo "SCCACHE_BUCKET=" >> "$GITHUB_ENV"
+            echo "SCCACHE_ENDPOINT=" >> "$GITHUB_ENV"
+            echo "SCCACHE_S3_KEY_PREFIX=" >> "$GITHUB_ENV"
+            echo "AWS_ACCESS_KEY_ID=" >> "$GITHUB_ENV"
+            echo "AWS_SECRET_ACCESS_KEY=" >> "$GITHUB_ENV"
+          fi
 
       - name: Prime sccache
         run: |
+          source ./tools/scripts/load-sccache-aws-creds.sh
           export SCCACHE_ERROR_LOG="$RUNNER_TEMP/sccache-mac.log"
           rm -f "$SCCACHE_ERROR_LOG"
           sccache --stop-server || true

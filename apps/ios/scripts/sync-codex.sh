@@ -5,23 +5,22 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 IOS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_DIR="$(cd "$IOS_DIR/../.." && pwd)"
 SUBMODULE_DIR="$REPO_DIR/shared/third_party/codex"
-PATCH_FILES=(
-    "$REPO_DIR/patches/codex/ios-exec-hook.patch"
-    "$REPO_DIR/patches/codex/mobile-code-mode-stub.patch"
-    "$REPO_DIR/patches/codex/thread-read-permissions.patch"
-    "$REPO_DIR/patches/codex/mobile-shell-snapshot-timeout.patch"
-    "$REPO_DIR/patches/codex/remote-app-server-websocket-cap.patch"
-    "$REPO_DIR/patches/codex/absolute-path-cross-platform.patch"
-    "$REPO_DIR/patches/codex/android-installation-id-lock.patch"
-    "$REPO_DIR/patches/codex/dynamic-tool-call-arguments-delta.patch"
-    "$REPO_DIR/patches/codex/approval-timestamps-serde-default.patch"
-    "$REPO_DIR/patches/codex/realtime-webrtc-env-apikey.patch"
-    # Realtime multi-server orchestrator (split from old client-controlled-handoff.patch).
-    # Apply order: server-hint adds the realtime_v2_session_tools helper consumed by dynamic-tools.
-    "$REPO_DIR/patches/codex/realtime-handoff-server-hint.patch"
-    "$REPO_DIR/patches/codex/realtime-dynamic-tools.patch"
-    "$REPO_DIR/patches/codex/realtime-client-controlled-handoff.patch"
-)
+PATCH_DIR="$REPO_DIR/patches/codex"
+# Ordered patch list lives in patches/codex/series, shared with build-rust.sh
+# (EXIT-trap rollback) and `make unpatch` so the three can't drift.
+PATCH_SERIES="$PATCH_DIR/series"
+if [ ! -f "$PATCH_SERIES" ]; then
+    echo "error: missing patch series file: $PATCH_SERIES" >&2
+    exit 1
+fi
+PATCH_FILES=()
+while IFS= read -r patch_name; do
+    PATCH_FILES+=("$PATCH_DIR/$patch_name")
+done < <(sed -e 's/#.*//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e '/^$/d' "$PATCH_SERIES")
+if [ "${#PATCH_FILES[@]}" -eq 0 ]; then
+    echo "error: no patches listed in $PATCH_SERIES" >&2
+    exit 1
+fi
 
 patch_already_upstreamed() {
     return 1

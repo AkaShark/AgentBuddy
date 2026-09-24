@@ -77,6 +77,18 @@ jobs:
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Configure sccache
+        run: |
+          if [ -n "${SCCACHE_ENDPOINT:-}" ] && [ -n "${AWS_ACCESS_KEY_ID:-}" ] && [ -n "${AWS_SECRET_ACCESS_KEY:-}" ]; then
+            echo "RUSTC_WRAPPER=sccache" >> "$GITHUB_ENV"
+          else
+            echo "SCCACHE_BUCKET=" >> "$GITHUB_ENV"
+            echo "SCCACHE_ENDPOINT=" >> "$GITHUB_ENV"
+            echo "SCCACHE_S3_KEY_PREFIX=" >> "$GITHUB_ENV"
+            echo "AWS_ACCESS_KEY_ID=" >> "$GITHUB_ENV"
+            echo "AWS_SECRET_ACCESS_KEY=" >> "$GITHUB_ENV"
+          fi
+
       - name: Setup sccache
         uses: mozilla-actions/sccache-action@v0.0.9
 
@@ -185,11 +197,24 @@ jobs:
         with:
           targets: aarch64-linux-android,x86_64-linux-android
 
+      - name: Configure sccache
+        run: |
+          if [ -n "${SCCACHE_ENDPOINT:-}" ] && [ -n "${AWS_ACCESS_KEY_ID:-}" ] && [ -n "${AWS_SECRET_ACCESS_KEY:-}" ]; then
+            echo "RUSTC_WRAPPER=sccache" >> "$GITHUB_ENV"
+          else
+            echo "SCCACHE_BUCKET=" >> "$GITHUB_ENV"
+            echo "SCCACHE_ENDPOINT=" >> "$GITHUB_ENV"
+            echo "SCCACHE_S3_KEY_PREFIX=" >> "$GITHUB_ENV"
+            echo "AWS_ACCESS_KEY_ID=" >> "$GITHUB_ENV"
+            echo "AWS_SECRET_ACCESS_KEY=" >> "$GITHUB_ENV"
+          fi
+
       - name: Setup sccache
         uses: mozilla-actions/sccache-action@v0.0.9
 
       - name: Prime sccache
         run: |
+          source ./tools/scripts/load-sccache-aws-creds.sh
           export SCCACHE_ERROR_LOG="$RUNNER_TEMP/sccache-android.log"
           rm -f "$SCCACHE_ERROR_LOG"
           sccache --stop-server || true

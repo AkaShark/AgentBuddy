@@ -153,11 +153,13 @@ endif
 KITTYLITTER_ARGS := $(strip $(KITTYLITTER_GOAL_ARGS) $(ARGS))
 UPDATE_ALLEYCAT_MAIN := $(ROOT)/tools/scripts/update-alleycat-main.sh
 
-PATCH_FILES := \
-	$(PATCHES_DIR)/ios-exec-hook.patch \
-	$(PATCHES_DIR)/client-controlled-handoff.patch \
-	$(PATCHES_DIR)/mobile-code-mode-stub.patch \
-	$(PATCHES_DIR)/thread-read-permissions.patch
+# Ordered codex patch list: patches/codex/series is the single source of truth
+# shared with sync-codex.sh (apply) and build-rust.sh (rollback). `#` starts a
+# comment there; HASH keeps the sed pattern portable across GNU make 3.81/4.3+.
+PATCH_SERIES := $(PATCHES_DIR)/series
+HASH := \#
+PATCH_FILES := $(addprefix $(PATCHES_DIR)/,$(shell sed -e 's/$(HASH).*//' -e '/^[[:space:]]*$$/d' '$(PATCH_SERIES)'))
+reverse = $(if $(1),$(call reverse,$(wordlist 2,$(words $(1)),$(1))) $(firstword $(1)))
 
 BOUNDARY_SOURCES := \
 	$(RUST_DIR)/codex-mobile-client/Cargo.toml \
@@ -559,7 +561,7 @@ patch: $(STAMP_SYNC)
 
 unpatch:
 	@echo "==> Reverting codex patches..."
-	@for pf in $(PATCH_FILES); do \
+	@for pf in $(call reverse,$(PATCH_FILES)); do \
 		if git -C $(SUBMODULE_DIR) apply --reverse --check "$$pf" >/dev/null 2>&1; then \
 			git -C $(SUBMODULE_DIR) apply --reverse "$$pf"; \
 		fi; \

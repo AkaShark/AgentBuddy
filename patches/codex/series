@@ -1,0 +1,24 @@
+# Ordered list of patches applied to shared/third_party/codex.
+#
+# Single source of truth read by:
+#   - apps/ios/scripts/sync-codex.sh   (applies in this order)
+#   - apps/ios/scripts/build-rust.sh   (EXIT-trap rollback, reverse order)
+#   - Makefile `unpatch`               (reverts in reverse order)
+#
+# One file name per line, relative to this directory. `#` starts a comment.
+# See README.md in this directory for what each patch does.
+ios-exec-hook.patch
+mobile-code-mode-stub.patch
+thread-read-permissions.patch
+mobile-shell-snapshot-timeout.patch
+remote-app-server-websocket-cap.patch
+absolute-path-cross-platform.patch
+android-installation-id-lock.patch
+dynamic-tool-call-arguments-delta.patch
+approval-timestamps-serde-default.patch
+realtime-webrtc-env-apikey.patch
+# Realtime multi-server orchestrator (split from old client-controlled-handoff.patch).
+# Apply order: server-hint adds the realtime_v2_session_tools helper consumed by dynamic-tools.
+realtime-handoff-server-hint.patch
+realtime-dynamic-tools.patch
+realtime-client-controlled-handoff.patch

@@ -1,6 +1,6 @@
 # Codex submodule patches
 
-Patches applied to `shared/third_party/codex` by `apps/ios/scripts/sync-codex.sh` during build.
+Patches applied to `shared/third_party/codex` by `apps/ios/scripts/sync-codex.sh` during build, in the order listed in [`series`](series). `series` is the single source of truth: `build-rust.sh` (EXIT-trap rollback) and `make unpatch` read the same file and revert in reverse order. Add new patches there.
 
 The patches are tightly coupled to the upstream codex source tree, so each codex tag bump tends to require a refresh. This README captures *intent* — what each patch does and which downstream code in this repo depends on it — so the next bump doesn't have to re-derive that from a 900-line diff.
 
@@ -72,7 +72,7 @@ Touches `core/src/realtime_conversation.rs`.
 
 These three patches together let mobile clients (litter) own dynamic-tool execution and handoff resolution during a realtime audio session, instead of routing everything through the in-process background_agent. They were originally one monolithic patch (`client-controlled-handoff.patch`) but were split for easier maintenance — most upstream churn in the realtime layer affects only one of them.
 
-Apply order in `sync-codex.sh` matters: `server-hint` first because it introduces the `realtime_v2_session_tools` helper that `dynamic-tools` reuses.
+Apply order in `series` matters: `server-hint` first because it introduces the `realtime_v2_session_tools` helper that `dynamic-tools` reuses.
 
 ### `realtime-handoff-server-hint.patch`
 Adds `server: Option<String>` to `RealtimeHandoffRequested` so the model can specify which connected server (e.g. `studio`, `mac-mini`, `local`) should handle the prompt. The mobile client reads this hint to route the handoff over SSH/WS to the right backend.

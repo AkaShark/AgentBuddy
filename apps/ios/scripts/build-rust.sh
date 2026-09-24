@@ -20,12 +20,22 @@ IOS_DEPLOYMENT_TARGET="${IOS_DEPLOYMENT_TARGET:-18.0}"
 MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-14.0}"
 SUBMODULE_DIR="$REPO_DIR/shared/third_party/codex"
 IOS_CLANGXX_WRAPPER="$SCRIPT_DIR/ios-clangxx-wrapper.sh"
-PATCH_FILES=(
-  "$REPO_DIR/patches/codex/ios-exec-hook.patch"
-  "$REPO_DIR/patches/codex/client-controlled-handoff.patch"
-  "$REPO_DIR/patches/codex/mobile-code-mode-stub.patch"
-  "$REPO_DIR/patches/codex/thread-read-permissions.patch"
-)
+PATCH_DIR="$REPO_DIR/patches/codex"
+# Same ordered list sync-codex.sh applies (patches/codex/series); the EXIT trap
+# below reverts the ones this run applied, in reverse order.
+PATCH_SERIES="$PATCH_DIR/series"
+if [ ! -f "$PATCH_SERIES" ]; then
+  echo "error: missing patch series file: $PATCH_SERIES" >&2
+  exit 1
+fi
+PATCH_FILES=()
+while IFS= read -r patch_name; do
+  PATCH_FILES+=("$PATCH_DIR/$patch_name")
+done < <(sed -e 's/#.*//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e '/^$/d' "$PATCH_SERIES")
+if [ "${#PATCH_FILES[@]}" -eq 0 ]; then
+  echo "error: no patches listed in $PATCH_SERIES" >&2
+  exit 1
+fi
 
 SYNC_MODE="--preserve-current"
 DEVICE_ONLY=0
@@ -118,7 +128,11 @@ for PATCH_FILE in "${PATCH_FILES[@]}"; do
 done
 
 cleanup_patch() {
-  for PATCH_FILE in "${PATCH_FILES[@]}"; do
+  # Reverse order: later patches can stack on hunks from earlier ones, so an
+  # earlier patch only reverse-applies cleanly once the later ones are gone.
+  local i
+  for (( i = ${#PATCH_FILES[@]} - 1; i >= 0; i-- )); do
+    local PATCH_FILE="${PATCH_FILES[$i]}"
     local was_pre_applied=0
     for pre in "${PATCHES_WERE_APPLIED[@]+"${PATCHES_WERE_APPLIED[@]}"}"; do
       if [ "$pre" = "$PATCH_FILE" ]; then

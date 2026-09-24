@@ -70,8 +70,9 @@ Use this flow to make Codex sessions from your Mac visible in the iOS/Android ap
 
 Upstream Codex is vendored as a submodule at `shared/third_party/codex`.
 
-Current local patch set, applied in this order by `sync-codex.sh` (see
-`patches/codex/README.md` for what each patch does and which mobile code depends on it):
+Current local patch set, applied in this order by `sync-codex.sh` from
+`patches/codex/series` (see `patches/codex/README.md` for what each patch does and which
+mobile code depends on it):
 
 - `patches/codex/ios-exec-hook.patch`
 - `patches/codex/mobile-code-mode-stub.patch`
@@ -88,8 +89,9 @@ Current local patch set, applied in this order by `sync-codex.sh` (see
 - `patches/codex/realtime-client-controlled-handoff.patch`
 
 The last three together replace the former monolithic `client-controlled-handoff.patch`.
-Every `.patch` file under `patches/codex/` is auto-applied; there is no separate
-"not auto-applied" set anymore.
+`patches/codex/series` is the single ordered list: `sync-codex.sh` applies it,
+`build-rust.sh` (EXIT-trap rollback) and `make unpatch` revert it in reverse order.
+A `.patch` file not listed there is not applied.
 
 Sync/apply (idempotent):
 
