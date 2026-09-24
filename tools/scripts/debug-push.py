@@ -146,7 +146,13 @@ def main() -> int:
         url,
         data=json.dumps(payload).encode(),
         method="POST",
-        headers={"Content-Type": "application/json", "Authorization": f"Bearer {admin_token}"},
+        # Cloudflare's browser integrity check rejects urllib's default
+        # User-Agent with error 1010, so identify the tool explicitly.
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {admin_token}",
+            "User-Agent": "agentbuddy-debug-push/1",
+        },
     )
     try:
         with urllib.request.build_opener(_NoRedirect).open(request, timeout=20) as response:
