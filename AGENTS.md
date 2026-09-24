@@ -15,7 +15,7 @@
 - `apps/android/core/bridge/.../Rust*.kt` — Android bridge files mapping Kotlin to the shared Rust layer. UniFFI Kotlin sources are generated into `shared/rust-bridge/generated/kotlin/` and consumed directly from there; do not maintain copied binding files under Android source roots.
 - `shared/third_party/codex/` is the upstream Codex submodule.
 - `apps/ios/GeneratedRust/` contains local generated Rust artifacts for iOS builds: UniFFI headers/modulemap plus raw device/simulator staticlibs. These artifacts are not committed.
-- `apps/ios/Frameworks/` contains downloaded/package-lane iOS XCFrameworks (`codex_mobile_client.xcframework` in package builds and `litter_ish.xcframework`). These artifacts are not committed.
+- `apps/ios/Frameworks/` contains downloaded/package-lane iOS XCFrameworks (`codex_mobile_client.xcframework` in package builds). These artifacts are not committed.
 - `apps/ios/project.yml` is the source of truth for project generation; regenerate `apps/ios/AgentBuddy.xcodeproj` instead of hand-editing project files.
 
 ## Architecture
@@ -59,7 +59,7 @@
 - Add conversation hydration, typed item shaping, or shared status normalization:
   - `shared/rust-bridge/codex-mobile-client/src/conversation.rs`
   - `shared/rust-bridge/codex-mobile-client/src/conversation_uniffi.rs`
-  - `shared/rust-bridge/codex-mobile-client/src/uniffi_shared.rs`
+  - `shared/rust-bridge/codex-mobile-client/src/ffi/shared.rs`
 - Add discovery ranking/dedupe/reconciliation:
   - `shared/rust-bridge/codex-mobile-client/src/discovery.rs`
   - `shared/rust-bridge/codex-mobile-client/src/discovery_uniffi.rs`
@@ -122,8 +122,8 @@ Incremental policy:
 ### Common targets
 | Target | Description |
 |---|---|
-| `make ios` | Full iOS package lane: sync → patch → bindings → rust (device+sim) → xcframework → litter-ish → xcgen → simulator build |
-| `make litter-ish` | Download the pinned `dnakov/litter-ish` release (xcframework + Alpine fakefs). Bump `LITTER_ISH_VERSION` in `Makefile` to upgrade. |
+| `make ios` | Full iOS package lane: sync → patch → bindings → rust (device+sim) → xcframework → alpine-fs → xcgen → simulator build |
+| `make alpine-fs` | Download the pinned Alpine rootfs from `dnakov/litter-ish`; bump `ALPINE_FS_VERSION` in `Makefile` to upgrade. The iSH kernel is built from Rust. |
 | `make ios-sim` | Full iOS package lane + simulator build |
 | `make ios-sim-fast` | Fast iOS simulator lane using raw simulator staticlib outputs in `GeneratedRust/ios-sim` |
 | `make ios-device` | Full iOS package lane + device build |
@@ -160,7 +160,7 @@ Incremental policy:
 
 ### Individual scripts (called by Make, can also be run standalone)
 - `./apps/ios/scripts/build-rust.sh` — cross-compile Rust for iOS; in fast mode it emits raw staticlibs + headers to `apps/ios/GeneratedRust/`, and in package mode it also creates `codex_mobile_client.xcframework`
-- `./apps/ios/scripts/download-litter-ish.sh` — fetch the pinned `dnakov/litter-ish` GitHub release, extract `litter_ish.xcframework` into `apps/ios/Frameworks/` and `alpine-fakefs/` into `apps/ios/Resources/`. Reads `LITTER_ISH_VERSION` from env (set by `make litter-ish`).
+- `./apps/ios/scripts/download-alpine-fs.sh` — fetch the pinned `dnakov/litter-ish` rootfs, verify its checksum, and extract it into `apps/ios/Resources/fs/`. Reads `ALPINE_FS_VERSION` from env (set by `make alpine-fs`).
 - `./apps/ios/scripts/sync-codex.sh` — sync codex submodule + apply patches
 - `./apps/ios/scripts/regenerate-project.sh` — regenerate Xcode project via xcodegen; this is the safe path because it removes any accidental nested `apps/ios/AgentBuddy.xcodeproj/AgentBuddy.xcodeproj` before regenerating
 - `./apps/ios/scripts/testflight-upload.sh` — archive, export IPA, upload to TestFlight
