@@ -8,14 +8,14 @@
 - ASC App Manager API key 已建立并通过 notarytool 验证。
 - App Store Connect 已建立 **AgentBuddy 搭子**，Apple ID `6815571588`，Bundle ID `com.akashark.agentbuddy`。
 - iOS 主 App、Live Activity、Watch、Watch Complications 四个标识已注册并关联 `group.com.akashark.agentbuddy`；前三个启用 Push。
-- APNs Key 表单已准备：AgentBuddy Push，Sandbox & Production、Team Scoped。尚未 Register，等待用户确认新增长期凭据。
+- APNs Key 已注册并下载：AgentBuddy Push，Sandbox & Production、Team Scoped，Key ID `686X55267F`。私钥已在本机私有目录校验并设置 0600，未进入 Git。
 - GitHub 已核对七个 Secret 名：MAC_DEVELOPER_ID_CERT_P12_B64、MAC_DEVELOPER_ID_CERT_PASSWORD、ASC_KEY_ID、ASC_ISSUER_ID、ASC_PRIVATE_KEY_P8_B64、IOS_TEAM_ID、IOS_APP_STORE_APP_ID。
 
 ## 桌面发布 CI
 
 运行：https://github.com/AkaShark/AgentBuddy/actions/runs/35973836528
 
-- 基于 `9f8d928`，尚不包含后续修复；最终 QA 需要重新构建最新 main。
+- 首次运行基于 `9f8d928`。最新修复版本 `3dc92ff` 已再次触发构建：https://github.com/AkaShark/AgentBuddy/actions/runs/35979742072 ，仍保持草稿。
 - 两个架构的 sidecar 编译已成功。
 - 草稿 `desktop-dev-1` 已创建，未发布。
 - 两份 AgentBuddy.zip 已提交 Apple 公证，检查时均为 In Progress。CI 尚未结束。
@@ -30,6 +30,7 @@
 | 9.3 配对 token 指纹 | 8ec52e1 | 使用 status.token_short |
 | 9.4 互斥测试 | a36020f | 注入 runner 驱动实际序列，验证安装/重启不被轮换打断 |
 | 9.5 内联 TOML | 8068a12 | 支持 inline agent/agents 表 |
+| 9.6 Cmd+Q 首次提示 | 73e052e | 自定义应用菜单，主窗口附着提示；确认后才记录已提示 |
 | 9.7 停止时轮询 | 98211e1 | 可见窗口停止时 5 秒；隐藏与失败退避仍 30 秒 |
 | 9.8 升级失败重试 | 7e8ab34 | 失败不保存新版本，后续启动重试 |
 | 9.9 缺少设置与诊断 | bf03606 | 手动 bin、Codex host/port、登录项提示、诊断守护进程版本 |
@@ -61,10 +62,10 @@
 ## 尚未完成
 
 1. 等待 Apple 公证和 CI，验收两个 DMG；包含最新修复后重建，再完成 Mac/手机 QA。
-2. 9.6 自定义应用菜单 Cmd+Q 首次退出提示尚未实现。
-3. 9.12 原文被截断；当前两个指定文件无 `clich`，需要确认实际意图。build-rust.sh 还引用已不存在的 uniffi_shared.rs，尚未修改。
-4. APNs 新密钥等待确认；Apple 浏览器保留页面恢复时连续超时，尚未重新取得可操作状态。
-5. Cloudflare Worker 部署尚未执行，需要 APNs 与 Firebase 服务账号；两个移动端推送 URL 尚未替换。
+2. Cmd+Q 已通过 computer use 实际 RED/GREEN 验证：旧包直接退出，新包显示提示，确认后退出，再次退出不重复提示。调试包构建通过；尚需正式签名包 QA。
+3. 9.12 原文被截断；当前两个指定文件无 `clich`，需要确认实际意图。build-rust.sh 中已不存在的 uniffi_shared.rs 输入已在 `3dc92ff` 移除，bash -n 通过；未更改实际递归源码哈希逻辑。
+4. Apple 浏览器连接已恢复，APNs 已完成。Cloudflare CLI 未登录；OAuth 页面已打开，因页面要求接受条款，等待用户确认或自行登录。
+5. Cloudflare Worker 部署尚未执行，仍需要 Firebase 服务账号和 Cloudflare 登录；两个移动端推送 URL 尚未替换。
 6. Firebase/Play 配置待补充。已确认工作流将 GOOGLE_SERVICES_JSON_B64 解码到 apps/android/app/google-services.json，且该文件已 gitignore。
 7. Android rootfs 仓库选择、品牌素材目录、正式隐私和支持页面 URL 等待用户回复；未替换美术或商店链接。
 8. 工作区原有/并行产生的 Ghostty 脚本与 patches 改动和两个脏子模块保留，未纳入本次提交，也未推子模块。
