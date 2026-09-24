@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(async () => undefined) }));
@@ -7,6 +7,7 @@ vi.mock("@tauri-apps/plugin-clipboard-manager", () => ({ writeText: (t: string) 
 
 import { Overview } from "./Overview";
 import type { HostState } from "../lib/host";
+import { invoke } from "@tauri-apps/api/core";
 
 const base: HostState = {
   install: { kind: "installed" },
@@ -23,6 +24,12 @@ const base: HostState = {
 };
 
 describe("Overview", () => {
+  it("repairs the service with a single install sequence and no extra restart", async () => {
+    vi.mocked(invoke).mockClear();
+    render(<Overview state={{ ...base, install: { kind: "path_mismatch", plist_exe: "/old/agentbuddy" } }} busy={false} run={async (f) => f()} />);
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "修复" })); });
+    expect(vi.mocked(invoke).mock.calls.map(([command]) => command)).toEqual(["host_install"]);
+  });
   it("shows running state, node id, formatted uptime and the daemon version", () => {
     render(<Overview state={base} busy={false} run={async (f) => f()} />);
     expect(screen.getByText("运行中")).toBeInTheDocument();

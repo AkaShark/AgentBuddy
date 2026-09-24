@@ -50,12 +50,7 @@ export function Overview({ state, busy, run, installAction = host.install, onIns
           <pre>服务指向旧版本或旧位置：{state.install.plist_exe}</pre>
           <button
             disabled={busy}
-            onClick={() =>
-              void run(async () => {
-                await host.install();
-                await host.restart();
-              })
-            }
+            onClick={() => void run(host.install)}
           >
             修复
           </button>
