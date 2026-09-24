@@ -1,4 +1,4 @@
-use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
+use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, Wry};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
@@ -181,13 +181,20 @@ fn quit(app: &AppHandle) {
         return;
     }
     settings.quit_notice_shown = true;
-    let _ = settings.save(app);
     let handle = app.clone();
-    app.dialog()
+    let mut dialog = app.dialog()
         .message("退出 AgentBuddy 不会停止主机服务，手机仍然可以连接这台 Mac。要停止服务请使用菜单里的「停止主机服务」。")
         .title("退出 AgentBuddy")
-        .kind(MessageDialogKind::Info)
-        .show(move |_| handle.exit(0));
+        .kind(MessageDialogKind::Info);
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.set_focus();
+        dialog = dialog.parent(&window);
+    }
+    dialog.show(move |_| {
+        let _ = settings.save(&handle);
+        handle.exit(0);
+    });
 }
 
 pub fn spawn_refresher(app: AppHandle) {
@@ -236,6 +243,30 @@ pub fn spawn_upgrade_check(app: AppHandle) {
 }
 
 pub fn install(app: &AppHandle) -> tauri::Result<()> {
+    #[cfg(target_os = "macos")]
+    {
+        // Keep Tauri's standard editing/window menus, but replace the native
+        // Quit item: its built-in action exits before our notice can run.
+        let application_menu = Menu::default(app)?;
+        application_menu.remove_at(0)?;
+        let quit_item = MenuItem::with_id(app, "app_quit", "退出 AgentBuddy", true, Some("CmdOrCtrl+Q"))?;
+        application_menu.prepend(&Submenu::with_items(app, "AgentBuddy", true, &[
+            &PredefinedMenuItem::about(app, None, None)?,
+            &PredefinedMenuItem::separator(app)?,
+            &PredefinedMenuItem::services(app, None)?,
+            &PredefinedMenuItem::separator(app)?,
+            &PredefinedMenuItem::hide(app, None)?,
+            &PredefinedMenuItem::hide_others(app, None)?,
+            &PredefinedMenuItem::separator(app)?,
+            &quit_item,
+        ])?)?;
+        app.set_menu(application_menu)?;
+        app.on_menu_event(|app, event| {
+            if event.id().as_ref() == "app_quit" {
+                quit(app);
+            }
+        });
+    }
     let status = MenuItem::with_id(app, "status", "状态：正在检测…", false, None::<&str>)?;
     let open = MenuItem::with_id(app, "open", "打开控制台", true, None::<&str>)?;
     let pair = MenuItem::with_id(app, "pair", "显示配对二维码", true, None::<&str>)?;

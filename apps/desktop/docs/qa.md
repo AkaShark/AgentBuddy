@@ -8,7 +8,7 @@
    `launchctl print gui/$(id -u)/com.akashark.agentbuddycli` 有输出，且 `ps` 里只有一个 `agentbuddy serve`。
 3. Agents 页：用 Homebrew / npm / nvm 装的 agent（如 claude、codex）显示「可用」——验证守护进程拿到了登录 shell 的 PATH。
 4. 配对页出现二维码；手机 App「添加服务器 → 扫码」连上并能列出 agent。
-5. 退出 App（首次弹提示）→ 手机仍能新建会话。
+5. 分别验证托盘退出与控制台 Cmd+Q：首次退出在控制台上显示「后台服务继续运行」提示，确认后才退出；再次启动后退出不重复提示。退出 App 后手机仍能新建会话。
 6. 重启 Mac，不打开 App → 手机仍能连接。
 7. 把 App 移到 ~/Desktop 再打开 → 概览出现「服务指向旧版本或旧位置」→ 点修复 → 状态恢复「运行中」。
 8. 配对页「轮换 token」→ 旧手机被拒绝，重新扫码后恢复。
