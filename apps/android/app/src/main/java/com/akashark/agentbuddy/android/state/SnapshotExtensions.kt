@@ -6,7 +6,6 @@ import uniffi.codex_mobile_client.AppServerSnapshot
 import uniffi.codex_mobile_client.AppServerTransportState
 import uniffi.codex_mobile_client.AppSessionSummary
 import uniffi.codex_mobile_client.AppThreadSnapshot
-import uniffi.codex_mobile_client.HydratedConversationItemContent
 import uniffi.codex_mobile_client.AppConnectionStepKind
 import uniffi.codex_mobile_client.AppConnectionStepSnapshot
 import uniffi.codex_mobile_client.AppConnectionStepState
@@ -217,24 +216,4 @@ val AppThreadSnapshot.contextPercent: Int
         if (window <= 0L) return 0
         val used = contextTokensUsed?.toLong() ?: return 0
         return ((used * 100) / window).toInt().coerceIn(0, 100)
-    }
-
-val AppThreadSnapshot.latestAssistantSnippet: String?
-    get() {
-        val items = hydratedConversationItems
-        for (i in items.indices.reversed()) {
-            val content = items[i].content
-            if (content is HydratedConversationItemContent.Assistant) {
-                val text = content.v1.text
-                if (text.isNotBlank()) {
-                    return if (text.length > 120) text.takeLast(120) else text
-                }
-            } else if (content is HydratedConversationItemContent.CodeReview) {
-                val title = content.v1.findings.firstOrNull()?.title
-                if (!title.isNullOrBlank()) {
-                    return if (title.length > 120) title.take(120) else title
-                }
-            }
-        }
-        return null
     }

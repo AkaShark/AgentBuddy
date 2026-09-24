@@ -11,6 +11,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -28,6 +29,7 @@ import com.akashark.agentbuddy.android.state.PetOverlayController
 import com.akashark.agentbuddy.android.state.AlleycatCredentialStore
 import com.akashark.agentbuddy.android.state.SavedServerStore
 import com.akashark.agentbuddy.android.state.SavedThreadsStore
+import com.akashark.agentbuddy.android.state.VisibleThreadTracker
 import com.akashark.agentbuddy.android.state.VoiceRuntimeController
 import com.akashark.agentbuddy.android.state.connectionModeLabel
 import kotlinx.coroutines.launch
@@ -282,6 +284,18 @@ fun AgentBuddyApp(
             if (!alreadyShowing) {
                 navStack = listOf(Route.Home, Route.Conversation(activeKey))
             }
+        }
+
+        // Lets the FCM service skip a completion notification for the
+        // conversation already on screen.
+        val visibleThreadKey = when (val route = currentRoute) {
+            is Route.Conversation -> route.key
+            is Route.RealtimeVoice -> route.key
+            else -> null
+        }
+        DisposableEffect(visibleThreadKey) {
+            VisibleThreadTracker.visibleThread = visibleThreadKey
+            onDispose { VisibleThreadTracker.visibleThread = null }
         }
 
         val rootModifier = if (currentRoute is Route.Conversation || currentRoute is Route.Terminal) {

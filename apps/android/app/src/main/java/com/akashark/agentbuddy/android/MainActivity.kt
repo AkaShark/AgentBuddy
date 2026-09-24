@@ -27,10 +27,15 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessaging
+import com.akashark.agentbuddy.android.push.PUSH_PREFS
+import com.akashark.agentbuddy.android.push.PUSH_PREFS_FCM_TOKEN
+import com.akashark.agentbuddy.android.push.PushDataKeys
+import com.akashark.agentbuddy.android.push.PushNotifications
 import com.akashark.agentbuddy.android.state.AppLifecycleController
 import com.akashark.agentbuddy.android.state.AppModel
 import com.akashark.agentbuddy.android.state.OpenAIApiKeyStore
 import com.akashark.agentbuddy.android.state.PetOverlayController
+import com.akashark.agentbuddy.android.state.VisibleThreadTracker
 import com.akashark.agentbuddy.android.ui.AnimatedSplashScreen
 import com.akashark.agentbuddy.android.ui.ExperimentalFeatures
 import com.akashark.agentbuddy.android.ui.AgentBuddyApp
@@ -43,10 +48,15 @@ import uniffi.codex_mobile_client.ThreadKey
 
 class MainActivity : ComponentActivity() {
     companion object {
-        const val EXTRA_NOTIFICATION_SERVER_ID = "agentbuddy.notification.serverId"
-        const val EXTRA_NOTIFICATION_THREAD_ID = "agentbuddy.notification.threadId"
+        // Same strings as the FCM data keys: a system-displayed push delivers
+        // its data as extras of the launch intent.
+        const val EXTRA_NOTIFICATION_SERVER_ID = PushDataKeys.SERVER_ID
+        const val EXTRA_NOTIFICATION_THREAD_ID = PushDataKeys.THREAD_ID
         const val EXTRA_OPEN_PET_SETTINGS = "agentbuddy.openPetSettings"
         private const val KEY_NOTIFICATION_PERMISSION_REQUESTED = "notification_permission_requested"
+
+        /** How long a notification tap waits for its host to reconnect. */
+        private const val NOTIFICATION_CONNECT_TIMEOUT_MS: ULong = 20_000uL
 
         /**
          * Set when the previous Activity instance was destroyed for a
@@ -60,9 +70,12 @@ class MainActivity : ComponentActivity() {
     private var appModel: AppModel? = null
     private val lifecycleController = AppLifecycleController()
     private var openPetSettingsRequest by mutableStateOf(0)
+    /** Latest FCM token (cached or fetched); registration is gated on notification permission. */
+    private var fcmToken: String? = null
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             LLog.i("MainActivity", "POST_NOTIFICATIONS granted=$granted")
+            syncPushRegistration()
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -76,6 +89,8 @@ class MainActivity : ComponentActivity() {
         OpenAIApiKeyStore(applicationContext).applyToEnvironment()
         ExperimentalFeatures.initialize(applicationContext)
         PetOverlayController.initialize(applicationContext)
+        // The system displays background completion pushes on this channel.
+        PushNotifications.ensureChannel(applicationContext)
 
         try {
             appModel = AppModel.init(this)
@@ -147,8 +162,20 @@ class MainActivity : ComponentActivity() {
         requestNotificationPermissionOnce()
     }
 
+    override fun onStart() {
+        super.onStart()
+        VisibleThreadTracker.appInForeground = true
+    }
+
+    override fun onStop() {
+        VisibleThreadTracker.appInForeground = false
+        super.onStop()
+    }
+
     override fun onResume() {
         super.onResume()
+        // Notification permission / channel may have changed in system settings.
+        syncPushRegistration()
         val model = appModel ?: return
         lifecycleScope.launch {
             lifecycleController.onResume(this@MainActivity, model)
@@ -159,7 +186,7 @@ class MainActivity : ComponentActivity() {
     override fun onPause() {
         super.onPause()
         val model = appModel ?: return
-        lifecycleController.onPause(this, model)
+        lifecycleController.onPause(model)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -196,11 +223,24 @@ class MainActivity : ComponentActivity() {
         val threadKey = consumeNotificationThreadKey(intent) ?: return
         val model = appModel ?: return
         lifecycleScope.launch {
-            model.activateThread(threadKey)
-
+            // Cold start / resume: onResume reconnects saved servers. Wait for
+            // this host before loading so the read is authoritative; the push
+            // itself is only a locator and never patches turn state.
+            val connected = model.client.awaitServerConnected(
+                threadKey.serverId,
+                NOTIFICATION_CONNECT_TIMEOUT_MS,
+            )
+            if (!connected) {
+                LLog.w("MainActivity", "notification tap: ${threadKey.serverId} not connected after wait; loading anyway")
+            }
             val resolvedKey = model.ensureThreadLoaded(threadKey) ?: threadKey
             model.activateThread(resolvedKey)
-            model.refreshThreadSnapshot(resolvedKey)
+            try {
+                model.forceRefreshThreadAuthoritative(resolvedKey)
+            } catch (error: Exception) {
+                LLog.w("MainActivity", "notification tap: authoritative refresh failed: ${error.message}")
+                model.refreshThreadSnapshot(resolvedKey)
+            }
         }
     }
 
@@ -237,19 +277,17 @@ class MainActivity : ComponentActivity() {
         ) {
             return
         }
-        val prefs = getSharedPreferences("agentbuddy_push", MODE_PRIVATE)
+        val prefs = getSharedPreferences(PUSH_PREFS, MODE_PRIVATE)
         if (prefs.getBoolean(KEY_NOTIFICATION_PERMISSION_REQUESTED, false)) return
         prefs.edit().putBoolean(KEY_NOTIFICATION_PERMISSION_REQUESTED, true).apply()
         notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 
     private fun loadPushToken() {
-        val cachedToken = getSharedPreferences("agentbuddy_push", MODE_PRIVATE)
-            .getString("fcm_token", null)
+        fcmToken = getSharedPreferences(PUSH_PREFS, MODE_PRIVATE)
+            .getString(PUSH_PREFS_FCM_TOKEN, null)
             ?.takeIf { it.isNotBlank() }
-        if (cachedToken != null) {
-            lifecycleController.setDevicePushToken(cachedToken)
-        }
+        syncPushRegistration()
         val messaging = try {
             if (FirebaseApp.getApps(applicationContext).isEmpty()) {
                 FirebaseApp.initializeApp(applicationContext)
@@ -263,15 +301,27 @@ class MainActivity : ComponentActivity() {
         messaging.token
             .addOnSuccessListener { token ->
                 if (token.isNotBlank()) {
-                    getSharedPreferences("agentbuddy_push", MODE_PRIVATE)
+                    getSharedPreferences(PUSH_PREFS, MODE_PRIVATE)
                         .edit()
-                        .putString("fcm_token", token)
+                        .putString(PUSH_PREFS_FCM_TOKEN, token)
                         .apply()
-                    lifecycleController.setDevicePushToken(token)
+                    fcmToken = token
+                    syncPushRegistration()
                 }
             }
             .addOnFailureListener { error ->
                 LLog.e("MainActivity", "Failed to fetch FCM token", error)
             }
+    }
+
+    /**
+     * Hand Rust the FCM token only while notifications can be shown; `null`
+     * (denied / disabled / no token) revokes host subscriptions. Chat and
+     * turn flows do not depend on it.
+     */
+    private fun syncPushRegistration() {
+        val model = appModel ?: return
+        runCatching { PushNotifications.syncRegistration(applicationContext, model.client, fcmToken) }
+            .onFailure { LLog.w("MainActivity", "setPushRegistration failed: ${it.message}") }
     }
 }

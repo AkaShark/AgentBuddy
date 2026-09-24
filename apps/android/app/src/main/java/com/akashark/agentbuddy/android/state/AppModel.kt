@@ -88,10 +88,15 @@ class AppModel private constructor(context: android.content.Context) {
     }
 
     companion object {
+        @Volatile
         private var _instance: AppModel? = null
 
         val shared: AppModel
             get() = _instance ?: throw IllegalStateException("AppModel not initialized — call init(context) first")
+
+        /** The live instance, without creating one (e.g. from the FCM service thread). */
+        val sharedOrNull: AppModel?
+            get() = _instance
 
         fun init(context: android.content.Context): AppModel {
             if (_instance == null) {

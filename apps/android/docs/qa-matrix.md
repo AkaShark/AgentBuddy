@@ -19,6 +19,7 @@ Current tests (`app/src/test/java/com/akashark/agentbuddy/android/`):
 - `SavedServerTransportTest` — saved-server direct vs SSH transport choice and legacy migration
 - `HomeDashboardSupportTests`, `SessionsDerivationTests` — home/session workspace labels and cwd normalization
 - `auth/ChatGPTOAuthLoopbackServerTest` — ChatGPT OAuth loopback redirect server
+- `push/TurnCompletionPushTest` — host completion push payload parsing, notification tag (= Worker collapse key), foreground suppression, push registration gating
 - `state/AppComposerPayloadTest` — composer payload → `turn/start` params
 - `state/RealtimeWebRtcTransportTest`, `state/VoiceDynamicToolSpecsTest` — realtime voice transport and dynamic tool specs
 - `state/SnapshotExtensionsTest` — snapshot display helpers (model labels)
@@ -42,6 +43,24 @@ Current tests (`app/src/test/java/com/akashark/agentbuddy/android/`):
 | Thread start/resume fallback sandbox | `workspace-write` with `danger-full-access` fallback when linux sandbox missing |
 | Thread turn pagination (v0.125+ remote) | Conversation opens with last 5 turns; "Load earlier messages" button fetches older 5-turn pages via `thread/turns/list` |
 | Thread turn pagination fallback (v0.124 remote) | Capability flips off via response inspection; embedded turns load fully; "Load earlier" button hidden |
+
+## Turn Completion Notifications (host push, design `docs/superpowers/specs/2026-09-24-host-push-notifications-design.md`)
+
+Rust `PushManager` subscribes on `TurnStarted` for alleycat hosts advertising `push.v1`; Android only supplies the FCM token and displays / routes the notification.
+
+| Area | Expected (Android) |
+|---|---|
+| Registration | FCM token goes to `AppClient.setPushRegistration` only when notifications are enabled (POST_NOTIFICATIONS on 33+, app notifications on, `turn_complete` channel not blocked); re-evaluated on resume and after the permission prompt |
+| Permission denied | Registration is `null` (Rust revokes); chat and turns work normally; no notification |
+| Token rotation | `onNewToken` persists the token and, if the app process is live, hands it to Rust immediately |
+| Background completion | System shows the Worker notification on channel `turn_complete` (「任务完成通知」, high importance); title 「任务已完成」/「任务未完成」 |
+| Foreground, other screen | `onMessageReceived` posts the same notification locally with the Worker tag (id 0), replacing any duplicate |
+| Foreground, viewing that thread | No notification (same `serverId` + `threadId` on screen) |
+| Tap (warm or cold start) | MainActivity reads `agentbuddy.notification.serverId` / `threadId` extras, waits up to 20 s for that host to connect, then loads and authoritatively refreshes the thread; nothing is inferred from the push |
+| Same threadId on two hosts | Separate notifications and routing (tag and routing include the host) |
+| Debug alert (`/debug/push` alert) | Shown in the foreground too, tag `agentbuddy-debug` when no routing keys |
+| Debug background (`/debug/push` background) | No UI; logcat `AgentBuddyFCM: debug background push received` |
+| Legacy host without `push.v1` | No subscription and no silent keepalive fallback |
 
 ## Terminal UX Matrix
 
