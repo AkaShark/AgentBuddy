@@ -42,7 +42,12 @@ async function getFCMAccessToken(env: Env): Promise<string> {
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`,
   })
-  const data = (await resp.json()) as { access_token: string }
+  const data = (await resp.json().catch(() => ({}))) as { access_token?: unknown }
+  if (!resp.ok || typeof data.access_token !== "string" || data.access_token.length === 0) {
+    // Never cache a failed exchange; the next push retries the token request.
+    cachedAccessToken = null
+    throw new Error(`FCM OAuth token request failed (${resp.status})`)
+  }
 
   cachedAccessToken = { token: data.access_token, expires: now + 55 * 60 }
   return data.access_token
@@ -53,7 +58,14 @@ export async function sendFCMPush(
   pushToken: string,
   contentState: ContentState
 ): Promise<{ ok: boolean; unregistered: boolean }> {
-  const accessToken = await getFCMAccessToken(env)
+  let accessToken: string
+  try {
+    accessToken = await getFCMAccessToken(env)
+  } catch (err) {
+    // Report a soft failure so the alarm loop reschedules instead of throwing.
+    console.log(`FCM token error: ${err instanceof Error ? err.message : String(err)}`)
+    return { ok: false, unregistered: false }
+  }
 
   const resp = await fetch(
     `https://fcm.googleapis.com/v1/projects/${env.FCM_PROJECT_ID}/messages:send`,
@@ -81,7 +93,11 @@ export async function sendFCMPush(
   )
 
   if (!resp.ok) {
-    const body = (await resp.json()) as { error?: { details?: Array<{ errorCode?: string }> } }
+    // A 401 means the cached access token was rejected; fetch a fresh one next time.
+    if (resp.status === 401) cachedAccessToken = null
+    const body = (await resp.json().catch(() => ({}))) as {
+      error?: { details?: Array<{ errorCode?: string }> }
+    }
     const unregistered = body.error?.details?.some((d) => d.errorCode === "UNREGISTERED") ?? false
     return { ok: false, unregistered }
   }
