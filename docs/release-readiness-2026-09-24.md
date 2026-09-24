@@ -1,0 +1,70 @@
+# AgentBuddy 发版收尾记录（2026-09-24）
+
+当前仍未完成发布验收；所有 GitHub Release 保持草稿。
+
+## 账号与发布配置
+
+- Developer ID Application 已签发，验证证书 Team 与本地私钥匹配，导出加密 p12。密钥只在本机私有目录和 GitHub Secrets，不进入仓库。
+- ASC App Manager API key 已建立并通过 notarytool 验证。
+- App Store Connect 已建立 **AgentBuddy 搭子**，Apple ID `6815571588`，Bundle ID `com.akashark.agentbuddy`。
+- iOS 主 App、Live Activity、Watch、Watch Complications 四个标识已注册并关联 `group.com.akashark.agentbuddy`；前三个启用 Push。
+- APNs Key 表单已准备：AgentBuddy Push，Sandbox & Production、Team Scoped。尚未 Register，等待用户确认新增长期凭据。
+- GitHub 已核对七个 Secret 名：MAC_DEVELOPER_ID_CERT_P12_B64、MAC_DEVELOPER_ID_CERT_PASSWORD、ASC_KEY_ID、ASC_ISSUER_ID、ASC_PRIVATE_KEY_P8_B64、IOS_TEAM_ID、IOS_APP_STORE_APP_ID。
+
+## 桌面发布 CI
+
+运行：https://github.com/AkaShark/AgentBuddy/actions/runs/35973836528
+
+- 基于 `9f8d928`，尚不包含后续修复；最终 QA 需要重新构建最新 main。
+- 两个架构的 sidecar 编译已成功。
+- 草稿 `desktop-dev-1` 已创建，未发布。
+- 两份 AgentBuddy.zip 已提交 Apple 公证，检查时均为 In Progress。CI 尚未结束。
+- 尚未确认两个 DMG 同在草稿，尚未执行 spctl/stapler 验收，尚未安装到 /Applications 做 LaunchAgent 与手机 QA。
+
+## 已提交的小问题修复
+
+| 原任务项 | 提交 | 结果 |
+|---|---|---|
+| 9.1 修复按钮重复重启 | 9f8d928 | install 已包含重启，前端去掉第二次调用 |
+| 9.2 登录 shell stdout 阻塞 | 9d9b95b | 并发读取 stdout，保留超时 |
+| 9.3 配对 token 指纹 | 8ec52e1 | 使用 status.token_short |
+| 9.4 互斥测试 | a36020f | 注入 runner 驱动实际序列，验证安装/重启不被轮换打断 |
+| 9.5 内联 TOML | 8068a12 | 支持 inline agent/agents 表 |
+| 9.7 停止时轮询 | 98211e1 | 可见窗口停止时 5 秒；隐藏与失败退避仍 30 秒 |
+| 9.8 升级失败重试 | 7e8ab34 | 失败不保存新版本，后续启动重试 |
+| 9.9 缺少设置与诊断 | bf03606 | 手动 bin、Codex host/port、登录项提示、诊断守护进程版本 |
+| 9.10 文档失效条目 | c6a24dc | 校正 alpine-fs 与 ffi/shared.rs |
+| 9.11 alleycat 刷新 | 9cfddc3 | 先更新所选 manifest rev 再 cargo update；默认仍不刷新 |
+
+代码修复均经历失败回归与通过验证；互斥测试用移除锁的变异版本确认能检测失去串行化。
+
+## 验证
+
+- `npm ci` 成功；存在 2 个 moderate audit 提示，未执行强制升级。
+- `cd apps/desktop && npm test && npx tsc --noEmit`：最新 25 个 Vitest + 2 个 Node 测试成功；TypeScript 成功。
+- `cargo test --lib --manifest-path apps/desktop/src-tauri/Cargo.toml`：最新 52 项成功。
+- `make desktop-sidecar` 与 sidecar_contract（2 项）基线成功；测试 daemon 已停止。
+- shell 输出测试全套运行中曾出现一次 2 秒超时；单独与后续全套重跑通过，原因未确认，保留为测试稳定性风险。
+- `python3 -m unittest discover -s tools/scripts/tests -p test_update_alleycat.py`：1 项成功；`bash -n tools/scripts/update-alleycat-main.sh` 成功；默认 no-op 已验证。
+- `cd apps/android && ./gradlew :app:testDebugUnitTest -Plitter.enableGhosttyAndroid=false`：成功，41 项任务 up-to-date，使用 Android Studio JBR 与本地 SDK。
+- `make ios-sim-fast` 未通过：首次 Zig 解包缓存报 FileNotFound；隔离缓存重试后进程被 SIGTERM 终止（Error 143），并非编译成功。日志在 `/tmp/agentbuddy-ios-sim-fast.log` 和 `/tmp/agentbuddy-ios-sim-fast-retry.log`。
+- 现有 React act 警告未导致失败。新设置仍需桌面视觉/交互 QA。
+
+## 缺失 workflow secrets
+
+- Android：ANDROID_UPLOAD_KEYSTORE_B64、LITTER_UPLOAD_STORE_PASSWORD、LITTER_UPLOAD_KEY_ALIAS、LITTER_UPLOAD_KEY_PASSWORD、LITTER_PLAY_SERVICE_ACCOUNT_JSON_B64、GOOGLE_SERVICES_JSON_B64。
+- iOS 商店签名：IOS_DIST_CERT_P12_B64、IOS_DIST_CERT_PASSWORD、IOS_APP_STORE_PROFILE_B64、IOS_LIVE_ACTIVITY_APP_STORE_PROFILE_B64、IOS_WATCH_APP_STORE_PROFILE_B64、IOS_WATCH_COMPLICATIONS_APP_STORE_PROFILE_B64。
+- 旧 Mac 发布通道：MAC_APP_STORE_PROFILE_B64、MAC_DIST_CERT_P12_B64、MAC_DIST_CERT_PASSWORD、MAC_DEVELOPER_ID_PROFILE_B64。
+- 构建缓存：SCCACHE_R2_ACCESS_KEY_ID、SCCACHE_R2_ENDPOINT、SCCACHE_R2_SECRET_ACCESS_KEY。
+- GITHUB_TOKEN 由 Actions 提供，不需要手动创建。
+
+## 尚未完成
+
+1. 等待 Apple 公证和 CI，验收两个 DMG；包含最新修复后重建，再完成 Mac/手机 QA。
+2. 9.6 自定义应用菜单 Cmd+Q 首次退出提示尚未实现。
+3. 9.12 原文被截断；当前两个指定文件无 `clich`，需要确认实际意图。build-rust.sh 还引用已不存在的 uniffi_shared.rs，尚未修改。
+4. APNs 新密钥等待确认；Apple 浏览器保留页面恢复时连续超时，尚未重新取得可操作状态。
+5. Cloudflare Worker 部署尚未执行，需要 APNs 与 Firebase 服务账号；两个移动端推送 URL 尚未替换。
+6. Firebase/Play 配置待补充。已确认工作流将 GOOGLE_SERVICES_JSON_B64 解码到 apps/android/app/google-services.json，且该文件已 gitignore。
+7. Android rootfs 仓库选择、品牌素材目录、正式隐私和支持页面 URL 等待用户回复；未替换美术或商店链接。
+8. 工作区原有/并行产生的 Ghostty 脚本与 patches 改动和两个脏子模块保留，未纳入本次提交，也未推子模块。
