@@ -107,9 +107,9 @@ export function describeError(e: unknown): string {
   return String(e);
 }
 
-export function pollIntervalMs(visible: boolean, consecutiveFailures = 0): number {
+export function pollIntervalMs(visible: boolean, consecutiveFailures = 0, running = true): number {
   if (consecutiveFailures >= 3) return 30000;
-  return visible ? 2000 : 30000;
+  return visible ? (running ? 2000 : 5000) : 30000;
 }
 
 function asHostError(e: unknown): HostError {
@@ -131,10 +131,13 @@ export function useHostState() {
   const [unreachable, setUnreachable] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const failures = useRef(0);
+  const running = useRef(true);
 
   const refresh = useCallback(async () => {
     try {
-      setState(await host.state());
+      const next = await host.state();
+      running.current = next.running;
+      setState(next);
       setError(null);
       failures.current = 0;
       setUnreachable(false);
@@ -169,7 +172,7 @@ export function useHostState() {
       await refresh();
       if (cancelled) return;
       const visible = await windowVisible();
-      timer.current = setTimeout(tick, pollIntervalMs(visible, failures.current));
+      timer.current = setTimeout(tick, pollIntervalMs(visible, failures.current, running.current));
     };
     void tick();
     return () => {

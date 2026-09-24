@@ -2,8 +2,9 @@ import { renderHook, act, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 
 const invoke = vi.fn();
+const visibility = vi.hoisted(() => ({ visible: false }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: (...a: unknown[]) => invoke(...a) }));
-vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: () => ({ isVisible: async () => false }) }));
+vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: () => ({ isVisible: async () => visibility.visible }) }));
 
 import { host, useHostState } from "./host";
 
@@ -16,6 +17,26 @@ const state = {
 };
 
 describe("useHostState", () => {
+  it("polls a stopped host every five seconds while the window is visible", async () => {
+    vi.useFakeTimers();
+    visibility.visible = true;
+    invoke.mockReset();
+    invoke.mockResolvedValue({ ...state, running: false });
+    const hook = renderHook(() => useHostState());
+    try {
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(invoke).toHaveBeenCalledTimes(1);
+      await act(async () => { await vi.advanceTimersByTimeAsync(4999); });
+      expect(invoke).toHaveBeenCalledTimes(1);
+      await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+      expect(invoke).toHaveBeenCalledTimes(2);
+    } finally {
+      hook.unmount();
+      visibility.visible = false;
+      vi.useRealTimers();
+    }
+  });
+
   it("keeps a failed action's error visible after the follow-up refresh", async () => {
     const installError = { kind: { type: "command_failed", code: 1, stderr: "bootstrap failed" }, detail: "install failed: bootstrap failed" };
     invoke.mockImplementation(async (cmd: string) => {
