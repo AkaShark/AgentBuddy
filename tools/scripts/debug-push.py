@@ -24,12 +24,14 @@ Examples (placeholders, never real tokens):
 from __future__ import annotations
 
 import argparse
+import getpass
 import hashlib
 import json
 import os
 import stat
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 
 DEFAULT_WORKER_URL = "https://agentbuddy-push-proxy.aaksharker.workers.dev"
@@ -44,12 +46,17 @@ def fail(message: str) -> "NoReturn":  # type: ignore[name-defined]
 def read_private_file(path: str, label: str) -> str:
     expanded = os.path.expanduser(path)
     try:
-        info = os.stat(expanded)
+        fd = os.open(expanded, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
     except FileNotFoundError:
         fail(f"{label} file not found: {path}")
-    if info.st_mode & (stat.S_IRWXG | stat.S_IRWXO):
-        fail(f"{label} file {path} is readable by group/others; run: chmod 600 {path}")
-    with open(expanded, encoding="utf-8") as handle:
+    except OSError as error:
+        fail(f"cannot open {label} file {path} (symlinks are refused): {error.strerror}")
+    with os.fdopen(fd, encoding="utf-8") as handle:
+        info = os.fstat(handle.fileno())
+        if info.st_uid != os.getuid():
+            fail(f"{label} file {path} is not owned by the current user")
+        if info.st_mode & (stat.S_IRWXG | stat.S_IRWXO):
+            fail(f"{label} file {path} is readable by group/others; run: chmod 600 {path}")
         value = handle.read().strip()
     if not value:
         fail(f"{label} file {path} is empty")
@@ -58,11 +65,25 @@ def read_private_file(path: str, label: str) -> str:
 
 def read_stdin(label: str) -> str:
     if sys.stdin.isatty():
-        print(f"Paste {label}, then press Ctrl-D:", file=sys.stderr)
-    value = sys.stdin.read().strip()
+        value = getpass.getpass(f"{label}: ").strip()
+    else:
+        value = sys.stdin.read().strip()
     if not value:
         fail(f"no {label} on stdin")
     return value
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Never follow redirects: urllib would resend the Authorization header."""
+
+    def redirect_request(self, *args, **kwargs):  # noqa: D401 - urllib hook
+        return None
+
+
+def require_https(url: str) -> None:
+    parts = urllib.parse.urlsplit(url)
+    if parts.scheme != "https" and parts.hostname not in ("localhost", "127.0.0.1", "::1"):
+        fail(f"worker URL must use https (got {parts.scheme}://{parts.hostname})")
 
 
 def fingerprint(secret: str) -> str:
@@ -112,6 +133,7 @@ def main() -> int:
             payload[key] = value
 
     url = args.worker_url.rstrip("/") + "/debug/push"
+    require_https(url)
     redacted = dict(payload, pushToken=fingerprint(device_token))
     print(f"POST {url}")
     print(f"Authorization: Bearer <admin token {fingerprint(admin_token)}>")
@@ -127,7 +149,7 @@ def main() -> int:
         headers={"Content-Type": "application/json", "Authorization": f"Bearer {admin_token}"},
     )
     try:
-        with urllib.request.urlopen(request, timeout=20) as response:
+        with urllib.request.build_opener(_NoRedirect).open(request, timeout=20) as response:
             status, text = response.status, response.read().decode()
     except urllib.error.HTTPError as error:
         status, text = error.code, error.read().decode()
