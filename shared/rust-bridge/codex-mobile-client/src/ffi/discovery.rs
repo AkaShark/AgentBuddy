@@ -12,6 +12,8 @@ use crate::slingshot_url::normalize_slingshot_base_url;
 use crate::slingshot_url::parse_slingshot_connection_url;
 use crate::ssh::SshCredentials;
 use crate::store::{AppConnectionProgressSnapshot, ServerHealthSnapshot};
+use crate::terminal::AppSshHostKeyMismatch;
+use crate::transport::TransportError;
 use std::sync::Arc;
 use tokio::sync::oneshot;
 use tracing::{debug, info, trace, warn};
@@ -395,7 +397,14 @@ impl ServerBridge {
             let result = mobile_client
                 .connect_remote_over_ssh(config, credentials, accept_unknown_host, working_dir)
                 .await
-                .map_err(|e| ClientError::Transport(e.to_string()));
+                .map_err(|e| match e {
+                    TransportError::SshHostKeyRejected(rejection) => {
+                        ClientError::SshHostKeyMismatch {
+                            mismatch: AppSshHostKeyMismatch::from_rejection(&rejection),
+                        }
+                    }
+                    other => ClientError::Transport(other.to_string()),
+                });
             match &result {
                 Ok(server_id) => info!(
                     "ServerBridge: connect_remote_over_ssh completed server_id={}",
@@ -505,7 +514,7 @@ impl ServerBridge {
                     "guided ssh connect failed server_id={} host={} error={}",
                     task_server_id, task_host, error
                 );
-                mark_progress_failure(&mut progress, error.to_string());
+                mark_progress_failure(&mut progress, error);
                 mobile_client
                     .app_store
                     .update_server_health(&task_server_id, ServerHealthSnapshot::Disconnected);

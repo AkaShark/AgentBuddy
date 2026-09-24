@@ -1,6 +1,6 @@
 use super::backend::{TerminalBackend, TerminalBackendEvent, open_backend, validate_size};
 use super::ssh::TerminalSshAuth;
-use super::ssh_known_hosts::TerminalSshTrustStore;
+use super::ssh_known_hosts::{AppSshHostKeyMismatch, TerminalSshTrustStore};
 use crate::ffi::shared::shared_runtime;
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -49,6 +49,10 @@ pub enum TerminalError {
     InvalidSize { detail: String },
     #[error("Backend: {detail}")]
     Backend { detail: String },
+    /// The SSH server's host key did not pass the pin check; platforms offer
+    /// to trust `mismatch.fingerprint` and reopen.
+    #[error("{mismatch}")]
+    SshHostKeyMismatch { mismatch: AppSshHostKeyMismatch },
     #[error("Terminal session is closed")]
     Closed,
 }

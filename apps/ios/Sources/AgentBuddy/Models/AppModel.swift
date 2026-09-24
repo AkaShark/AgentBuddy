@@ -66,6 +66,9 @@ final class AppModel {
         // — the AppDelegate call site is a no-op on second invocation.
         AgentBuddyPlatform.bootstrapLocalRuntimeIfNeeded()
 
+        // Register host-key pinning before any SSH connect or reconnect runs.
+        SshHostKeyTrust.register()
+
         let rc = ReconnectController()
         rc.setCredentialProvider(provider: SwiftSshCredentialProvider())
         rc.setSlingshotCredentialProvider(provider: SwiftSlingshotCredentialProvider())

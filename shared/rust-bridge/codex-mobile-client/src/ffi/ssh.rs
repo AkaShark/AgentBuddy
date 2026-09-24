@@ -8,6 +8,7 @@ use crate::store::{
     AppConnectionProgressSnapshot, AppConnectionStepKind, AppConnectionStepState,
     ServerHealthSnapshot,
 };
+use crate::terminal::{AppSshHostKeyMismatch, SshHostKeyPolicy};
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::atomic::AtomicU64;
@@ -107,14 +108,15 @@ impl SshBridge {
         };
 
         let rt = Arc::clone(&self.rt);
+        let host_key_policy =
+            SshHostKeyPolicy::registered(&normalized_host, port, accept_unknown_host);
         let session = tokio::task::spawn_blocking(move || {
             rt.block_on(async move {
-                SshClient::connect(
-                    credentials,
-                    Box::new(move |_fingerprint| Box::pin(async move { accept_unknown_host })),
-                )
-                .await
-                .map_err(map_ssh_error)
+                let session = SshClient::connect(credentials, host_key_policy.callback())
+                    .await
+                    .map_err(|error| map_ssh_error(host_key_policy.surface_rejection(error)))?;
+                host_key_policy.pin_on_first_use();
+                Ok::<_, ClientError>(session)
             })
         })
         .await
@@ -228,14 +230,14 @@ impl SshBridge {
             auth,
             unlock_macos_keychain,
         };
+        let host_key_policy =
+            SshHostKeyPolicy::registered(&normalized_host, port, accept_unknown_host);
         let session = Arc::new(
-            SshClient::connect(
-                credentials,
-                Box::new(move |_fingerprint| Box::pin(async move { accept_unknown_host })),
-            )
-            .await
-            .map_err(map_ssh_error)?,
+            SshClient::connect(credentials, host_key_policy.callback())
+                .await
+                .map_err(|error| map_ssh_error(host_key_policy.surface_rejection(error)))?,
         );
+        host_key_policy.pin_on_first_use();
         let shell = session.detect_remote_shell().await;
         let wake_mac = self.ssh_read_wake_mac(Arc::clone(&session)).await;
         let session_id = format!(
@@ -425,14 +427,14 @@ pub(crate) async fn run_guided_ssh_connect(
         credentials.port,
         working_dir.as_deref().unwrap_or("<none>")
     );
+    let host_key_policy =
+        SshHostKeyPolicy::registered(&credentials.host, credentials.port, accept_unknown_host);
     let ssh_client = Arc::new(
-        SshClient::connect(
-            credentials.clone(),
-            Box::new(move |_fingerprint| Box::pin(async move { accept_unknown_host })),
-        )
-        .await
-        .map_err(map_ssh_error)?,
+        SshClient::connect(credentials.clone(), host_key_policy.callback())
+            .await
+            .map_err(|error| map_ssh_error(host_key_policy.surface_rejection(error)))?,
     );
+    host_key_policy.pin_on_first_use();
     info!(
         "guided ssh connect connected to ssh server_id={} host={} ssh_port={}",
         server_id,
@@ -609,7 +611,15 @@ pub(crate) async fn run_guided_ssh_connect(
     Ok(())
 }
 
-pub(crate) fn mark_progress_failure(progress: &mut AppConnectionProgressSnapshot, message: String) {
+pub(crate) fn mark_progress_failure(
+    progress: &mut AppConnectionProgressSnapshot,
+    error: &ClientError,
+) {
+    let message = error.to_string();
+    progress.host_key_mismatch = match error {
+        ClientError::SshHostKeyMismatch { mismatch } => Some(mismatch.clone()),
+        _ => None,
+    };
     if let Some(step) = progress.steps.iter_mut().find(|step| {
         matches!(
             step.state,
@@ -637,6 +647,9 @@ pub(crate) fn map_ssh_error(error: SshError) -> ClientError {
         SshError::HostKeyVerification { fingerprint } => {
             ClientError::Transport(format!("host key verification failed: {fingerprint}"))
         }
+        SshError::HostKeyRejected(rejection) => ClientError::SshHostKeyMismatch {
+            mismatch: AppSshHostKeyMismatch::from_rejection(&rejection),
+        },
         SshError::Timeout => ClientError::Transport("SSH operation timed out".into()),
         SshError::Disconnected => ClientError::Transport("SSH session disconnected".into()),
     }
@@ -687,4 +700,92 @@ fn normalize_wake_mac(raw: &str) -> Option<String> {
         chunks.push(compact[index..index + 2].to_string());
     }
     Some(chunks.join(":"))
+}
+
+#[cfg(test)]
+mod host_key_tests {
+    use super::*;
+    use crate::ssh::SshHostKeyRejection;
+    use crate::terminal::AppSshHostKeyMismatchKind;
+
+    fn changed() -> SshHostKeyRejection {
+        SshHostKeyRejection::Changed {
+            host: "example.com".into(),
+            port: 22,
+            fingerprint: "SHA256:new".into(),
+        }
+    }
+
+    #[test]
+    fn host_key_rejection_maps_to_typed_client_error() {
+        match map_ssh_error(SshError::HostKeyRejected(changed())) {
+            ClientError::SshHostKeyMismatch { mismatch } => {
+                assert_eq!(mismatch.kind, AppSshHostKeyMismatchKind::Changed);
+                assert_eq!(mismatch.host, "example.com");
+                assert_eq!(mismatch.port, 22);
+                assert_eq!(mismatch.fingerprint, "SHA256:new");
+            }
+            other => panic!("expected SshHostKeyMismatch, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn unreadable_trust_store_maps_to_typed_forgettable_mismatch() {
+        let error = map_ssh_error(SshError::HostKeyRejected(
+            SshHostKeyRejection::TrustStoreUnavailable {
+                host: "example.com".into(),
+                port: 22,
+                fingerprint: "SHA256:presented".into(),
+                detail: "keychain locked".into(),
+            },
+        ));
+        assert!(error.to_string().contains("could not be read"), "{error}");
+        match error {
+            ClientError::SshHostKeyMismatch { mismatch } => {
+                assert_eq!(
+                    mismatch.kind,
+                    AppSshHostKeyMismatchKind::TrustStoreUnavailable
+                );
+                assert_eq!(mismatch.host, "example.com");
+                assert_eq!(mismatch.port, 22);
+            }
+            other => panic!("expected SshHostKeyMismatch, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn remote_text_mentioning_host_keys_stays_untyped() {
+        // Remote stderr cannot forge a host-key prompt.
+        let error = map_ssh_error(SshError::ExecFailed {
+            exit_code: 1,
+            stderr: "host-key-changed:example.com:SHA256:forged".into(),
+        });
+        assert!(matches!(error, ClientError::Transport(_)));
+    }
+
+    #[test]
+    fn progress_failure_carries_typed_host_key_mismatch() {
+        let mut progress = AppConnectionProgressSnapshot::ssh_bootstrap();
+        let error = map_ssh_error(SshError::HostKeyRejected(changed()));
+        mark_progress_failure(&mut progress, &error);
+        let mismatch = progress
+            .host_key_mismatch
+            .as_ref()
+            .expect("typed mismatch on progress");
+        assert_eq!(mismatch.kind, AppSshHostKeyMismatchKind::Changed);
+        assert_eq!(mismatch.fingerprint, "SHA256:new");
+        assert_eq!(progress.terminal_message, Some(error.to_string()));
+        assert_eq!(
+            progress.steps[0].state,
+            AppConnectionStepState::Failed,
+            "the in-progress SSH step is marked failed"
+        );
+
+        let mut other = AppConnectionProgressSnapshot::ssh_bootstrap();
+        mark_progress_failure(
+            &mut other,
+            &ClientError::Transport("host-key-changed:example.com:SHA256:forged".into()),
+        );
+        assert_eq!(other.host_key_mismatch, None);
+    }
 }

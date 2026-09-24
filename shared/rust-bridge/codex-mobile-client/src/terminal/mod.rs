@@ -39,4 +39,8 @@ pub use session::{
     TerminalBackendKind, TerminalError, TerminalOutputListener, TerminalSession, TerminalSize,
 };
 pub use ssh::TerminalSshAuth;
-pub use ssh_known_hosts::{TerminalSshTrustBackend, TerminalSshTrustStore};
+pub(crate) use ssh_known_hosts::SshHostKeyPolicy;
+pub use ssh_known_hosts::{
+    AppSshHostKeyMismatch, AppSshHostKeyMismatchKind, SshTrustLookup, TerminalSshTrustBackend,
+    TerminalSshTrustStore, set_ssh_trust_store,
+};

@@ -12,17 +12,21 @@ final class TerminalSessionController {
         case failed(String)
     }
 
+    /// First connect to an SSH host with no pinned key.
     struct SshHostTrustChallenge {
-        let host: String
-        let port: UInt16
-        let fingerprint: String
+        let mismatch: AppSshHostKeyMismatch
         let backend: TerminalBackendKind
+
+        var fingerprint: String { mismatch.fingerprint }
     }
 
     private(set) var phase: Phase = .idle
     private(set) var output = ""
     private(set) var sessionId: String?
     private(set) var sshTrustChallenge: SshHostTrustChallenge?
+    /// The SSH host presented a key different from the pinned one, or the
+    /// pinned key could not be read.
+    var sshHostKeyChange: SSHHostKeyChangePrompt?
 
     @ObservationIgnored private let appStore: AppStore
     @ObservationIgnored private var outputListener: TerminalOutputRelay?
@@ -45,14 +49,14 @@ final class TerminalSessionController {
         let generation = eventGeneration
         phase = .connecting
         sshTrustChallenge = nil
+        sshHostKeyChange = nil
         do {
             let id: String
             if isSshBackend(backend) {
-                let trustStore = TerminalSshTrustStore(backend: SwiftSshTrustBackend.shared)
                 id = try await appStore.openTerminalSessionWithTrustStore(
                     kind: backend,
                     size: terminalSize,
-                    trustStore: trustStore
+                    trustStore: SshHostKeyTrust.store
                 )
             } else {
                 id = try await appStore.openTerminalSession(
@@ -74,9 +78,22 @@ final class TerminalSessionController {
             phase = .running
         } catch {
             sessionId = nil
-            if let challenge = Self.sshHostTrustChallenge(from: error, backend: backend) {
-                sshTrustChallenge = challenge
-                phase = .failed("Unknown SSH host key \(challenge.fingerprint)")
+            if case let TerminalError.SshHostKeyMismatch(mismatch) = error {
+                switch mismatch.kind {
+                case .unknown:
+                    sshTrustChallenge = SshHostTrustChallenge(mismatch: mismatch, backend: backend)
+                    phase = .failed("Unknown SSH host key \(mismatch.fingerprint)")
+                case .changed:
+                    sshHostKeyChange = SSHHostKeyChangePrompt(mismatch: mismatch) { [weak self] in
+                        await self?.reopen(backend)
+                    }
+                    phase = .failed("SSH host key changed \(mismatch.fingerprint)")
+                case .trustStoreUnavailable:
+                    sshHostKeyChange = SSHHostKeyChangePrompt(mismatch: mismatch) { [weak self] in
+                        await self?.reopen(backend)
+                    }
+                    phase = .failed("Saved SSH host key could not be read")
+                }
             } else {
                 phase = .failed(error.localizedDescription)
             }
@@ -90,14 +107,16 @@ final class TerminalSessionController {
 
     func trustUnknownSshHostAndRetry() async {
         guard let challenge = sshTrustChallenge else { return }
-        SwiftSshTrustBackend.shared.write(
-            host: challenge.host,
-            port: challenge.port,
-            fingerprint: challenge.fingerprint
-        )
+        SshHostKeyTrust.trust(challenge.mismatch)
+        await reopen(challenge.backend)
+    }
+
+    /// Retries the SSH open after the user trusted the presented key.
+    private func reopen(_ backend: TerminalBackendKind) async {
         sshTrustChallenge = nil
+        sshHostKeyChange = nil
         phase = .idle
-        await open(backend: challenge.backend)
+        await open(backend: backend)
     }
 
     func switchBackend(_ backend: TerminalBackendKind) async {
@@ -131,41 +150,6 @@ final class TerminalSessionController {
     func setOutputSink(_ sink: ((Data) -> Void)?) {
         outputSink = sink
         outputListener?.setOutputSink(sink)
-    }
-
-    private static func sshHostTrustChallenge(
-        from error: Error,
-        backend: TerminalBackendKind
-    ) -> SshHostTrustChallenge? {
-        guard case let .remoteSsh(
-            host: host,
-            port: port,
-            username: _,
-            auth: _,
-            shell: _,
-            acceptUnknownHost: _,
-            cwd: _
-        ) = backend else {
-            return nil
-        }
-        guard let fingerprint = unknownHostFingerprint(from: error.localizedDescription) else {
-            return nil
-        }
-        return SshHostTrustChallenge(
-            host: host,
-            port: port,
-            fingerprint: fingerprint,
-            backend: backend
-        )
-    }
-
-    private static func unknownHostFingerprint(from description: String) -> String? {
-        guard let range = description.range(of: "unknown-host:") else { return nil }
-        let raw = description[range.upperBound...]
-        let fingerprint = raw
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "\"'()[]"))
-        return fingerprint.isEmpty ? nil : fingerprint
     }
 
     func resize(cols: UInt16, rows: UInt16, notifyBackend: Bool = true) async {

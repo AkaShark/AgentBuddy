@@ -389,3 +389,11 @@
 "Push server, task, and approval state to a paired Apple Watch. Requires the AgentBuddy watch app to be installed." = "将服务器、任务和审批状态推送到已配对的 Apple Watch。需安装搭子的 Watch app。";
 "Tap the Thinking shimmer while the assistant generates to play a tiny generated minigame." = "在助手生成时点按「思考」微光，玩一个即时生成的小游戏。";
 "Show the local and remote terminal launcher on the home screen." = "在主屏显示本地和远程终端入口。";
+
+/* === SSH 主机密钥变更确认（Discovery / 设置 SSH 连接）=== */
+"SSH Host Key Changed" = "SSH 主机密钥已变更";
+"Trust New Key" = "信任新密钥";
+"The SSH host key for %@ no longer matches the one saved on this device. This happens after a server reinstall, but it can also mean someone is intercepting the connection.\n\nNew fingerprint:\n%@\n\nOnly trust the new key if you expected this change." = "%1$@ 的 SSH 主机密钥与本设备保存的不一致。服务器重装后会出现这种情况，但也可能意味着有人正在拦截连接。\n\n新指纹：\n%2$@\n\n仅在你预期到此变更时才信任新密钥。";
+"Saved SSH Host Key Unreadable" = "无法读取已保存的 SSH 主机密钥";
+"Forget Saved Host Key" = "忘记已保存的主机密钥";
+"The SSH host key saved on this device for %@ could not be read, so the connection was refused.\n\nForget the saved key to connect again; the server's current key will be saved as new.\n\nServer fingerprint:\n%@" = "本设备为 %1$@ 保存的 SSH 主机密钥无法读取，因此连接已被拒绝。\n\n忘记已保存的密钥即可重新连接；服务器当前的密钥将作为新密钥保存。\n\n服务器指纹：\n%2$@";

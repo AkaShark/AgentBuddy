@@ -12,6 +12,12 @@ pub enum ClientError {
     EventClosed(String),
     #[error("Minigame generation failed: {0}")]
     MinigameGenerationFailed(String),
+    /// An SSH connect refused because the server's host key did not pass the
+    /// pin check; platforms offer to trust `mismatch.fingerprint` and retry.
+    #[error("{mismatch}")]
+    SshHostKeyMismatch {
+        mismatch: crate::terminal::AppSshHostKeyMismatch,
+    },
 }
 
 impl From<crate::RpcClientError> for ClientError {

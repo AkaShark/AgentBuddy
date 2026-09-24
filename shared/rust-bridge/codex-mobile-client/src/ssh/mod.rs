@@ -56,7 +56,7 @@ pub(crate) use codex_binary::RemoteCodexBinary;
 pub(crate) use exec::build_posix_exec_command;
 pub use types::{
     ExecResult, SshAuth, SshBootstrapResult, SshCredentials, SshError, SshExecChild, SshExecIo,
-    SshExecStderr, SshExecStdin, SshExecStdout,
+    SshExecStderr, SshExecStdin, SshExecStdout, SshHostKeyRejection,
 };
 pub(crate) use types::{RemoteShell, SshBootstrapTransport};
 

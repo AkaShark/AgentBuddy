@@ -238,6 +238,10 @@ pub enum SshError {
     AuthFailed(String),
     #[error("host key verification failed: fingerprint {fingerprint}")]
     HostKeyVerification { fingerprint: String },
+    /// A [`HostKeyVerification`](Self::HostKeyVerification) failure
+    /// classified by the host-key trust policy.
+    #[error("{0}")]
+    HostKeyRejected(SshHostKeyRejection),
     #[error("command failed (exit {exit_code}): {stderr}")]
     ExecFailed { exit_code: u32, stderr: String },
     #[error("port forward failed: {0}")]
@@ -246,4 +250,36 @@ pub enum SshError {
     Timeout,
     #[error("disconnected")]
     Disconnected,
+}
+
+/// Why the SSH host-key trust policy refused the key a server presented.
+/// `host` / `port` are the normalized pin-store key for the connect.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum SshHostKeyRejection {
+    /// A key is pinned for the host and the server presented a different one.
+    #[error("SSH host key for {host}:{port} changed; server presented {fingerprint}")]
+    Changed {
+        host: String,
+        port: u16,
+        fingerprint: String,
+    },
+    /// Nothing is pinned for the host and the connect did not allow unknown hosts.
+    #[error("SSH host key for {host}:{port} is not trusted; server presented {fingerprint}")]
+    Unknown {
+        host: String,
+        port: u16,
+        fingerprint: String,
+    },
+    /// The pin store could not be read, so the key was neither verified nor
+    /// pinned; the connect is refused instead of trusting a possibly lost pin.
+    #[error(
+        "SSH host-key trust store unavailable for {host}:{port} ({detail}); refusing to connect"
+    )]
+    TrustStoreUnavailable {
+        host: String,
+        port: u16,
+        /// Fingerprint the server presented (`SHA256:...`).
+        fingerprint: String,
+        detail: String,
+    },
 }

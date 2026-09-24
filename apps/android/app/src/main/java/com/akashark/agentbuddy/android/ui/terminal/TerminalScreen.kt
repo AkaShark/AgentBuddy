@@ -71,6 +71,7 @@ import com.akashark.agentbuddy.android.state.SshAuthMethod
 import com.akashark.agentbuddy.android.state.SshCredentialStore
 import com.akashark.agentbuddy.android.state.TerminalSessionController
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
+import com.akashark.agentbuddy.android.ui.discovery.SshHostKeyChangedDialog
 import kotlinx.coroutines.launch
 import uniffi.codex_mobile_client.TerminalBackendKind
 import uniffi.codex_mobile_client.TerminalSshAuth
@@ -173,6 +174,13 @@ fun TerminalScreen(
                         .padding(horizontal = 10.dp, vertical = 7.dp),
                 )
             }
+        }
+        controller.sshHostKeyChange?.let { change ->
+            SshHostKeyChangedDialog(
+                mismatch = change.mismatch,
+                onDismiss = controller::dismissHostKeyChange,
+                onConfirm = controller::retryAfterHostKeyChange,
+            )
         }
 
         TerminalOutputPane(

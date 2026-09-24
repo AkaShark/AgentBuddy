@@ -9,6 +9,7 @@ use crate::session::connection::{InProcessConfig, ServerConfig};
 use crate::slingshot_url::is_slingshot_connection_url;
 use crate::slingshot_url::parse_slingshot_connection_url;
 use crate::ssh::{SshAuth, SshClient, SshCredentials};
+use crate::terminal::SshHostKeyPolicy;
 use crate::types::AgentRuntimeKind;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -513,13 +514,18 @@ pub(crate) async fn execute_reconnect_plan(
                 auth,
                 unlock_macos_keychain: credential.unlock_macos_keychain,
             };
-            let ssh_client = match SshClient::connect(
-                ssh_creds,
-                Box::new(move |_fingerprint| Box::pin(async move { true })),
-            )
-            .await
+            // Reconnects run unattended: a pinned key must match, a host seen
+            // for the first time is pinned (trust on first use), and an
+            // unreadable pin store refuses the connect without pinning.
+            let host_key_policy = SshHostKeyPolicy::registered(host, *ssh_port, true);
+            let ssh_client = match SshClient::connect(ssh_creds, host_key_policy.callback())
+                .await
+                .map_err(|error| host_key_policy.surface_rejection(error))
             {
-                Ok(client) => Arc::new(client),
+                Ok(client) => {
+                    host_key_policy.pin_on_first_use();
+                    Arc::new(client)
+                }
                 Err(e) => {
                     warn!(
                         "reconnect: SSH bridge plan failed to connect server_id={} error={}",

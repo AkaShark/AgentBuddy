@@ -26,6 +26,7 @@ use crate::store::{
     AppConnectionProgressSnapshot, AppQueuedFollowUpKind, AppQueuedFollowUpPreview, AppSnapshot,
     AppStoreReducer, AppStoreUpdateRecord, ServerHealthSnapshot, ThreadSnapshot,
 };
+use crate::terminal::SshHostKeyPolicy;
 use crate::transport::{RpcError, TransportError};
 use crate::types::{
     AgentRuntimeInfo, AgentRuntimeKind, AppCollaborationModePreset, AppModeKind,
@@ -2093,14 +2094,19 @@ impl MobileClient {
         // so resume can rebuild the full SSH transport.
         self.replace_existing_session(server_id.as_str()).await;
 
-        let ssh_client = Arc::new(
-            SshClient::connect(
-                ssh_credentials.clone(),
-                Box::new(move |_fingerprint| Box::pin(async move { accept_unknown_host })),
-            )
-            .await
-            .map_err(map_ssh_transport_error)?,
+        let host_key_policy = SshHostKeyPolicy::registered(
+            &ssh_credentials.host,
+            ssh_credentials.port,
+            accept_unknown_host,
         );
+        let ssh_client = Arc::new(
+            SshClient::connect(ssh_credentials.clone(), host_key_policy.callback())
+                .await
+                .map_err(|error| {
+                    map_ssh_transport_error(host_key_policy.surface_rejection(error))
+                })?,
+        );
+        host_key_policy.pin_on_first_use();
         info!(
             "MobileClient: SSH transport established server_id={} host={} ssh_port={}",
             config.server_id,
@@ -2167,6 +2173,10 @@ impl MobileClient {
         result
     }
 
+    /// `ssh_client` must already have passed [`SshHostKeyPolicy`] in the
+    /// caller (`connect_remote_over_ssh` / `run_guided_ssh_connect`); the
+    /// SSH reconnect transport reuses that verified session, so no second
+    /// host-key check runs here.
     pub(crate) async fn finish_connect_remote_over_ssh(
         &self,
         mut config: ServerConfig,

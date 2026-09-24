@@ -339,6 +339,68 @@ struct SSHLoginSheet: View {
     }
 }
 
+/// An SSH connect refused because the server's host key no longer matches
+/// the key pinned on this device, or because that saved key could not be
+/// read (typed Rust `AppSshHostKeyMismatch`).
+struct SSHHostKeyChangePrompt: Identifiable {
+    let id = UUID()
+    let mismatch: AppSshHostKeyMismatch
+    /// Re-runs the refused connect once the approved key is pinned (or the
+    /// unreadable saved key is forgotten).
+    let retry: @MainActor () async -> Void
+
+    var hostLabel: String {
+        mismatch.port == 22 ? mismatch.host : "\(mismatch.host):\(mismatch.port)"
+    }
+
+    var isSavedKeyUnreadable: Bool {
+        mismatch.kind == .trustStoreUnavailable
+    }
+}
+
+extension View {
+    /// Asks the user to confirm a changed SSH host key. "Trust New Key" pins
+    /// exactly the fingerprint shown and retries, so the retry only succeeds
+    /// if the server still presents that key (otherwise it prompts again).
+    /// When the saved key could not be read, "Forget Saved Host Key" removes
+    /// it and retries, so the host is treated as new.
+    func sshHostKeyChangeAlert(_ prompt: Binding<SSHHostKeyChangePrompt?>) -> some View {
+        alert(
+            prompt.wrappedValue?.isSavedKeyUnreadable == true
+                ? Text("Saved SSH Host Key Unreadable")
+                : Text("SSH Host Key Changed"),
+            isPresented: Binding(
+                get: { prompt.wrappedValue != nil },
+                set: { if !$0 { prompt.wrappedValue = nil } }
+            ),
+            presenting: prompt.wrappedValue
+        ) { pending in
+            if pending.isSavedKeyUnreadable {
+                Button("Forget Saved Host Key", role: .destructive) {
+                    prompt.wrappedValue = nil
+                    SshHostKeyTrust.forget(pending.mismatch)
+                    Task { await pending.retry() }
+                }
+            } else {
+                Button("Trust New Key", role: .destructive) {
+                    prompt.wrappedValue = nil
+                    SshHostKeyTrust.trust(pending.mismatch)
+                    Task { await pending.retry() }
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                prompt.wrappedValue = nil
+            }
+        } message: { pending in
+            if pending.isSavedKeyUnreadable {
+                Text("The SSH host key saved on this device for \(pending.hostLabel) could not be read, so the connection was refused.\n\nForget the saved key to connect again; the server's current key will be saved as new.\n\nServer fingerprint:\n\(pending.mismatch.fingerprint)")
+            } else {
+                Text("The SSH host key for \(pending.hostLabel) no longer matches the one saved on this device. This happens after a server reinstall, but it can also mean someone is intercepting the connection.\n\nNew fingerprint:\n\(pending.mismatch.fingerprint)\n\nOnly trust the new key if you expected this change.")
+            }
+        }
+    }
+}
+
 #if DEBUG
 #Preview("SSH Login") {
     SSHLoginSheet(

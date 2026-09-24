@@ -26,6 +26,8 @@ struct DiscoveryView: View {
     @State private var pendingAutoNavigateServerId: String?
     @State private var pendingAutoNavigateServer: DiscoveredServer?
     @State private var connectError: String?
+    @State private var sshHostKeyChange: SSHHostKeyChangePrompt?
+    @State private var guidedSSHAttempt: GuidedSSHAttempt?
     @State private var renameTarget: DiscoveredServer?
     @State private var renameText = ""
     @Environment(AppState.self) private var appState
@@ -169,24 +171,9 @@ struct DiscoveryView: View {
             self.sshServer = pendingSSHServer
         }
         .onChange(of: appModel.snapshot) { _, _ in
-            guard let pendingAutoNavigateServerId else { return }
-            guard let serverSnapshot = appModel.snapshot?.serverSnapshot(for: pendingAutoNavigateServerId) else {
-                return
-            }
-            if serverSnapshot.health == .connected {
-                self.pendingAutoNavigateServerId = nil
-                if let server = pendingAutoNavigateServer
-                    ?? discovery.servers.first(where: { $0.id == pendingAutoNavigateServerId }) {
-                    self.pendingAutoNavigateServer = nil
-                    navigateAfterConnect(server)
-                }
-            } else if serverSnapshot.health == .disconnected,
-                      let message = serverSnapshot.connectionProgress?.terminalMessage {
-                self.pendingAutoNavigateServerId = nil
-                self.pendingAutoNavigateServer = nil
-                connectError = message
-            }
+            handlePendingAutoNavigate()
         }
+        .sshHostKeyChangeAlert($sshHostKeyChange)
         .alert("Connection Failed", isPresented: showConnectError, actions: {
             Button("OK") { connectError = nil }
         }, message: {
@@ -942,19 +929,36 @@ struct DiscoveryView: View {
                 SavedServerStore.remember(server)
             case .sshThenRemote(let host, let credentials):
                 startedAsyncBootstrap = true
-                connectedServerId = try await connectViaSSH(server: server, host: host, credentials: credentials)
+                // Watch before starting: a fast refusal (e.g. host key) can be
+                // published before the guided connect returns.
+                guidedSSHAttempt = GuidedSSHAttempt(server: server, host: host, credentials: credentials)
+                pendingAutoNavigateServerId = server.id
+                pendingAutoNavigateServer = server
+                do {
+                    connectedServerId = try await connectViaSSH(server: server, host: host, credentials: credentials)
+                } catch {
+                    guidedSSHAttempt = nil
+                    pendingAutoNavigateServerId = nil
+                    pendingAutoNavigateServer = nil
+                    throw error
+                }
             }
         } catch {
             connectingServer = nil
             connectError = error.localizedDescription
             return
         }
+        if startedAsyncBootstrap {
+            // Rust has now replaced any previous attempt's state with this
+            // one, so failures seen from here on belong to this attempt.
+            guidedSSHAttempt?.started = true
+            pendingAutoNavigateServerId = connectedServerId
+        }
         await appModel.refreshSnapshot()
 
         connectingServer = nil
         if startedAsyncBootstrap {
-            pendingAutoNavigateServerId = connectedServerId
-            pendingAutoNavigateServer = server
+            handlePendingAutoNavigate()
             return
         }
         if appModel.snapshot?.servers.first(where: { $0.serverId == connectedServerId })?.health == .connected {
@@ -1068,7 +1072,65 @@ struct DiscoveryView: View {
             )
         } catch {
             connectingServer = nil
-            connectError = error.localizedDescription
+            if let mismatch = SshHostKeyTrust.promptableHostKey(in: error) {
+                presentSSHHostKeyChange(mismatch, server: server, host: host, credentials: credentials)
+            } else {
+                connectError = error.localizedDescription
+            }
+        }
+    }
+
+    /// Resolves the pending guided SSH connect against the current snapshot:
+    /// navigates once connected, or reports the failure (offering "Trust New
+    /// Key" / "Forget Saved Host Key" for a typed host-key refusal).
+    private func handlePendingAutoNavigate() {
+        guard let pendingAutoNavigateServerId else { return }
+        guard let serverSnapshot = appModel.snapshot?.serverSnapshot(for: pendingAutoNavigateServerId) else {
+            return
+        }
+        if serverSnapshot.health == .connected {
+            self.pendingAutoNavigateServerId = nil
+            guidedSSHAttempt = nil
+            if let server = pendingAutoNavigateServer
+                ?? discovery.servers.first(where: { $0.id == pendingAutoNavigateServerId }) {
+                self.pendingAutoNavigateServer = nil
+                navigateAfterConnect(server)
+            }
+        } else if serverSnapshot.health == .disconnected,
+                  let message = serverSnapshot.connectionProgress?.terminalMessage {
+            // Until the guided connect has started, a failure in the snapshot
+            // may still be the previous attempt's.
+            if let attempt = guidedSSHAttempt, !attempt.started { return }
+            self.pendingAutoNavigateServerId = nil
+            self.pendingAutoNavigateServer = nil
+            let attempt = guidedSSHAttempt
+            guidedSSHAttempt = nil
+            if let attempt, attempt.server.id == pendingAutoNavigateServerId,
+               let mismatch = serverSnapshot.connectionProgress?.hostKeyMismatch,
+               mismatch.isPromptable {
+                presentSSHHostKeyChange(
+                    mismatch,
+                    server: attempt.server,
+                    host: attempt.host,
+                    credentials: attempt.credentials
+                )
+                return
+            }
+            connectError = message
+        }
+    }
+
+    /// Shows the host-key confirmation for a typed Rust mismatch. Trusting
+    /// pins the displayed key (or forgetting drops the unreadable saved key)
+    /// and reruns the SSH login for `server`.
+    private func presentSSHHostKeyChange(
+        _ mismatch: AppSshHostKeyMismatch,
+        server: DiscoveredServer,
+        host: String,
+        credentials: SSHCredentials
+    ) {
+        sshHostKeyChange = SSHHostKeyChangePrompt(mismatch: mismatch) {
+            await startSSHAgentProbe(server: server, host: host, credentials: credentials)
         }
     }
 
@@ -1685,6 +1747,17 @@ private final class WakeProbeResumeGate: @unchecked Sendable {
         resumed = true
         return true
     }
+}
+
+/// The in-flight guided SSH connect, kept so a host-key refusal reported
+/// through the server snapshot can offer "Trust New Key" and retry.
+private struct GuidedSSHAttempt {
+    let server: DiscoveredServer
+    let host: String
+    let credentials: SSHCredentials
+    /// The guided connect call returned, so the snapshot no longer holds a
+    /// previous attempt's failure.
+    var started = false
 }
 
 private enum ManualConnectionMode: String, CaseIterable, Identifiable {

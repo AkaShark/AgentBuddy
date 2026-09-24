@@ -114,6 +114,19 @@ impl SshClient {
             client::connect(Arc::new(config), &*addr, handler),
         )
         .await;
+
+        // If the handler rejected the key, surface a specific error. russh
+        // aborts the handshake with `UnknownKey` in that case, so this must
+        // run before the generic connect-failure mapping below.
+        if let Some(fp) = rejected_fp.lock().await.take() {
+            warn!("SSH host key rejected addr={} fingerprint={}", addr, fp);
+            append_bridge_info_log(&format!(
+                "ssh_host_key_rejected addr={} fingerprint={}",
+                addr, fp
+            ));
+            return Err(SshError::HostKeyVerification { fingerprint: fp });
+        }
+
         let mut handle = match connect_result {
             Ok(Ok(handle)) => handle,
             Ok(Err(error)) => {
@@ -130,16 +143,6 @@ impl SshClient {
                 return Err(SshError::Timeout);
             }
         };
-
-        // If the handler rejected the key, surface a specific error.
-        if let Some(fp) = rejected_fp.lock().await.take() {
-            warn!("SSH host key rejected addr={} fingerprint={}", addr, fp);
-            append_bridge_info_log(&format!(
-                "ssh_host_key_rejected addr={} fingerprint={}",
-                addr, fp
-            ));
-            return Err(SshError::HostKeyVerification { fingerprint: fp });
-        }
 
         let auth_result = match &credentials.auth {
             SshAuth::Password(pw) => handle

@@ -37,6 +37,7 @@ import uniffi.codex_mobile_client.MessageParser
 import uniffi.codex_mobile_client.ReconnectController
 import uniffi.codex_mobile_client.ServerBridge
 import uniffi.codex_mobile_client.SshBridge
+import uniffi.codex_mobile_client.TerminalSshTrustStore
 import uniffi.codex_mobile_client.ThreadKey
 import uniffi.codex_mobile_client.AppListThreadsRequest
 import uniffi.codex_mobile_client.AppLoginAccountRequest
@@ -44,6 +45,7 @@ import uniffi.codex_mobile_client.AppRefreshModelsRequest
 import uniffi.codex_mobile_client.AppReadThreadRequest
 import uniffi.codex_mobile_client.AppStartThreadRequest
 import uniffi.codex_mobile_client.registerAndroidTools
+import uniffi.codex_mobile_client.setSshTrustStore
 import uniffi.codex_mobile_client.threadPermissionsAreAuthoritative
 
 class LocalAccountLoginRequiredException(val serverId: String) :
@@ -113,6 +115,8 @@ class AppModel private constructor(context: android.content.Context) {
     val serverBridge: ServerBridge
     val ssh: SshBridge
     val sshSessionStore: SshSessionStore
+    /** Process-wide SSH host-key pins shared with every Rust SSH connect path. */
+    val sshTrustStore: TerminalSshTrustStore
     val parser: MessageParser
     val reconnectController: ReconnectController
     val launchState: AppLaunchState
@@ -138,6 +142,9 @@ class AppModel private constructor(context: android.content.Context) {
         serverBridge = ServerBridge()
         ssh = SshBridge()
         sshSessionStore = SshSessionStore(ssh)
+        // Register host-key pinning before any SSH connect or reconnect runs.
+        sshTrustStore = TerminalSshTrustStore(SshTrustStore(context))
+        setSshTrustStore(sshTrustStore)
         parser = MessageParser()
         reconnectController = ReconnectController()
         reconnectController.setCredentialProvider(

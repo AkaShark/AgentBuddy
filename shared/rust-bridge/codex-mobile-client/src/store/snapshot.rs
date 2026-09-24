@@ -44,6 +44,9 @@ pub struct AppConnectionProgressSnapshot {
     pub steps: Vec<AppConnectionStepSnapshot>,
     pub pending_install: bool,
     pub terminal_message: Option<String>,
+    /// Set when the connect was refused because the SSH host key did not pass
+    /// the pin check; platforms offer to trust its fingerprint and retry.
+    pub host_key_mismatch: Option<crate::terminal::AppSshHostKeyMismatch>,
 }
 
 impl AppConnectionProgressSnapshot {
@@ -83,6 +86,7 @@ impl AppConnectionProgressSnapshot {
             ],
             pending_install: false,
             terminal_message: None,
+            host_key_mismatch: None,
         }
     }
 

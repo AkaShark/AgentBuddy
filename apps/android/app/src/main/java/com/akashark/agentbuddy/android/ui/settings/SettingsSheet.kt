@@ -84,10 +84,12 @@ import com.akashark.agentbuddy.android.state.OpenAIApiKeyStore
 import com.akashark.agentbuddy.android.state.PetOverlayController
 import com.akashark.agentbuddy.android.state.SavedServer
 import com.akashark.agentbuddy.android.state.SavedServerStore
+import com.akashark.agentbuddy.android.state.SavedSshCredential
 import com.akashark.agentbuddy.android.state.SshAuthMethod
 import com.akashark.agentbuddy.android.state.SshCredentialStore
 import com.akashark.agentbuddy.android.state.connectionModeLabel
 import com.akashark.agentbuddy.android.state.isConnected
+import com.akashark.agentbuddy.android.state.isPromptable
 import com.akashark.agentbuddy.android.state.statusColor
 import com.akashark.agentbuddy.android.state.statusLabel
 import com.akashark.agentbuddy.android.state.toRecord
@@ -104,9 +106,12 @@ import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
 import com.akashark.agentbuddy.android.ui.AgentBuddyThemeIndexEntry
 import com.akashark.agentbuddy.android.ui.AgentBuddyThemeManager
 import com.akashark.agentbuddy.android.ui.discovery.SSHLoginDialog
+import com.akashark.agentbuddy.android.ui.discovery.SshHostKeyChangePrompt
+import com.akashark.agentbuddy.android.ui.discovery.SshHostKeyChangedDialog
 import com.akashark.agentbuddy.android.util.LLog
 import kotlinx.coroutines.launch
 import uniffi.codex_mobile_client.Account
+import uniffi.codex_mobile_client.AppServerHealth
 import uniffi.codex_mobile_client.AppServerSnapshot
 import uniffi.codex_mobile_client.AppLoginAccountRequest
 import uniffi.codex_mobile_client.AppPetSummary
@@ -188,6 +193,94 @@ private fun SettingsTopLevel(
 
     var editTarget by remember { mutableStateOf<AppServerSnapshot?>(null) }
     var sshReconnectTarget by remember { mutableStateOf<SavedServer?>(null) }
+    val sshCredentialStore = remember(context) { SshCredentialStore(context.applicationContext) }
+    var pendingSshReconnect by remember { mutableStateOf<SshReconnectAttempt?>(null) }
+    var sshHostKeyChange by remember { mutableStateOf<SshHostKeyChangePrompt?>(null) }
+    var sshReconnectError by remember { mutableStateOf<String?>(null) }
+
+    /** Guided SSH reconnect from [SSHLoginDialog]; returns an inline error or null. */
+    suspend fun reconnectOverSsh(
+        saved: SavedServer,
+        credential: SavedSshCredential,
+        rememberCredentials: Boolean,
+    ): String? =
+        try {
+            if (rememberCredentials) {
+                sshCredentialStore.save(saved.hostname, saved.resolvedSshPort, credential)
+            } else {
+                sshCredentialStore.delete(saved.hostname, saved.resolvedSshPort)
+            }
+
+            appModel.serverBridge.disconnectServer(saved.id)
+            // Publish the removal, then watch before starting: the guided
+            // connect can fail before `startRemoteOverSshConnect` returns, and
+            // the watcher must never see the previous attempt's state.
+            appModel.refreshSnapshot()
+            pendingSshReconnect = SshReconnectAttempt(saved, credential, rememberCredentials)
+
+            when (credential.method) {
+                SshAuthMethod.PASSWORD -> appModel.serverBridge.startRemoteOverSshConnect(
+                    serverId = saved.id,
+                    displayName = saved.name,
+                    host = saved.hostname,
+                    port = saved.resolvedSshPort.toUShort(),
+                    username = credential.username,
+                    password = credential.password,
+                    privateKeyPem = null,
+                    passphrase = null,
+                    unlockMacosKeychain = credential.unlockMacosKeychain,
+                    acceptUnknownHost = true,
+                    workingDir = null,
+                )
+                SshAuthMethod.KEY -> appModel.serverBridge.startRemoteOverSshConnect(
+                    serverId = saved.id,
+                    displayName = saved.name,
+                    host = saved.hostname,
+                    port = saved.resolvedSshPort.toUShort(),
+                    username = credential.username,
+                    password = null,
+                    privateKeyPem = credential.privateKey,
+                    passphrase = credential.passphrase,
+                    unlockMacosKeychain = false,
+                    acceptUnknownHost = true,
+                    workingDir = null,
+                )
+            }
+            appModel.refreshSnapshot()
+            sshReconnectTarget = null
+            null
+        } catch (e: Exception) {
+            pendingSshReconnect = null
+            LLog.e("SettingsSheet", "SSH reconnect failed: ${e.message}", e)
+            e.message ?: "SSH reconnect failed"
+        }
+
+    // The guided reconnect reports failures through the server snapshot; a
+    // changed host key there asks the user before trusting the new key (an
+    // unreadable saved key offers to forget it), any other failure is shown.
+    LaunchedEffect(snapshot, pendingSshReconnect) {
+        val attempt = pendingSshReconnect ?: return@LaunchedEffect
+        val serverSnapshot = snapshot?.servers?.firstOrNull { it.serverId == attempt.server.id }
+            ?: return@LaunchedEffect
+        if (serverSnapshot.isConnected) {
+            pendingSshReconnect = null
+        } else if (serverSnapshot.health == AppServerHealth.DISCONNECTED) {
+            val progress = serverSnapshot.connectionProgress ?: return@LaunchedEffect
+            val message = progress.terminalMessage ?: return@LaunchedEffect
+            pendingSshReconnect = null
+            val mismatch = progress.hostKeyMismatch?.takeIf { it.isPromptable }
+            if (mismatch == null) {
+                sshReconnectError = message
+                return@LaunchedEffect
+            }
+            sshHostKeyChange = SshHostKeyChangePrompt(
+                server = attempt.server,
+                credential = attempt.credential,
+                rememberCredentials = attempt.rememberCredentials,
+                mismatch = mismatch,
+            )
+        }
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -395,62 +488,51 @@ private fun SettingsTopLevel(
     }
 
     sshReconnectTarget?.let { saved ->
-        val sshCredentialStore = remember(context) { SshCredentialStore(context.applicationContext) }
-        val sshPort = saved.resolvedSshPort
         SSHLoginDialog(
             server = saved,
-            initialCredential = sshCredentialStore.load(saved.hostname, sshPort),
+            initialCredential = sshCredentialStore.load(saved.hostname, saved.resolvedSshPort),
             onDismiss = { sshReconnectTarget = null },
             onConnect = { credential, rememberCredentials ->
-                try {
-                    if (rememberCredentials) {
-                        sshCredentialStore.save(saved.hostname, sshPort, credential)
-                    } else {
-                        sshCredentialStore.delete(saved.hostname, sshPort)
-                    }
+                reconnectOverSsh(saved, credential, rememberCredentials)
+            },
+        )
+    }
 
-                    appModel.serverBridge.disconnectServer(saved.id)
+    sshHostKeyChange?.let { prompt ->
+        SshHostKeyChangedDialog(
+            mismatch = prompt.mismatch,
+            onDismiss = { sshHostKeyChange = null },
+            onConfirm = {
+                sshHostKeyChange = null
+                scope.launch {
+                    reconnectOverSsh(prompt.server, prompt.credential, prompt.rememberCredentials)
+                        ?.let { sshReconnectError = it }
+                }
+            },
+        )
+    }
 
-                    when (credential.method) {
-                        SshAuthMethod.PASSWORD -> appModel.serverBridge.startRemoteOverSshConnect(
-                            serverId = saved.id,
-                            displayName = saved.name,
-                            host = saved.hostname,
-                            port = sshPort.toUShort(),
-                            username = credential.username,
-                            password = credential.password,
-                            privateKeyPem = null,
-                            passphrase = null,
-                            unlockMacosKeychain = credential.unlockMacosKeychain,
-                            acceptUnknownHost = true,
-                            workingDir = null,
-                        )
-                        SshAuthMethod.KEY -> appModel.serverBridge.startRemoteOverSshConnect(
-                            serverId = saved.id,
-                            displayName = saved.name,
-                            host = saved.hostname,
-                            port = sshPort.toUShort(),
-                            username = credential.username,
-                            password = null,
-                            privateKeyPem = credential.privateKey,
-                            passphrase = credential.passphrase,
-                            unlockMacosKeychain = false,
-                            acceptUnknownHost = true,
-                            workingDir = null,
-                        )
-                    }
-                    appModel.refreshSnapshot()
-                    sshReconnectTarget = null
-                    null
-                } catch (e: Exception) {
-                    LLog.e("SettingsSheet", "SSH reconnect failed: ${e.message}", e)
-                    e.message ?: "SSH reconnect failed"
+    sshReconnectError?.let { error ->
+        AlertDialog(
+            onDismissRequest = { sshReconnectError = null },
+            title = { Text("SSH 重连失败") },
+            text = { Text(error) },
+            confirmButton = {
+                TextButton(onClick = { sshReconnectError = null }) {
+                    Text("确定")
                 }
             },
         )
     }
 
 }
+
+/** The guided SSH reconnect in flight, kept so a host-key refusal can be retried. */
+private data class SshReconnectAttempt(
+    val server: SavedServer,
+    val credential: SavedSshCredential,
+    val rememberCredentials: Boolean,
+)
 
 @Composable
 private fun ServerSettingsRow(

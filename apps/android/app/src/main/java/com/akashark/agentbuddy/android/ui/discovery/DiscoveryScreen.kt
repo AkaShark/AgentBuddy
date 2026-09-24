@@ -76,6 +76,8 @@ import com.akashark.agentbuddy.android.state.SavedSshCredential
 import com.akashark.agentbuddy.android.state.ChatGPTOAuth
 import com.akashark.agentbuddy.android.state.SshAuthMethod
 import com.akashark.agentbuddy.android.state.SshCredentialStore
+import com.akashark.agentbuddy.android.state.isPromptable
+import com.akashark.agentbuddy.android.state.promptableSshHostKey
 import com.akashark.agentbuddy.android.state.connectionProgressDetail
 import com.akashark.agentbuddy.android.state.isConnected
 import com.akashark.agentbuddy.android.state.statusColor
@@ -104,6 +106,8 @@ import com.akashark.agentbuddy.android.ui.common.AgentRuntimeKind
 import com.akashark.agentbuddy.android.ui.common.metadata
 import com.akashark.agentbuddy.android.ui.common.runtimeLabel
 import com.akashark.agentbuddy.android.ui.common.runtimeSortIndex
+import uniffi.codex_mobile_client.AppSshHostKeyMismatch
+import uniffi.codex_mobile_client.AppSshHostKeyMismatchKind
 import uniffi.codex_mobile_client.AppSshSessionResult
 import uniffi.codex_mobile_client.AppServerHealth
 import uniffi.codex_mobile_client.AppServerSnapshot
@@ -117,6 +121,12 @@ private data class SshBridgeAgentContext(
     val sessionId: String,
     val host: String,
     val availability: List<RemoteAgentAvailability>,
+    val credential: SavedSshCredential,
+)
+
+/** The in-flight guided SSH connect, kept so a host-key refusal can offer a retry. */
+private data class GuidedSshAttempt(
+    val server: SavedServer,
     val credential: SavedSshCredential,
 )
 
@@ -157,6 +167,8 @@ fun DiscoveryScreen(
     var authorizedSlingshotConnect by remember { mutableStateOf<Pair<AppSlingshotEnvironment, String>?>(null) }
     var wakingServerId by remember { mutableStateOf<String?>(null) }
     var connectError by remember { mutableStateOf<String?>(null) }
+    var sshHostKeyChange by remember { mutableStateOf<SshHostKeyChangePrompt?>(null) }
+    var guidedSshAttempt by remember { mutableStateOf<GuidedSshAttempt?>(null) }
     var renameTarget by remember { mutableStateOf<SavedServer?>(null) }
     val slingshotStepUpLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult(),
@@ -196,11 +208,28 @@ fun DiscoveryScreen(
         val serverSnapshot = snapshot?.servers?.firstOrNull { it.serverId == pendingServerId } ?: return@LaunchedEffect
         if (serverSnapshot.isConnected) {
             pendingAutoNavigateServerId = null
+            guidedSshAttempt = null
             onDismiss()
         } else if (serverSnapshot.health == AppServerHealth.DISCONNECTED) {
-            serverSnapshot.connectionProgress?.terminalMessage?.let { message ->
+            val progress = serverSnapshot.connectionProgress
+            progress?.terminalMessage?.let { message ->
                 pendingAutoNavigateServerId = null
-                connectError = message
+                val attempt = guidedSshAttempt?.takeIf { it.server.id == pendingServerId }
+                guidedSshAttempt = null
+                val mismatch = progress.hostKeyMismatch?.takeIf { it.isPromptable }
+                if (attempt != null && mismatch != null) {
+                    sshHostKeyChange = SshHostKeyChangePrompt(
+                        server = attempt.server,
+                        credential = attempt.credential,
+                        rememberCredentials = sshCredentialStore.load(
+                            attempt.server.hostname,
+                            attempt.server.resolvedSshPort,
+                        ) != null,
+                        mismatch = mismatch,
+                    )
+                } else {
+                    connectError = message
+                }
             }
         }
     }
@@ -359,6 +388,7 @@ fun DiscoveryScreen(
         }
 
     suspend fun startGuidedSshConnect(server: SavedServer, credential: SavedSshCredential) {
+        guidedSshAttempt = GuidedSshAttempt(server, credential)
         when (credential.method) {
             SshAuthMethod.PASSWORD -> {
                 appModel.serverBridge.startRemoteOverSshConnect(
@@ -393,6 +423,105 @@ fun DiscoveryScreen(
             }
         }
     }
+
+    /**
+     * SSH login from [SSHLoginDialog]: opens a session, probes SSH-bridge agents
+     * and falls back to the guided Codex connect. Returns an inline error, or
+     * null when the dialog is done (connected, agent picker, or host-key prompt).
+     */
+    suspend fun connectViaSshLogin(
+        server: SavedServer,
+        credential: SavedSshCredential,
+        rememberCredentials: Boolean,
+    ): String? =
+        try {
+            LLog.t(
+                logTag,
+                "starting SSH connect",
+                fields = mapOf(
+                    "serverId" to server.id,
+                    "host" to server.hostname,
+                    "sshPort" to server.resolvedSshPort,
+                    "authMethod" to credential.method.name,
+                    "os" to server.os,
+                ),
+            )
+            if (rememberCredentials) {
+                sshCredentialStore.save(server.hostname, server.resolvedSshPort, credential)
+            } else {
+                sshCredentialStore.delete(server.hostname, server.resolvedSshPort)
+            }
+
+            val session = openSshSession(server, credential)
+            val availability = appModel.ssh.sshProbeRemoteAgents(session.sessionId)
+            val bridgeAgents = availableSshBridgeKinds(availability)
+            if (bridgeAgents.isNotEmpty()) {
+                sshAgentContext = SshBridgeAgentContext(
+                    server = server,
+                    sessionId = session.sessionId,
+                    host = session.normalizedHost,
+                    availability = availability,
+                    credential = credential,
+                )
+                sshServer = null
+                null
+            } else {
+                appModel.ssh.sshClose(session.sessionId)
+                LLog.t(
+                    logTag,
+                    "no SSH bridge agents available; falling back to Codex SSH",
+                    fields = mapOf(
+                        "serverId" to server.id,
+                        "host" to server.hostname,
+                    ),
+                )
+                startGuidedSshConnect(server, credential)
+                SavedServerStore.remember(
+                    context,
+                    server.withPreferredConnection("ssh"),
+                )
+                reloadSavedServers()
+                appModel.refreshSnapshot()
+                pendingAutoNavigateServerId = server.id
+                LLog.t(
+                    logTag,
+                    "guided SSH bootstrap started",
+                    fields = mapOf(
+                        "serverId" to server.id,
+                        "host" to server.hostname,
+                        "sshPort" to server.resolvedSshPort,
+                    ),
+                )
+                sshServer = null
+                null
+            }
+        } catch (e: Exception) {
+            LLog.e(
+                logTag,
+                "guided SSH connect failed",
+                e,
+                fields = mapOf(
+                    "serverId" to server.id,
+                    "host" to server.hostname,
+                    "sshPort" to server.resolvedSshPort,
+                    "authMethod" to credential.method.name,
+                    "os" to server.os,
+                ),
+            )
+            val mismatch = promptableSshHostKey(e)
+            if (mismatch != null) {
+                sshServer = null
+                sshHostKeyChange = SshHostKeyChangePrompt(
+                    server = server,
+                    credential = credential,
+                    rememberCredentials = rememberCredentials,
+                    mismatch = mismatch,
+                )
+                null
+            } else {
+                e.message ?: "无法通过 SSH 连接。"
+            }
+        }
 
     suspend fun prepareServerForSelection(entry: SavedServer): SavedServer {
         if (entry.source == "local" || entry.websocketURL != null) {
@@ -710,81 +839,20 @@ fun DiscoveryScreen(
             initialCredential = sshCredentialStore.load(server.hostname, server.resolvedSshPort),
             onDismiss = { sshServer = null },
             onConnect = { credential, rememberCredentials ->
-                try {
-                    LLog.t(
-                        logTag,
-                        "starting SSH connect",
-                        fields = mapOf(
-                            "serverId" to server.id,
-                            "host" to server.hostname,
-                            "sshPort" to server.resolvedSshPort,
-                            "authMethod" to credential.method.name,
-                            "os" to server.os,
-                        ),
-                    )
-                    if (rememberCredentials) {
-                        sshCredentialStore.save(server.hostname, server.resolvedSshPort, credential)
-                    } else {
-                        sshCredentialStore.delete(server.hostname, server.resolvedSshPort)
-                    }
+                connectViaSshLogin(server, credential, rememberCredentials)
+            },
+        )
+    }
 
-                    val session = openSshSession(server, credential)
-                    val availability = appModel.ssh.sshProbeRemoteAgents(session.sessionId)
-                    val bridgeAgents = availableSshBridgeKinds(availability)
-                    if (bridgeAgents.isNotEmpty()) {
-                        sshAgentContext = SshBridgeAgentContext(
-                            server = server,
-                            sessionId = session.sessionId,
-                            host = session.normalizedHost,
-                            availability = availability,
-                            credential = credential,
-                        )
-                        sshServer = null
-                        null
-                    } else {
-                        appModel.ssh.sshClose(session.sessionId)
-                        LLog.t(
-                            logTag,
-                            "no SSH bridge agents available; falling back to Codex SSH",
-                            fields = mapOf(
-                                "serverId" to server.id,
-                                "host" to server.hostname,
-                            ),
-                        )
-                        startGuidedSshConnect(server, credential)
-                        SavedServerStore.remember(
-                            context,
-                            server.withPreferredConnection("ssh"),
-                        )
-                        reloadSavedServers()
-                        appModel.refreshSnapshot()
-                        pendingAutoNavigateServerId = server.id
-                        LLog.t(
-                            logTag,
-                            "guided SSH bootstrap started",
-                            fields = mapOf(
-                                "serverId" to server.id,
-                                "host" to server.hostname,
-                                "sshPort" to server.resolvedSshPort,
-                            ),
-                        )
-                        sshServer = null
-                        null
-                    }
-                } catch (e: Exception) {
-                    LLog.e(
-                        logTag,
-                        "guided SSH connect failed",
-                        e,
-                        fields = mapOf(
-                            "serverId" to server.id,
-                            "host" to server.hostname,
-                            "sshPort" to server.resolvedSshPort,
-                            "authMethod" to credential.method.name,
-                            "os" to server.os,
-                        ),
-                    )
-                    e.message ?: "无法通过 SSH 连接。"
+    sshHostKeyChange?.let { prompt ->
+        SshHostKeyChangedDialog(
+            mismatch = prompt.mismatch,
+            onDismiss = { sshHostKeyChange = null },
+            onConfirm = {
+                sshHostKeyChange = null
+                scope.launch {
+                    connectViaSshLogin(prompt.server, prompt.credential, prompt.rememberCredentials)
+                        ?.let { connectError = it }
                 }
             },
         )
@@ -1522,6 +1590,80 @@ private fun RenameServerDialog(
         confirmButton = {
             TextButton(onClick = { onRename(newName.trim()) }) {
                 Text("保存")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        },
+    )
+}
+
+/**
+ * An SSH connect refused because the server's host key no longer matches the
+ * key pinned on this device, or because that saved key could not be read
+ * (typed Rust [AppSshHostKeyMismatch]). Carries what is needed to retry the
+ * same login after the user trusts the new key or forgets the unreadable one.
+ */
+internal data class SshHostKeyChangePrompt(
+    val server: SavedServer,
+    val credential: SavedSshCredential,
+    val rememberCredentials: Boolean,
+    val mismatch: AppSshHostKeyMismatch,
+)
+
+/**
+ * Confirmation for a changed SSH host key. "信任新密钥" pins exactly the
+ * displayed fingerprint before calling [onConfirm], so the caller's retry
+ * only succeeds if the server still presents that key (otherwise it prompts
+ * again). When the saved key could not be read
+ * ([AppSshHostKeyMismatchKind.TRUST_STORE_UNAVAILABLE]), "忘记已保存的主机密钥"
+ * removes it before [onConfirm], so the retry treats the host as new.
+ */
+@Composable
+internal fun SshHostKeyChangedDialog(
+    mismatch: AppSshHostKeyMismatch,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    val appModel = LocalAppModel.current
+    val port = mismatch.port.toInt()
+    val hostDisplay = if (port == 22) mismatch.host else "${mismatch.host}:$port"
+    val savedKeyUnreadable = mismatch.kind == AppSshHostKeyMismatchKind.TRUST_STORE_UNAVAILABLE
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (savedKeyUnreadable) "无法读取已保存的 SSH 主机密钥" else "SSH 主机密钥已变更") },
+        text = {
+            if (savedKeyUnreadable) {
+                Text(
+                    "本设备为 $hostDisplay 保存的 SSH 主机密钥无法读取，因此连接已被拒绝。\n\n" +
+                        "忘记已保存的密钥即可重新连接；服务器当前的密钥将作为新密钥保存。\n\n" +
+                        "服务器指纹：\n${mismatch.fingerprint}",
+                )
+            } else {
+                Text(
+                    "$hostDisplay 的 SSH 主机密钥与本设备保存的不一致。服务器重装后会出现这种情况，" +
+                        "但也可能意味着有人正在拦截连接。\n\n新指纹：\n${mismatch.fingerprint}\n\n" +
+                        "仅在你预期到此变更时才信任新密钥。",
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (savedKeyUnreadable) {
+                        appModel.sshTrustStore.unpin(mismatch.host, mismatch.port)
+                    } else {
+                        appModel.sshTrustStore.pin(mismatch.host, mismatch.port, mismatch.fingerprint)
+                    }
+                    onConfirm()
+                },
+            ) {
+                Text(
+                    if (savedKeyUnreadable) "忘记已保存的主机密钥" else "信任新密钥",
+                    color = AgentBuddyTheme.danger,
+                )
             }
         },
         dismissButton = {

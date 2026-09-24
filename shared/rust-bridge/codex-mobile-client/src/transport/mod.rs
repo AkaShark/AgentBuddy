@@ -20,6 +20,10 @@ pub enum ConnectionState {
 pub enum TransportError {
     #[error("connection failed: {0}")]
     ConnectionFailed(String),
+    /// The SSH host-key trust policy refused the server's key; the FFI layer
+    /// maps it to a typed `ClientError::SshHostKeyMismatch`.
+    #[error("{0}")]
+    SshHostKeyRejected(crate::ssh::SshHostKeyRejection),
     #[error("send failed: {0}")]
     SendFailed(String),
     #[error("receive failed: {0}")]

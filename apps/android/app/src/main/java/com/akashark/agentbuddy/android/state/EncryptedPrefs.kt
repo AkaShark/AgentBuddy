@@ -17,13 +17,17 @@ import androidx.security.crypto.MasterKey
  * so deleting it would invalidate the other stores' keysets and every launch
  * would cascade into wiping them all — credentials would never persist past
  * a single session.
+ *
+ * [onReset] is called with the decryption failure when the file was wiped.
  */
 internal fun openEncryptedPrefsOrReset(
     context: Context,
     name: String,
+    onReset: ((Throwable) -> Unit)? = null,
 ): SharedPreferences {
-    return runCatching { buildEncryptedPrefs(context, name) }.getOrElse {
+    return runCatching { buildEncryptedPrefs(context, name) }.getOrElse { error ->
         context.deleteSharedPreferences(name)
+        onReset?.invoke(error)
         buildEncryptedPrefs(context, name)
     }
 }

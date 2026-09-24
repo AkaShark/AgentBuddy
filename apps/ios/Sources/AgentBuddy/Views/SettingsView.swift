@@ -12,6 +12,8 @@ struct SettingsView: View {
     @AppStorage(ConversationDisplayPreferenceKey.tools) private var toolDisplayMode = ConversationDetailDisplayMode.collapsed.rawValue
     @State private var activeServerSheet: SettingsServerSheet?
     @State private var serverEditError: String?
+    @State private var sshHostKeyChange: SSHHostKeyChangePrompt?
+    @State private var pendingSSHReconnect: SettingsSSHReconnectAttempt?
 
     private var localServer: AppServerSnapshot? {
         // Account management (ChatGPT login / API key) is local-only, always.
@@ -84,6 +86,10 @@ struct SettingsView: View {
                     }
                 }
             }
+            .onChange(of: appModel.snapshot) { _, snapshot in
+                handleSSHReconnectProgress(snapshot)
+            }
+            .sshHostKeyChangeAlert($sshHostKeyChange)
             .alert("Server Update Failed", isPresented: Binding(
                 get: { serverEditError != nil },
                 set: { if !$0 { serverEditError = nil } }
@@ -486,7 +492,15 @@ struct SettingsView: View {
     ) async {
         await SshSessionStore.shared.close(serverId: server.id, ssh: appModel.ssh)
         appModel.serverBridge.disconnectServer(serverId: server.id)
-
+        // Publish the removal, then watch before starting: the guided connect
+        // can fail (and publish its snapshot) before `startRemoteOverSSH`
+        // returns, and the watcher must never see the previous attempt's state.
+        await appModel.refreshSnapshot()
+        pendingSSHReconnect = SettingsSSHReconnectAttempt(
+            server: server,
+            host: host,
+            credentials: credentials
+        )
         do {
             _ = try await startRemoteOverSSH(
                 serverId: server.id,
@@ -497,7 +511,40 @@ struct SettingsView: View {
             )
             await appModel.refreshSnapshot()
         } catch {
+            pendingSSHReconnect = nil
             serverEditError = error.localizedDescription
+        }
+    }
+
+    /// Watches the guided SSH reconnect started from Settings; a refusal
+    /// because the host key changed offers "Trust New Key" (or, for an
+    /// unreadable saved key, "Forget Saved Host Key") and retries. Any other
+    /// failure is shown as an error.
+    private func handleSSHReconnectProgress(_ snapshot: AppSnapshotRecord?) {
+        guard let attempt = pendingSSHReconnect,
+              let serverSnapshot = snapshot?.serverSnapshot(for: attempt.server.id) else {
+            return
+        }
+        if serverSnapshot.health == .connected {
+            pendingSSHReconnect = nil
+            return
+        }
+        guard serverSnapshot.health == .disconnected,
+              let progress = serverSnapshot.connectionProgress,
+              let message = progress.terminalMessage else {
+            return
+        }
+        pendingSSHReconnect = nil
+        guard let mismatch = progress.hostKeyMismatch, mismatch.isPromptable else {
+            serverEditError = message
+            return
+        }
+        sshHostKeyChange = SSHHostKeyChangePrompt(mismatch: mismatch) {
+            await reconnectViaSSH(
+                server: attempt.server,
+                host: attempt.host,
+                credentials: attempt.credentials
+            )
         }
     }
 
@@ -540,6 +587,12 @@ struct SettingsView: View {
         }
     }
 
+}
+
+private struct SettingsSSHReconnectAttempt {
+    let server: DiscoveredServer
+    let host: String
+    let credentials: SSHCredentials
 }
 
 private enum SettingsServerSheet: Identifiable {

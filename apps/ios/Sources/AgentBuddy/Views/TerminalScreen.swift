@@ -49,6 +49,7 @@ struct TerminalScreen: View {
         .ignoresSafeArea(.container, edges: [.top, .bottom, .horizontal])
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .toolbar(.hidden, for: .navigationBar)
+        .sshHostKeyChangeAlert($controller.sshHostKeyChange)
         .task {
             attachOutputSink()
             guard !didStart else { return }

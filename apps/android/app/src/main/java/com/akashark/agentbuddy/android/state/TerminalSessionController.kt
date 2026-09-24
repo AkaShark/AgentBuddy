@@ -6,12 +6,14 @@ import androidx.compose.runtime.setValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import uniffi.codex_mobile_client.AppSshHostKeyMismatch
+import uniffi.codex_mobile_client.AppSshHostKeyMismatchKind
 import uniffi.codex_mobile_client.AppStore
 import uniffi.codex_mobile_client.TerminalBackendKind
+import uniffi.codex_mobile_client.TerminalException
 import uniffi.codex_mobile_client.TerminalOutputListener
 import uniffi.codex_mobile_client.TerminalSession
 import uniffi.codex_mobile_client.TerminalSize
-import uniffi.codex_mobile_client.TerminalSshTrustStore
 
 class TerminalSessionController(
     private val scope: CoroutineScope,
@@ -25,12 +27,19 @@ class TerminalSessionController(
         FAILED,
     }
 
+    /**
+     * An SSH open refused by the host-key check: [AppSshHostKeyMismatchKind.UNKNOWN]
+     * for a first connect (inline trust button), [AppSshHostKeyMismatchKind.CHANGED]
+     * when the pinned key differs (confirmation dialog),
+     * [AppSshHostKeyMismatchKind.TRUST_STORE_UNAVAILABLE] when the pinned key could
+     * not be read (dialog offering to forget it).
+     */
     data class SshHostTrustChallenge(
-        val host: String,
-        val port: UShort,
-        val fingerprint: String,
+        val mismatch: AppSshHostKeyMismatch,
         val backend: TerminalBackendKind,
-    )
+    ) {
+        val fingerprint: String get() = mismatch.fingerprint
+    }
 
     var phase by mutableStateOf(Phase.IDLE)
         private set
@@ -41,6 +50,8 @@ class TerminalSessionController(
     var errorMessage by mutableStateOf<String?>(null)
         private set
     var sshTrustChallenge by mutableStateOf<SshHostTrustChallenge?>(null)
+        private set
+    var sshHostKeyChange by mutableStateOf<SshHostTrustChallenge?>(null)
         private set
 
     var sessionId: String? = null
@@ -71,13 +82,16 @@ class TerminalSessionController(
         errorMessage = null
         exitCode = null
         sshTrustChallenge = null
+        sshHostKeyChange = null
         scope.launch {
             try {
                 val size = TerminalSize(cols = terminalCols, rows = terminalRows)
                 val id = if (backend is TerminalBackendKind.RemoteSsh) {
-                    val backendImpl = SshTrustStore(AppModel.shared.appContext)
-                    val trustStore = TerminalSshTrustStore(backendImpl)
-                    appStore.openTerminalSessionWithTrustStore(backend, size, trustStore)
+                    appStore.openTerminalSessionWithTrustStore(
+                        backend,
+                        size,
+                        AppModel.shared.sshTrustStore,
+                    )
                 } else {
                     appStore.openTerminalSession(backend, size)
                 }
@@ -118,12 +132,25 @@ class TerminalSessionController(
                 phase = Phase.RUNNING
             } catch (error: Exception) {
                 sessionId = null
-                val challenge = sshHostTrustChallenge(error, backend)
-                if (challenge != null) {
-                    sshTrustChallenge = challenge
-                    errorMessage = "Unknown SSH host key ${challenge.fingerprint}"
-                } else {
+                val mismatch = (error as? TerminalException.SshHostKeyMismatch)?.mismatch
+                if (mismatch == null) {
                     errorMessage = error.message ?: "Unable to open terminal"
+                } else {
+                    val challenge = SshHostTrustChallenge(mismatch, backend)
+                    when (mismatch.kind) {
+                        AppSshHostKeyMismatchKind.UNKNOWN -> {
+                            sshTrustChallenge = challenge
+                            errorMessage = "Unknown SSH host key ${mismatch.fingerprint}"
+                        }
+                        AppSshHostKeyMismatchKind.CHANGED -> {
+                            sshHostKeyChange = challenge
+                            errorMessage = "SSH host key changed ${mismatch.fingerprint}"
+                        }
+                        AppSshHostKeyMismatchKind.TRUST_STORE_UNAVAILABLE -> {
+                            sshHostKeyChange = challenge
+                            errorMessage = "无法读取已保存的 SSH 主机密钥"
+                        }
+                    }
                 }
                 phase = Phase.FAILED
             }
@@ -132,15 +159,30 @@ class TerminalSessionController(
 
     fun trustUnknownSshHostAndRetry() {
         val challenge = sshTrustChallenge ?: return
-        SshTrustStore(AppModel.shared.appContext).write(
-            host = challenge.host,
-            port = challenge.port,
-            fingerprint = challenge.fingerprint,
-        )
+        val mismatch = challenge.mismatch
+        AppModel.shared.sshTrustStore.pin(mismatch.host, mismatch.port, mismatch.fingerprint)
+        reopen(challenge.backend)
+    }
+
+    /**
+     * Reopens after the host-key dialog pinned the displayed key (or forgot the
+     * unreadable saved one).
+     */
+    fun retryAfterHostKeyChange() {
+        val challenge = sshHostKeyChange ?: return
+        reopen(challenge.backend)
+    }
+
+    fun dismissHostKeyChange() {
+        sshHostKeyChange = null
+    }
+
+    private fun reopen(backend: TerminalBackendKind) {
         sshTrustChallenge = null
+        sshHostKeyChange = null
         errorMessage = null
         phase = Phase.IDLE
-        open(challenge.backend)
+        open(backend)
     }
 
     fun switchBackend(backend: TerminalBackendKind) {
@@ -177,31 +219,6 @@ class TerminalSessionController(
 
     fun setOutputByteSink(sink: ((ByteArray) -> Unit)?) {
         outputByteSink = sink
-    }
-
-    private fun sshHostTrustChallenge(
-        error: Exception,
-        backend: TerminalBackendKind,
-    ): SshHostTrustChallenge? {
-        val sshBackend = backend as? TerminalBackendKind.RemoteSsh ?: return null
-        val fingerprint = unknownHostFingerprint(error.message.orEmpty()) ?: return null
-        return SshHostTrustChallenge(
-            host = sshBackend.host,
-            port = sshBackend.port,
-            fingerprint = fingerprint,
-            backend = backend,
-        )
-    }
-
-    private fun unknownHostFingerprint(message: String): String? {
-        val marker = "unknown-host:"
-        val start = message.indexOf(marker)
-        if (start < 0) return null
-        return message
-            .substring(start + marker.length)
-            .trim()
-            .trim('"', '\'', '(', ')', '[', ']')
-            .takeIf { it.isNotEmpty() }
     }
 
     fun resize(cols: Int, rows: Int, notifyBackend: Boolean = true) {

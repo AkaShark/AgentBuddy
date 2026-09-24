@@ -564,7 +564,12 @@ pub(super) fn map_rpc_client_error(error: crate::RpcClientError) -> RpcError {
 }
 
 pub(super) fn map_ssh_transport_error(error: crate::ssh::SshError) -> TransportError {
-    TransportError::ConnectionFailed(error.to_string())
+    match error {
+        crate::ssh::SshError::HostKeyRejected(rejection) => {
+            TransportError::SshHostKeyRejected(rejection)
+        }
+        other => TransportError::ConnectionFailed(other.to_string()),
+    }
 }
 
 pub(super) async fn refresh_thread_list_from_app_server(
