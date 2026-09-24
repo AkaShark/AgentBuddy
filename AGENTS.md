@@ -2,27 +2,27 @@
 
 ## Project Structure & Module Organization
 - `apps/ios/Sources/AgentBuddy/` contains the iOS app code.
-- `apps/ios/Sources/AgentBuddy/Views/` holds SwiftUI screens, `Models/` contains app state/session logic, and `Bridge/` contains JSON-RPC + C FFI bridge code.
+- `apps/ios/Sources/AgentBuddy/Views/` holds SwiftUI screens, `Models/` contains app state/session logic, and `Bridge/` contains the generated UniFFI Swift plus thin Swift/ObjC glue.
 - `apps/android/app/src/main/java/com/akashark/agentbuddy/android/ui/` contains Android Compose shell/screens.
-- `apps/android/app/src/main/java/com/akashark/agentbuddy/android/state/` contains Android app state, server/session manager, SSH, and websocket transport.
-- `apps/android/core/bridge/` contains Android UniFFI bootstrap and generated Rust bindings.
+- `apps/android/app/src/main/java/com/akashark/agentbuddy/android/state/` contains Android app state (`AppModel.kt`), lifecycle/voice controllers, and platform stores (saved servers/threads/apps, SSH credentials). Transport and SSH run in Rust.
+- `apps/android/core/bridge/` contains Android UniFFI bootstrap (`UniffiInit.kt`, which also loads the legacy `codex_bridge` JNI lib), the Ghostty renderer JNI bridge, and per-ABI `jniLibs/`.
 - `apps/android/app/src/test/java/` contains Android unit tests.
 - `apps/android/docs/qa-matrix.md` tracks Android parity QA coverage.
 - `apps/desktop/` is the Tauri v2 macOS menu-bar host app: `src/` React + TS console, `src-tauri/` Rust backend that drives the bundled `agentbuddy` sidecar through its CLI (`sidecar.rs` holds the subcommand allowlist, `shellenv.rs` injects the user's login-shell PATH). It never links alleycat and never touches the mobile Rust crate. See `apps/desktop/README.md`.
-- `shared/rust-bridge/codex-mobile-client/` is the single shared Rust client library consumed by both iOS and Android. It owns the public UniFFI surface, generated upstream RPC coverage, canonical store/reducer state, hydration, discovery, SSH, and shared runtime logic. `MobileClient` is the top-level internal Rust facade.
+- `shared/rust-bridge/codex-mobile-client/` is the single shared Rust client library consumed by both iOS and Android. It owns the public UniFFI surface, typed upstream RPC coverage, canonical store/reducer state, hydration, discovery, SSH, and shared runtime logic. `MobileClient` is the top-level internal Rust facade.
 - `shared/rust-bridge/codex-bridge/` is legacy C-FFI support that should not be used for new mobile runtime features.
-- `apps/ios/Sources/AgentBuddy/Bridge/Rust*.swift` — iOS bridge files mapping Swift to the shared Rust layer.
-- `apps/android/core/bridge/.../Rust*.kt` — Android bridge files mapping Kotlin to the shared Rust layer. UniFFI Kotlin sources are generated into `shared/rust-bridge/generated/kotlin/` and consumed directly from there; do not maintain copied binding files under Android source roots.
+- `apps/ios/Sources/AgentBuddy/Bridge/` — generated `UniFFICodexClient.generated.swift` (local-only) plus hand-written glue. The only hand-written `Rust*.swift` helpers are `RustAlleycatBridge.swift` and `RustVoiceHandoff.swift`; the rest is Ghostty renderer, Swift SSH credential/trust providers, dynamic tools, and message-content glue.
+- Android has no hand-written `Rust*.kt` helpers: app code calls the generated `uniffi.codex_mobile_client` package directly. UniFFI Kotlin sources are generated into `shared/rust-bridge/generated/kotlin/` and compiled straight into `:app` via `java.srcDir` in `apps/android/app/build.gradle.kts`; do not maintain copied binding files under Android source roots.
 - `shared/third_party/codex/` is the upstream Codex submodule.
 - `apps/ios/GeneratedRust/` contains local generated Rust artifacts for iOS builds: UniFFI headers/modulemap plus raw device/simulator staticlibs. These artifacts are not committed.
 - `apps/ios/Frameworks/` contains downloaded/package-lane iOS XCFrameworks (`codex_mobile_client.xcframework` in package builds). These artifacts are not committed.
 - `apps/ios/project.yml` is the source of truth for project generation; regenerate `apps/ios/AgentBuddy.xcodeproj` instead of hand-editing project files.
 
 ## Architecture
-- **iOS root layout:** `ContentView` uses a `ZStack` with a persistent `HeaderView`, main content area, and a `SidebarOverlay` that slides from the left.
+- **iOS root layout:** `ContentView` (in `AgentBuddyApp.swift`) is a `ZStack` of the theme background, `HomeNavigationView` (the primary `NavigationStack`: home dashboard → conversation), and floating overlays (e.g. the pet overlay). There is no sidebar overlay; `HeaderView` is only the principal toolbar item on the conversation screen.
 - **iOS state management:** `AppStore` (Rust, via UniFFI) is the canonical runtime state owner. `AppModel` is the thin Swift observation shell over Rust snapshots and updates. `AppState` is UI-only state.
 - **iOS server flow:** discovery and SSH are separate utility bridges; thread/session/account operations come from generated Rust RPC plus store updates.
-- **Android root layout:** `AgentBuddyAppShell` is the Compose entry; `DefaultAgentBuddyAppState` maps backend state into UI state.
+- **Android root layout:** `AgentBuddyApp()` in `ui/AgentBuddyApp.kt` is the Compose entry (hosted by `MainActivity`); `state/AppModel.kt` is the thin observation shell over Rust `AppStore` snapshots and updates.
 - **Android state/transport:** Android should use the same Rust-owned runtime model as iOS instead of re-implementing shared session/thread/account logic in Kotlin.
 - **Android server flow:** discovery seeds come from Android NSD, but discovery merge/probe policy lives in Rust; connection, auth, and thread/account flows go through Rust RPC + store updates.
 - **Message rendering parity:** both platforms support reasoning/system sections, code block rendering, and inline image handling.
@@ -33,7 +33,7 @@
 - `AppStore` is the Rust-owned state surface. It owns snapshots, typed updates, and the small set of truly composite/store-local actions.
 - `AppClient` is the public UniFFI client surface for direct server operations and typed results.
 - `DiscoveryBridge` and `SshBridge` are separate Rust utility surfaces. Do not move discovery/SSH policy back into Swift/Kotlin.
-- iOS uses UniFFI-generated Swift plus thin bridge helpers; Android uses UniFFI-generated Kotlin plus thin bridge helpers.
+- iOS uses UniFFI-generated Swift plus two thin helpers (`RustAlleycatBridge.swift`, `RustVoiceHandoff.swift`); Android calls the UniFFI-generated Kotlin directly.
 - iOS Debug/device links the raw static library in `apps/ios/GeneratedRust/ios-device/libcodex_mobile_client.a`. Package/release lanes may still create `apps/ios/Frameworks/codex_mobile_client.xcframework`, but that is not the default debug/device artifact.
 
 ## Feature Placement Rules
@@ -47,12 +47,13 @@
 - `AppStore` should stay minimal: snapshots, subscriptions, and truly composite/store-local actions only. Direct server operations belong on `AppClient`.
 - Prefer authoritative updates. Store state should be populated from upstream events first, then targeted refresh/reconcile when upstream events are insufficient. Do not hand-patch platform state after RPC success.
 - New boundary types that cross into Swift/Kotlin should be UniFFI-safe Rust records/enums. Internal Rust-only state can stay richer and non-UniFFI.
-- Generated Rust sources must stay local-only. Use `*.generated.rs` filenames and do not commit generated Rust files; regenerate them via `./shared/rust-bridge/generate-bindings.sh`.
+- There are no generated Rust sources. The only generated code is the UniFFI Swift/Kotlin bindings (`shared/rust-bridge/generated/`, `apps/ios/Sources/AgentBuddy/Bridge/UniFFICodexClient.generated.swift`); keep them local-only (gitignored) and regenerate via `make bindings` / `./shared/rust-bridge/generate-bindings.sh`.
 
 ## Where To Implement New Work
 - Add or change direct server coverage:
-  - update `shared/rust-bridge/codex-mobile-client/src/ffi/client.rs`
-  - update `shared/rust-bridge/codex-mobile-client/src/rpc/client_impl.rs` and/or reconciliation code as needed
+  - add the typed `AppClient` method with mobile-owned request/result records in `shared/rust-bridge/codex-mobile-client/src/ffi/client.rs`
+  - route it through `MobileClient` in `shared/rust-bridge/codex-mobile-client/src/mobile_client/` (`request_typed_for_server`)
+  - add reconciliation in `shared/rust-bridge/codex-mobile-client/src/store/reconcile.rs` when upstream events are insufficient
   - regenerate bindings
 - Add canonical runtime state, reducer logic, or reconciliation:
   - `shared/rust-bridge/codex-mobile-client/src/store/`
@@ -86,11 +87,10 @@
 
 ## Dependencies
 ### iOS (SPM via `apps/ios/project.yml`)
-- **Textual** — Renders Markdown in assistant/system messages with custom theming (successor to MarkdownUI).
+- **Hairball** (`dnakov/hairball`, product `HairballUI`) — renders Markdown in assistant/system messages with custom theming.
 ### Android (Gradle)
 - **Compose Material3** — primary Android UI toolkit.
 - **Markwon** — Markdown rendering for assistant/system text.
-- **JSch** — SSH transport for remote bootstrap flow.
 - **androidx.security:security-crypto** — encrypted credential storage.
 ### Rust Shared Layer (Cargo)
 - **codex-app-server-protocol**, **codex-app-server-client**, **codex-protocol**, **codex-core** — upstream Codex crates.
@@ -108,7 +108,7 @@ Before building on a new machine, verify:
 5. *(Optional)* `pymobiledevice3` enables `make ios-device-run` over Tailscale when the device is not on the local network. Install with `pipx install pymobiledevice3` (or `uv tool install pymobiledevice3`). Also requires Tailscale on both the Mac and the iOS device.
 
 ## Build System
-The root `Makefile` is the primary build interface. It orchestrates submodule sync, patching, UniFFI binding generation, Rust cross-compilation, raw staticlib generation, optional xcframework packaging, Xcode project generation, and platform builds — with stamp-file caching in `.build-stamps/` so repeated runs skip completed steps. If `sccache` is installed it is used automatically via `RUSTC_WRAPPER=sccache`.
+The root `Makefile` is the primary build interface. It orchestrates submodule sync, patching, UniFFI binding generation, Rust cross-compilation, raw staticlib generation, optional xcframework packaging, Xcode project generation, and platform builds — with stamp-file caching in `.build-stamps/` so repeated runs skip completed steps. If `sccache` is installed, package/CI builds use it via `RUSTC_WRAPPER=sccache` with a local disk cache; the remote S3/R2 backend is opt-in (R2: `SCCACHE_BUCKET` + `SCCACHE_ENDPOINT` + `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`; plain AWS S3: `SCCACHE_BUCKET` + AWS credentials or `AWS_PROFILE`/`SCCACHE_AWS_PROFILE`, optional `SCCACHE_REGION`/`AWS_REGION`; a bucket with neither endpoint nor credentials falls back to the local cache — see `tools/scripts/load-sccache-aws-creds.sh`).
 
 There are two distinct iOS Rust lanes:
 - Fast dev lane: raw staticlib + generated headers in `apps/ios/GeneratedRust/`, used by Debug/device builds (`make rust-ios-device-fast`, `make ios-device-fast`).
@@ -117,21 +117,21 @@ There are two distinct iOS Rust lanes:
 
 Incremental policy:
 - Package targets run with `CARGO_INCREMENTAL=0`.
-- Dev targets intentionally unset `CARGO_INCREMENTAL` rather than forcing it on, because this repo’s `sccache` setup rejects explicit incremental compilation.
+- Dev targets (`DEV_CARGO_ENV`) set `CARGO_INCREMENTAL=1` and unset `RUSTC_WRAPPER`: sccache rejects incremental compilation, and incremental wins for small-change rebuilds.
 
 ### Common targets
 | Target | Description |
 |---|---|
-| `make ios` | Full iOS package lane: sync → patch → bindings → rust (device+sim) → xcframework → alpine-fs → xcgen → simulator build |
-| `make alpine-fs` | Download the pinned Alpine rootfs from `dnakov/litter-ish`; bump `ALPINE_FS_VERSION` in `Makefile` to upgrade. The iSH kernel is built from Rust. |
+| `make ios` | Full iOS package lane: sync → patch → Ghostty → bindings → rust (device+sim) → xcframework → xcgen → simulator build (does not run `alpine-fs`) |
+| `make alpine-fs` | Download the pinned Alpine rootfs from `dnakov/litter-ish`; bump `ALPINE_FS_VERSION` in `Makefile` to upgrade. Not bundled into the iOS app while local iSH is disabled (see Fork Notes). |
 | `make ios-sim` | Full iOS package lane + simulator build |
 | `make ios-sim-fast` | Fast iOS simulator lane using raw simulator staticlib outputs in `GeneratedRust/ios-sim` |
 | `make ios-device` | Full iOS package lane + device build |
 | `make ios-device-fast` | Fast iOS device lane using raw staticlib outputs in `GeneratedRust/` |
 | `make ios-run` | Full iOS build then opens Xcode |
-| `make android` | Full Android pipeline: sync → kotlin bindings → rust JNI → gradle assemble |
+| `make android` | Fast Android dev build (default `arm64-v8a` / `android-dev` profile): rust JNI → Alpine fs + proot → gradle `assembleDebug` |
 | `make android-emulator-fast` | Fast Android dev build using the host-appropriate emulator ABI (`arm64-v8a` on Apple Silicon, `x86_64` on Intel) |
-| `make android-install` | Build + install remote-only APK to emulator |
+| `make android-install` | Build + install the debug APK on a connected physical device (`ANDROID_DEVICE_SERIAL` overrides) |
 | `make all` | Both platforms |
 | `make rust-ios` | Alias for the full Rust iOS package lane |
 | `make rust-ios-package` | Build/package Rust for iOS (device+sim + xcframework) |
@@ -161,7 +161,7 @@ Incremental policy:
 ### Individual scripts (called by Make, can also be run standalone)
 - `./apps/ios/scripts/build-rust.sh` — cross-compile Rust for iOS; in fast mode it emits raw staticlibs + headers to `apps/ios/GeneratedRust/`, and in package mode it also creates `codex_mobile_client.xcframework`
 - `./apps/ios/scripts/download-alpine-fs.sh` — fetch the pinned `dnakov/litter-ish` rootfs, verify its checksum, and extract it into `apps/ios/Resources/fs/`. Reads `ALPINE_FS_VERSION` from env (set by `make alpine-fs`).
-- `./apps/ios/scripts/sync-codex.sh` — sync codex submodule + apply patches
+- `./apps/ios/scripts/sync-codex.sh` — sync codex submodule + apply the patches listed, in order, in `patches/codex/series` (the single list also used by `build-rust.sh` rollback and `make unpatch`)
 - `./apps/ios/scripts/regenerate-project.sh` — regenerate Xcode project via xcodegen; this is the safe path because it removes any accidental nested `apps/ios/AgentBuddy.xcodeproj/AgentBuddy.xcodeproj` before regenerating
 - `./apps/ios/scripts/testflight-upload.sh` — archive, export IPA, upload to TestFlight
 - `./shared/rust-bridge/generate-bindings.sh` — generate UniFFI Swift/Kotlin bindings
@@ -170,11 +170,13 @@ Incremental policy:
 - `./tools/scripts/fetch-mobile-store-artifacts.py` — one-shot iOS + Android store triage fetcher; use `--last-hours N` or `--since ... --until ...` to pull TestFlight feedback/crashes/crash logs plus Play reviews/crash issues/reports into one output directory and print a Markdown summary with local artifact links. Reuses `testflight-feedback.sh` for the TestFlight feedback path. Android private testing feedback remains Play Console UI-only and is not available through the public APIs used here.
 - `./tools/scripts/triage-mobile-feedback.py` — rerunnable GitHub + TestFlight + Play triage ledger. It wraps `fetch-mobile-store-artifacts.py`, fetches GitHub issues/PRs, stores raw per-run snapshots under `artifacts/mobile-triage/runs/`, and preserves per-item status/notes in `artifacts/mobile-triage/triage-state.json`. Use `mark '<item-id>' --status done --note ...` after an item is handled, or `--status pr-open --note 'Fix PR #...'` when a fix PR has been opened, so later runs do not put the same item back in the unhandled queue.
 
-### Hot Reload (InjectionIII)
-- Install: `brew install --cask injectioniii`
-- Key views have `@ObserveInjection` + `.enableInjection()` wired up (ContentView, ConversationView, HeaderView, SessionSidebarView, MessageBubbleView).
-- Debug builds include `-Xlinker -interposable` in linker flags.
-- Run the app in simulator, open InjectionIII pointed at the project directory, then save any Swift file to see changes without relaunching.
+### Ghostty (terminal renderer)
+- libghostty builds from `shared/third_party/ghostty` (patches in `patches/ghostty/`) with zig 0.15.2: `make ghostty-ios` / `make ghostty-android`.
+- `GHOSTTY_KEEP_ZIG_CACHE=1` keeps a pre-seeded zig package cache instead of wiping it — useful behind networks where zig's package fetcher stalls (prefetch the deps once, then build).
+- Xcode 26 needs `xcodebuild -downloadComponent MetalToolchain` for Ghostty's Metal renderer.
+
+### Hot Reload
+- Not wired up: there is no InjectionIII / `@ObserveInjection` integration in this repo.
 
 ## Autonomous Debugging Runbook
 - Prefer the fast lanes for local iteration before package/release lanes: `make ios-sim-fast`, `make ios-device-fast`, and `make android-emulator-fast`.
@@ -188,7 +190,7 @@ Incremental policy:
 ## Coding Style & Naming Conventions
 - Swift style follows standard Xcode defaults: 4-space indentation, `UpperCamelCase` for types, `lowerCamelCase` for properties/functions.
 - Kotlin style follows standard Android/Kotlin conventions: 4-space indentation, `UpperCamelCase` types, `lowerCamelCase` members.
-- Dark theme: pure `Color.black` backgrounds, `#00FF9C` accent, `SFMono-Regular` font throughout.
+- Theming is JSON-driven: ~80 themes in `apps/ios/Sources/AgentBuddy/Resources/Themes/` (also packaged as Android assets), defaults `agentbuddy-dark` / `agentbuddy-light` (`ThemeManager`). The mono font is bundled Berkeley Mono with an `SFMono-Regular` fallback. Use theme colors instead of hardcoded values.
 - Keep concurrency boundaries explicit (`actor`, `@MainActor`) and avoid cross-actor mutable state.
 - Group iOS files by layer (`Views`, `Models`, `Bridge`) and Android files by module (`app/ui`, `app/state`, `core/*`).
 - No repository-local SwiftLint/SwiftFormat config is currently committed; keep formatting consistent with existing files.
@@ -212,9 +214,13 @@ AgentBuddy (Chinese display name 「搭子」) is a rebranded, independently-pub
 
 - **Branding**: all user-facing names, bundle/package ids, schemes, and identifiers are AgentBuddy (UI shows 「搭子」 in zh-Hans / Android). iOS scheme + project: `AgentBuddy` / `apps/ios/AgentBuddy.xcodeproj` (regenerate from `project.yml`, never hand-edit). Android package: `com.akashark.agentbuddy.android` (core bridge `com.akashark.agentbuddy.android.core.bridge`; the Rust JNI exports in `android_jni.rs` / `android_context.rs` encode this package and must move with it). Mac daemon binary `agentbuddy` (crate `agentbuddycli` in `services/kittylitter`, shipped as the desktop app's sidecar with bundle id `com.akashark.agentbuddy.host`; no npm publishing; launchd label `com.akashark.agentbuddycli` — the directory name and the `KITTYLITTER_*` Makefile variables intentionally keep the upstream name). GitHub repo: `https://github.com/AkaShark/AgentBuddy`.
 - **Signing (iOS)**: Apple team `HNKUYWPBVC`, bundle `com.akashark.agentbuddy` (+ `.liveactivity`, `.watchkitapp`, `.watchkitapp.complications`; app group `group.com.akashark.agentbuddy`; URL scheme `agentbuddyauth`). Device build uses automatic signing: `xcodebuild ... -allowProvisioningUpdates DEVELOPMENT_TEAM=HNKUYWPBVC`. App Store Connect API key lives under `~/.appstoreconnect/private_keys/`. The Baozi-era `DDZU3W897W` and litter-era `UCYH39VCQT` teams' certs are not usable for this app — do not use them.
-- **Android build**: needs Android SDK platform-35 + NDK + `cargo-ndk` + JDK 17; Rust `.so`s build via `tools/scripts/build-android-rust.sh`. The Ghostty terminal feature is **disabled by default for fork builds** (`-Plitter.enableGhosttyAndroid=false`) because it requires zig 0.15.2 (the brew default 0.16.0 fails `requireZig`). Firebase `google-services.json` is not committed and must be generated for `com.akashark.agentbuddy.android`.
+- **Android build**: needs Android SDK platform-35 + NDK + `cargo-ndk` + JDK 17; Rust `.so`s build via `tools/scripts/build-android-rust.sh`. Ghostty JNI is auto-enabled at build time when `ghostty.h` + `libghostty.so` exist for every requested ABI (`build-android-rust.sh` builds them on demand with zig 0.15.2 — brew's default 0.16.0 fails `requireZig`; force off with `-Plitter.enableGhosttyAndroid=false` or `LITTER_ENABLE_GHOSTTY_ANDROID=0`). In the UI the terminal is only hidden behind the `TERMINAL` experimental flag (off by default). Firebase `google-services.json` is not committed and must be generated for `com.akashark.agentbuddy.android`.
 - **alleycat fork**: the Rust deps in `shared/rust-bridge/Cargo.toml` and `services/kittylitter/Cargo.toml` point at the public `https://github.com/AkaShark/alleycat.git` fork, pinned to commit `3c6dfe2c6b060864d8cb0fcae58f73a6ed1ea10f` (same commit as upstream `dnakov/alleycat`). `tools/scripts/update-alleycat-main.sh` is a no-op by default; only `AGENTBUDDY_REFRESH_ALLEYCAT=1` moves the pin to the fork's latest `main`. `.cargo/config.toml` sets `net.git-fetch-with-cli = true` so Cargo fetches git deps through the system `git`. (`ish-embed-host` legitimately stays on `dnakov/litter-ish` — an upstream dep, not forked.)
 - **Localization**: the base (English) display name is `AgentBuddy`; iOS zh-Hans strings live in `apps/ios/Sources/AgentBuddy/zh-Hans.lproj/Localizable.strings` and `InfoPlist.strings` and show 「搭子」. Android UI strings are **hardcoded Chinese literals in Kotlin** (no `values-zh` resources) — translate in place; `android:label` is 「搭子」. Note `Text(stringVariable)` renders verbatim; only `Text("literal")` / `LocalizedStringKey` localizes.
 - **Product deltas from upstream**: tipping/TipJar removed on both platforms; BYO-API-key (no hosted login); top logo, splash and home cat still use the Baozi-era art (brand artwork has not been replaced yet); the 喵闻联播 `cat_transmission` easter egg and the TipJar StoreKit configuration were removed.
 - **Push infrastructure**: iOS and Android use the AgentBuddy-owned Cloudflare Worker `https://agentbuddy-push-proxy.aaksharker.workers.dev`; source is `services/push-proxy`. APNs and Firebase credentials are Worker secrets and must not enter Git. The Android Alpine rootfs release repo still references `huangguang1999/baozi-ish` in `apps/android/scripts/download-alpine-fs.sh`. `[baozi-fork]` comments mark inherited changes and are kept as provenance.
 - **Shared sentinels**: `"This Device"` is a cross-platform sentinel compared in iOS/Android/Rust — never translate the stored value; map it to a display string at render time only.
+- **Pairing security (known risk, intentionally not fixed yet)**: alleycat pairing uses one shared bearer token for all phones (no per-device tokens/allowlist); revoking means `agentbuddy rotate`, which invalidates every phone. alleycat defaults enable the `shell` agent (PTY login shell), claude `bypass_permissions=true` (`--dangerously-skip-permissions`) and amp `dangerously_allow_all=true`, so anyone with the QR/pair payload can run commands as the Mac user. `host.key` / `host.toml` (token) are 0600 plaintext files, not Keychain. Mitigations today: disable agents or set those flags false in `host.toml` (desktop Agents page), and rotate the token after any exposure. The proper fix (per-device pairing) belongs in the `AkaShark/alleycat` fork.
+- **ChatGPT OAuth on iOS**: only the login button was removed (`[baozi-fork]`). `ChatGPTOAuth.swift` and its entry points (`AppModel.ensureLocalAuthForThreadStart` → `loginLocalChatGPTAccount`, `SettingsView`, `AccountView`) stay because Slingshot remote control and ChatGPT-backed voice transcription depend on the ChatGPT token. Keep it unless those features are dropped.
+- **iOS local iSH is disabled**: `ishDisabledForFork = true` in `AgentBuddyPlatform.swift` (iSH SIGABRTs with "invalid vdso"). The Rust `ish` feature is off and the Alpine fs is not bundled on iOS, but `IshFS` / `ishDefaultCwd` call sites are intentionally kept for a future re-enable. The "This Device" / `localIsh` terminal is therefore not functional on iOS.
+- **Deferred refactors (tracked, not done)**: the Swift/Kotlin `AppModel`s still duplicate some reducer logic (streaming delta merge, `preserveStreamingText`, insertion index) that should move into Rust; Android still loads the legacy `codex_bridge` `.so` (`nativeBridgeInit`) alongside `codex_mobile_client` and should fold it into `codex-mobile-client`.

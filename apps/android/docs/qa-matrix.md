@@ -4,40 +4,44 @@
 
 This matrix covers transport reliability and startup-path parity for Android websocket + bridge flows.
 
-## Automated Regression Scaffolding
+## Automated Unit Tests
 
-Run unit tests for both runtime flavors:
+There is a single app build (no product flavors; `ENABLE_ON_DEVICE_BRIDGE=true`,
+`RUNTIME_STARTUP_MODE="hybrid"`). Run the JVM unit tests from `apps/android`:
 
 ```bash
-./gradlew :app:testOnDeviceDebugUnitTest
-./gradlew :app:testRemoteOnlyDebugUnitTest
+./gradlew :app:testDebugUnitTest
 ```
 
-Current automated checks:
+Current tests (`app/src/test/java/com/akashark/agentbuddy/android/`):
 
-- `RuntimeFlavorConfigTest`
-  - validates startup mode/build config parity (`ENABLE_ON_DEVICE_BRIDGE`, `RUNTIME_STARTUP_MODE`)
-  - validates canonical app runtime transport declaration (`APP_RUNTIME_TRANSPORT`)
-- `BridgeTransportReliabilityPolicyTest`
-  - validates reconnect detection policy for healthy/stale websocket state
-- `CodexRuntimeStartupPolicyTest`
-  - validates startup toggle parsing and precedence logic
-- `ThreadPlaceholderPrunePolicyTest`
-  - validates placeholder prune-on-refresh behavior (including active-thread exemption)
+- `RuntimeFlavorConfigTest` — startup mode / transport `BuildConfig` parity
+- `SavedServerTransportTest` — saved-server direct vs SSH transport choice and legacy migration
+- `HomeDashboardSupportTests`, `SessionsDerivationTests` — home/session workspace labels and cwd normalization
+- `auth/ChatGPTOAuthLoopbackServerTest` — ChatGPT OAuth loopback redirect server
+- `state/AppComposerPayloadTest` — composer payload → `turn/start` params
+- `state/RealtimeWebRtcTransportTest`, `state/VoiceDynamicToolSpecsTest` — realtime voice transport and dynamic tool specs
+- `state/SnapshotExtensionsTest` — snapshot display helpers (model labels)
+- `state/SshHostKeyMismatchTest` — typed SSH host-key prompts (changed key, unreadable saved key) read from Rust errors
+- `ui/AgentBuddyAppearanceModeTest`, `ui/ConversationTextSizingTest` — appearance mode and text sizing
+- `ui/conversation/BundledMorphdomAssetTest` — bundled morphdom asset for the widget WebView shell
+- `ui/conversation/ComposerBarSlashCommandTest` — composer slash commands
+- `ui/conversation/MathMarkdownTest` — math Markdown rendering
+- `ui/conversation/ResponseSubmissionErrorsTest` — turn submission error messages
 
 ## Manual Matrix
 
-| Area | onDevice flavor | remoteOnly flavor |
-|---|---|---|
-| App launch | App launches and can start local bridge-backed session | App launches and does not auto-start local bridge |
-| Connect local/on-device | Success (`ServerConfig.local`) | Expected failure with clear "disabled" error |
-| Connect remote server | Success | Success |
-| SSH-discovered remote server | Prompts for SSH credentials, connects through SSH port forwarding, and never attempts `ws://host:22` directly | Same |
-| Local transport drop | Reconnect and one-time reinitialize before next non-initialize RPC | N/A (local startup disabled) |
-| Remote transport drop | Reconnect behavior via Rust `AppStore` updates and resumed RPC notifications | Same |
-| Thread start/resume fallback sandbox | `workspace-write` with `danger-full-access` fallback when linux sandbox missing | Same |
-| Thread turn pagination (v0.125+ remote) | Conversation opens with last 5 turns; "Load earlier messages" button fetches older 5-turn pages via `thread/turns/list` | Same |
-| Thread turn pagination fallback (v0.124 remote) | Capability flips off via response inspection; embedded turns load fully; "Load earlier" button hidden | Same |
+| Area | Expected |
+|---|---|
+| App launch | App launches and can start a local bridge-backed session |
+| Connect local/on-device | Success (`ServerConfig.local`) |
+| Connect remote server | Success |
+| SSH-discovered remote server | Prompts for SSH credentials, connects through SSH port forwarding, and never attempts `ws://host:22` directly |
+| Local transport drop | Reconnect and one-time reinitialize before next non-initialize RPC |
+| Remote transport drop | Reconnect behavior via Rust `AppStore` updates and resumed RPC notifications |
+| Thread start/resume fallback sandbox | `workspace-write` with `danger-full-access` fallback when linux sandbox missing |
+| Thread turn pagination (v0.125+ remote) | Conversation opens with last 5 turns; "Load earlier messages" button fetches older 5-turn pages via `thread/turns/list` |
+| Thread turn pagination fallback (v0.124 remote) | Capability flips off via response inspection; embedded turns load fully; "Load earlier" button hidden |
 
 ## Terminal UX Matrix
 
@@ -76,10 +80,10 @@ broader composer autocomplete work.
 
 ## Suggested Smoke Steps
 
-1. `onDeviceDebug`: connect local default server, start thread, send turn, toggle network off/on, send another turn.
-2. `onDeviceDebug`: kill local bridge process (or force stop app), relaunch, confirm initialize and thread list recover.
-3. `remoteOnlyDebug`: attempt local connect path, verify explicit disabled error; connect remote server and run thread/list + turn/start.
-4. Both flavors: verify account read/login status refresh still updates UI after reconnect.
+1. Debug build: connect local default server, start thread, send turn, toggle network off/on, send another turn.
+2. Debug build: kill local bridge process (or force stop app), relaunch, confirm initialize and thread list recover.
+3. Debug build: connect a remote server and run thread/list + turn/start.
+4. Verify account read/login status refresh still updates UI after reconnect.
 
 ## Thinking-indicator Minigame (iOS + Android)
 
@@ -123,6 +127,8 @@ disconnects and re-establishes the chosen transport.
 | Validation errors surface inline | Alert "Invalid Server" with localized reason, dismiss returns to editor | Same — `AlertDialog` with reason; dismiss returns to editor |
 | Save (no reconnect) | Persists `SavedServerStore` + calls `store.renameServer`, leaves connection intact | Same |
 | Remove server | `SavedServerStore.remove` + closes SSH session + disconnects bridge | Same |
+| SSH host key changed / saved key unreadable (Discovery, Settings reconnect, Terminal) | `sshHostKeyChangeAlert` offers "Trust New Key" (pins the shown fingerprint) or "Forget Saved Host Key" (unpins), then retries | `SshHostKeyChangedDialog` offers 「信任新密钥」 or 「忘记已保存的主机密钥」, then retries |
+| Settings SSH reconnect fails for another reason | "Server Update Failed" alert shows the Rust `terminalMessage` | SSH reconnect error dialog shows the Rust `terminalMessage` |
 
 ## Sidebar + Picker Parity Checklist (iOS + Android)
 
@@ -223,8 +229,8 @@ Generative UI is permanent (no flag). Local-server threads register `show_widget
 
 | Area | Check |
 |---|---|
-| Bootstrap | `AppClient.setSavedAppsDirectory(MobilePreferencesDirectory.path(context))` is called once in `AppModel.init`, before any thread starts. Without this, the Rust `show_widget` finalize hook is a silent no-op. |
-| Auto-upsert | When the model finalizes a `show_widget` with `app_id = "fitness-tracker"` on a local-server thread, the Rust hook calls `saved_app_upsert(directory, originThreadId, appId, title, html, w, h, schema)` and writes to `{filesDir}/LitterPreferences/apps/saved_apps.json` + `html/<uuid>.html`. No Kotlin-initiated promote call is needed. |
+| Bootstrap | `AppClient.setSavedAppsDirectory(SavedAppsDirectory.path(context))` (`{filesDir}/Apps`) is called once in `AppModel.init`, before any thread starts. Without this, the Rust `show_widget` finalize hook is a silent no-op. |
+| Auto-upsert | When the model finalizes a `show_widget` with `app_id = "fitness-tracker"` on a local-server thread, the Rust hook calls `saved_app_upsert(directory, originThreadId, appId, title, html, w, h, schema)` and writes to `{filesDir}/Apps/saved_apps.json` + `html/<uuid>.html` (state in `state/<uuid>.json`). No Kotlin-initiated promote call is needed. |
 | Saved-as chip | Finalized `WidgetRow` whose `HydratedWidgetData.appId` is non-null renders a compact "Saved as `<slug>`" chip below the WebView (11sp mono, accent slug). Tap resolves `SavedAppsStore.appForSlug(slug, threadId)` to a UUID and pushes `Route.SavedApp`. Chip is absent when `appId == null` or the widget isn't finalized. |
 | Home-row takeover | `HomeDashboardScreen` keeps a `savedAppsByThread` map keyed by `originThreadId`, reloaded via `SavedAppsStore.reload` on every snapshot tick (MVP coarse reactivity; R3 will supply a `SavedAppsChanged` stream). When a session's threadId has entries, its row renders `HomeAppTakeoverRow` (monogram + title + slug subtitle + "+N more" when there are siblings) instead of `SessionCanvasRow`. Tap navigates to `Route.SavedApp(mostRecent.id)`. Swipe-to-hide on the session still works. |
 | Apps list entry | Settings sheet "Apps → Saved Apps" row is always visible (no flag gate). Pushes `Route.Apps`. |
