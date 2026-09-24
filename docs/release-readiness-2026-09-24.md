@@ -78,3 +78,6 @@
 - 已连接 iPhone 15 Pro Max，确认调试包使用 AgentBuddy 新 Worker 地址。
 - 首次启动复现 APNs 注册失败：应用缺少 `aps-environment`。在 `project.yml` 补齐推送 entitlement 后重新生成工程，设备构建成功，签名包含 `aps-environment=development`。
 - 修复包已安装并启动，设备回调成功取得 32 字节 APNs token（不在文档中记录 token）。真机后台接收与业务刷新仍待实测；token 注册成功不代表推送送达。
+
+- 用户选择模拟测试：Mac 使用真机 token 注册 30 秒间隔、150 秒 TTL 的 sandbox 推送。Worker 记录三次 `APNs sandbox → 200 OK`；iPhone 在 `applicationState=background` 收到静默推送，执行 runtime handler 并完成 `newData`。测试注册已主动注销。
+- 完整业务流程仍未验收：手机进入后台时，自行调用 Worker `/register` 报“无法连接服务器”；Mac 代注册仅验证了服务端到 APNs 到真机后台接收，未证明手机到 Worker 的网络路径，也未验证有运行任务时的状态刷新。后续应检查手机网络对 workers.dev 的可达性，必要时配置可访问的自有域名。
