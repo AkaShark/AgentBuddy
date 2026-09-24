@@ -21,7 +21,9 @@ path = "src/main.rs"
 # reproducible builds / GPLv3 source-correspondence (was: branch = "main").
 # tools/scripts/update-alleycat-main.sh leaves this rev alone unless you opt in
 # with AGENTBUDDY_REFRESH_ALLEYCAT=1, so normal builds never float it.
-alleycat = { git = "https://github.com/AkaShark/alleycat.git", rev = "3c6dfe2c6b060864d8cb0fcae58f73a6ed1ea10f" }
+# a5bdd83 is on the fork branch feat/host-push-notifications (draft PR
+# AkaShark/alleycat#1: host push subscriptions); it is not on the fork main yet.
+alleycat = { git = "https://github.com/AkaShark/alleycat.git", rev = "a5bdd83f1dedc9169610efe5a245f82bb0198f13" }
 anyhow = "1"
 
 [profile.release]
