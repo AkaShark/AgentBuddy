@@ -3,7 +3,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
 use serde::Serialize;
-use toml_edit::{value, DocumentMut, Item, Table};
+use toml_edit::{value, DocumentMut, Item, Table, TableLike};
 
 use crate::error::HostError;
 
@@ -28,7 +28,7 @@ fn parse(text: &str) -> Result<DocumentMut, HostError> {
         .map_err(|e| HostError::config_invalid(format!("host.toml: {e}")))
 }
 
-fn agent_table<'a>(doc: &'a mut DocumentMut, agent: &str) -> Result<&'a mut Table, HostError> {
+fn agent_table<'a>(doc: &'a mut DocumentMut, agent: &str) -> Result<&'a mut dyn TableLike, HostError> {
     let agents = doc
         .as_table_mut()
         .entry("agents")
@@ -37,12 +37,12 @@ fn agent_table<'a>(doc: &'a mut DocumentMut, agent: &str) -> Result<&'a mut Tabl
             t.set_implicit(true);
             Item::Table(t)
         })
-        .as_table_mut()
+        .as_table_like_mut()
         .ok_or_else(|| HostError::config_invalid("host.toml: `agents` is not a table"))?;
     agents
         .entry(agent)
         .or_insert_with(|| Item::Table(Table::new()))
-        .as_table_mut()
+        .as_table_like_mut()
         .ok_or_else(|| {
             HostError::config_invalid(format!("host.toml: `agents.{agent}` is not a table"))
         })
@@ -50,13 +50,13 @@ fn agent_table<'a>(doc: &'a mut DocumentMut, agent: &str) -> Result<&'a mut Tabl
 
 pub fn set_agent_enabled(text: &str, agent: &str, enabled: bool) -> Result<String, HostError> {
     let mut doc = parse(text)?;
-    agent_table(&mut doc, agent)?["enabled"] = value(enabled);
+    agent_table(&mut doc, agent)?.insert("enabled", value(enabled));
     Ok(doc.to_string())
 }
 
 pub fn set_agent_bin(text: &str, agent: &str, bin: &str) -> Result<String, HostError> {
     let mut doc = parse(text)?;
-    agent_table(&mut doc, agent)?[bin_key(agent)] = value(bin);
+    agent_table(&mut doc, agent)?.insert(bin_key(agent), value(bin));
     Ok(doc.to_string())
 }
 
@@ -108,6 +108,21 @@ mod tests {
     use super::*;
 
     const HOST: &str = include_str!("../tests/fixtures/host.toml");
+
+    #[test]
+    fn edits_inline_agent_tables_without_losing_other_settings() {
+        for input in [
+            "[agents]\ncodex = { enabled = true, bin = 'old', port = 8390 }\n",
+            "agents = { codex = { enabled = true, bin = 'old', port = 8390 } }\n",
+        ] {
+            let out = set_agent_enabled(input, "codex", false).unwrap();
+            let out = set_agent_bin(&out, "codex", "/new/codex").unwrap();
+            let doc = parse(&out).unwrap();
+            assert_eq!(doc["agents"]["codex"]["enabled"].as_bool(), Some(false));
+            assert_eq!(doc["agents"]["codex"]["bin"].as_str(), Some("/new/codex"));
+            assert_eq!(doc["agents"]["codex"]["port"].as_integer(), Some(8390));
+        }
+    }
 
     #[test]
     fn set_agent_enabled_flips_only_that_agent_and_keeps_comments() {
