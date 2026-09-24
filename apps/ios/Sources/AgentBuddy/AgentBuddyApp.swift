@@ -75,7 +75,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         UNUserNotificationCenter.current().delegate = self
         UNUserNotificationCenter.current().setNotificationCategories([
             UNNotificationCategory(
-                identifier: "agentbuddy.task.complete",
+                identifier: PushNotificationSupport.completionCategoryIdentifier,
                 actions: [],
                 intentIdentifiers: [],
                 options: [.allowAnnouncement]
@@ -198,8 +198,14 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     }
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        let hex = deviceToken.map { String(format: "%02x", $0) }.joined()
-        LLog.info("push", "device token received", fields: ["bytes": deviceToken.count, "hex": hex])
+        LLog.info(
+            "push",
+            "device token received",
+            fields: [
+                "bytes": deviceToken.count,
+                "sha256Prefix": PushNotificationSupport.tokenFingerprint(deviceToken)
+            ]
+        )
         if let appRuntime {
             appRuntime.setDevicePushToken(deviceToken)
         } else {
@@ -231,30 +237,38 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         _ = semaphore.wait(timeout: .now() + 2.5)
     }
 
+    /// Host-reported completion pushes are visible alerts; there is no silent
+    /// keep-alive push to act on anymore.
     func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any], fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
         LLog.info(
             "push",
-            "background push received",
-            fields: [
-                "applicationState": application.applicationState.debugName
-            ],
-            payloadJson: notificationPayloadJson(userInfo)
+            "remote notification received; no background work",
+            fields: ["applicationState": application.applicationState.debugName]
         )
-        if application.applicationState == .active {
-            LLog.info("push", "skipping background push handler because app is already active")
-            completionHandler(.noData)
-            return
-        }
-        guard let appRuntime else {
-            LLog.warn("push", "background push received before runtime was ready")
-            completionHandler(.noData)
-            return
-        }
-        Task { @MainActor in
-            await appRuntime.handleBackgroundPush()
-            LLog.info("push", "background push handling completed", fields: ["result": "newData"])
-            completionHandler(.newData)
-        }
+        completionHandler(.noData)
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        let key = PushNotificationSupport.threadKey(from: notification.request.content.userInfo)
+        let options = PushNotificationSupport.presentationOptions(
+            for: key,
+            visibleThread: appRuntime?.visibleConversationKey,
+            isAppActive: UIApplication.shared.applicationState == .active
+        )
+        LLog.info(
+            "push",
+            "presenting foreground notification",
+            fields: [
+                "serverId": key?.serverId ?? "",
+                "threadId": key?.threadId ?? "",
+                "suppressed": options.isEmpty
+            ]
+        )
+        completionHandler(options)
     }
 
     func userNotificationCenter(
@@ -291,9 +305,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
             return
         }
 
-        if let key = AppLifecycleController.notificationThreadKey(
-            from: response.notification.request.content.userInfo
-        ) {
+        if let key = PushNotificationSupport.threadKey(from: info) {
             openThreadFromNotification(key)
         }
         completionHandler()
@@ -984,9 +996,18 @@ private struct HomeNavigationView: View {
             updateHomeDashboardActivity()
             hydratePinnedThreadsIfNeeded()
             seedInitialConversationIfNeeded(activeKey: appModel.snapshot?.activeThread)
+            // A recreated stack (e.g. theme change) starts at home again.
+            AppRuntimeController.shared.visibleConversationKey = Self.visibleConversationKey(in: navigationPath)
+            openNotificationThreadIfRequested()
         }
         .onChange(of: appModel.snapshot?.activeThread) { _, newKey in
             seedInitialConversationIfNeeded(activeKey: newKey)
+        }
+        .onChange(of: navigationPath) { _, newPath in
+            AppRuntimeController.shared.visibleConversationKey = Self.visibleConversationKey(in: newPath)
+        }
+        .onChange(of: AppRuntimeController.shared.notificationNavigationRequest) { _, _ in
+            openNotificationThreadIfRequested()
         }
         .onChange(of: navigationPath.count) { _, newCount in
             updateHomeDashboardActivity()
@@ -1399,6 +1420,18 @@ private struct HomeNavigationView: View {
             approvalPolicy: appState.launchApprovalPolicy(for: resolvedThreadKey),
             sandboxMode: appState.launchSandboxMode(for: resolvedThreadKey)
         )
+    }
+
+    private static func visibleConversationKey(in path: [HomeNavigationRoute]) -> ThreadKey? {
+        guard case let .conversation(key) = path.last else { return nil }
+        return key
+    }
+
+    /// A notification tap resolved its thread; show it on top of the stack.
+    private func openNotificationThreadIfRequested() {
+        guard let key = AppRuntimeController.shared.consumeNotificationNavigationRequest(),
+              navigationPath.last != .conversation(key) else { return }
+        replaceTopConversation(with: key)
     }
 
     private func openConversation(_ key: ThreadKey) {

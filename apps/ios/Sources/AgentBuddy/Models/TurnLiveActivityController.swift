@@ -90,10 +90,16 @@ final class TurnLiveActivityController {
         writeRunningTurnSnapshot(for: thread, startDate: now, snapshot: snapshot)
     }
 
-    private func update(for thread: AppThreadSnapshot, activeCount: Int, snapshot: AppSnapshotRecord) {
+    private func update(
+        for thread: AppThreadSnapshot,
+        activeCount: Int,
+        snapshot: AppSnapshotRecord,
+        force: Bool = false,
+        staleAfter: TimeInterval = 60
+    ) {
         guard let activity else { return }
         let now = CFAbsoluteTimeGetCurrent()
-        guard now - lastUpdateTime > 2.0 else { return }
+        guard force || now - lastUpdateTime > 2.0 else { return }
 
         if let assistantSnippet = thread.latestAssistantSnippetSnapshot,
            outputSnippetSourceItemId != assistantSnippet.sourceItemId || outputSnippet != assistantSnippet.snippet {
@@ -112,35 +118,33 @@ final class TurnLiveActivityController {
         )
         lastUpdateTime = now
         Task {
-            await activity.update(.init(state: state, staleDate: Date(timeIntervalSinceNow: 60)))
+            await activity.update(.init(state: state, staleDate: Date(timeIntervalSinceNow: staleAfter)))
         }
 
         writeRunningTurnSnapshot(for: thread, startDate: startDate ?? Date(), snapshot: snapshot)
     }
 
-    func updateBackgroundWake(for thread: AppThreadSnapshot, pushCount: Int) {
-        guard let activity else { return }
-        if let snapshot = thread.latestAssistantSnippetSnapshot,
-           outputSnippetSourceItemId != snapshot.sourceItemId || outputSnippet != snapshot.snippet {
-            outputSnippetSourceItemId = snapshot.sourceItemId
-            outputSnippet = snapshot.snippet
-        }
-
-        let state = CodexTurnAttributes.ContentState(
-            phase: .thinking,
-            elapsedSeconds: Int(Date().timeIntervalSince(startDate ?? Date())),
-            toolCallCount: 0,
-            activeThreadCount: 1,
-            outputSnippet: outputSnippet,
-            pushCount: pushCount,
-            fileChangeCount: 0,
-            contextPercent: thread.contextPercent
+    /// App entered background. Phase 1 has no push-updated Live Activities,
+    /// so once iOS suspends the app the activity freezes: publish the latest
+    /// state now, marked stale when the background window closes. Foreground
+    /// recovery `sync`s it again (or ends it when the turn is done).
+    func markBackgrounded(_ snapshot: AppSnapshotRecord?) {
+        sync(snapshot)
+        guard let snapshot,
+              let activeKey,
+              let thread = snapshot.threadSnapshot(for: activeKey) else { return }
+        update(
+            for: thread,
+            activeCount: snapshot.threadsWithTrackedTurns.count,
+            snapshot: snapshot,
+            force: true,
+            staleAfter: Self.backgroundStaleInterval
         )
-        lastUpdateTime = CFAbsoluteTimeGetCurrent()
-        Task {
-            await activity.update(.init(state: state, staleDate: Date(timeIntervalSinceNow: 60)))
-        }
     }
+
+    /// Roughly the background execution window iOS grants after the app
+    /// leaves the foreground; later the activity can no longer be refreshed.
+    private static let backgroundStaleInterval: TimeInterval = 30
 
     func endCurrent(phase: CodexTurnAttributes.ContentState.Phase, snapshot: AppSnapshotRecord?) {
         guard let activity else { return }

@@ -11,6 +11,10 @@ final class AppRuntimeController {
     @ObservationIgnored private weak var appModel: AppModel?
     @ObservationIgnored private let reachability = NetworkReachabilityObserver()
 
+    /// Mirrors the iOS runtime so shared notification routing compiles.
+    @ObservationIgnored var visibleConversationKey: ThreadKey?
+    private(set) var notificationNavigationRequest: ThreadKey?
+
     func bind(appModel: AppModel, voiceRuntime: VoiceRuntimeController) {
         self.appModel = appModel
         reachability.bind(appModel: appModel)
@@ -47,6 +51,7 @@ final class AppRuntimeController {
         await appModel.client.shutdownAlleycatEndpoint()
     }
 
+    /// Catalyst does not register for host-reported completion pushes.
     func setDevicePushToken(_ token: Data) {}
 
     func reconnectSavedServers() async {
@@ -92,11 +97,18 @@ final class AppRuntimeController {
     func openThreadFromNotification(key: ThreadKey) async {
         guard let appModel else { return }
         appModel.activateThread(key)
+        notificationNavigationRequest = key
         await appModel.refreshSnapshot()
         if let resolvedKey = await appModel.ensureThreadLoaded(key: key) {
             appModel.activateThread(resolvedKey)
             await appModel.refreshSnapshot()
         }
+    }
+
+    func consumeNotificationNavigationRequest() -> ThreadKey? {
+        let key = notificationNavigationRequest
+        notificationNavigationRequest = nil
+        return key
     }
 
     func handleSnapshot(_ snapshot: AppSnapshotRecord?) {}
@@ -126,27 +138,9 @@ final class AppRuntimeController {
         }
     }
 
-    func handleBackgroundPush() async {}
-
     @ObservationIgnored private var hasRecoveredOnForeground = false
     @ObservationIgnored private var lastBackgroundedAt: Date?
     private static let longResumeThreshold: TimeInterval = 15
-}
-
-@MainActor
-final class AppLifecycleController {
-    static let notificationServerIdKey = "agentbuddy.notification.serverId"
-    static let notificationThreadIdKey = "agentbuddy.notification.threadId"
-
-    static func notificationThreadKey(from userInfo: [AnyHashable: Any]) -> ThreadKey? {
-        guard let serverId = userInfo[notificationServerIdKey] as? String,
-              let threadId = userInfo[notificationThreadIdKey] as? String,
-              !serverId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              !threadId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return nil
-        }
-        return ThreadKey(serverId: serverId, threadId: threadId)
-    }
 }
 
 @MainActor

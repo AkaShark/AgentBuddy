@@ -324,16 +324,6 @@ final class AppSnapshotRuntimeTests: XCTestCase {
         XCTAssertEqual(reloadKeys, [key])
     }
 
-    @MainActor
-    func testNotificationThreadKeyParsesThreadMetadata() {
-        let key = AppLifecycleController.notificationThreadKey(from: [
-            AppLifecycleController.notificationServerIdKey: "srv",
-            AppLifecycleController.notificationThreadIdKey: "thread-1"
-        ])
-
-        XCTAssertEqual(key, ThreadKey(serverId: "srv", threadId: "thread-1"))
-    }
-
     private func makeSnapshot(threads: [AppThreadSnapshot]) -> AppSnapshotRecord {
         let server = AppServerSnapshot(
             serverId: "srv",

@@ -11,21 +11,21 @@ private let appLifecycleSignpostLog = OSLog(
 
 @MainActor
 final class AppLifecycleController {
-    static let notificationServerIdKey = "agentbuddy.notification.serverId"
-    static let notificationThreadIdKey = "agentbuddy.notification.threadId"
-
     struct BackgroundTurnReconciliation {
         let remainingKeys: Set<ThreadKey>
         let activeThreads: [AppThreadSnapshot]
         let completedNotificationThread: AppThreadSnapshot?
     }
 
-    private let pushProxy = PushProxyClient()
-    private var pushProxyRegistrationId: String?
     private var devicePushToken: Data?
     private var backgroundedTurnKeys: Set<ThreadKey> = []
+    /// Active turn id of each tracked thread when the app was backgrounded,
+    /// so the local completion fallback can ask Rust about that exact turn.
+    private var backgroundedTurnIds: [ThreadKey: String] = [:]
+    /// Current background completion observation; stale observers compare
+    /// against it and stop re-arming.
+    private var backgroundObservationID: UUID?
     private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
-    private var bgWakeCount: Int = 0
     private var notificationPermissionRequested = false
     private var hasRecoveredCurrentForegroundSession = false
     private var hasEnteredBackgroundSinceLaunch = false
@@ -47,8 +47,43 @@ final class AppLifecycleController {
     /// remainder of that window.
     private static let longResumeThreshold: TimeInterval = 15
 
-    func setDevicePushToken(_ token: Data) {
+    func setDevicePushToken(_ token: Data, client: AppClient?) {
         devicePushToken = token
+        guard let client else { return }
+        refreshPushRegistration(client: client)
+    }
+
+    /// Hand Rust the current push registration: the APNs token while the user
+    /// allows notifications, otherwise `nil` so Rust revokes this device's
+    /// host subscriptions. Re-run whenever the token or permission may change.
+    func refreshPushRegistration(client: AppClient) {
+        UNUserNotificationCenter.current().getNotificationSettings { [weak self] settings in
+            let status = settings.authorizationStatus
+            Task { @MainActor [weak self] in
+                self?.applyPushRegistration(authorizationStatus: status, client: client)
+            }
+        }
+    }
+
+    private func applyPushRegistration(authorizationStatus: UNAuthorizationStatus, client: AppClient) {
+        let environment = PushNotificationSupport.currentApnsEnvironment()
+        let registration = PushNotificationSupport.registration(
+            token: devicePushToken,
+            authorizationStatus: authorizationStatus,
+            environment: environment
+        )
+        LLog.info(
+            "push",
+            "updating push registration",
+            fields: [
+                "registered": registration != nil,
+                "hasToken": devicePushToken != nil,
+                "authorizationStatus": authorizationStatus.rawValue,
+                "apnsEnvironment": String(describing: environment),
+                "tokenSha256Prefix": devicePushToken.map(PushNotificationSupport.tokenFingerprint) ?? ""
+            ]
+        )
+        client.setPushRegistration(registration: registration)
     }
 
     func reconnectSavedServers(appModel: AppModel) async {
@@ -97,13 +132,14 @@ final class AppLifecycleController {
     }
 
     func appDidEnterBackground(
-        snapshot: AppSnapshotRecord?,
+        appModel: AppModel,
         hasActiveVoiceSession: Bool,
         liveActivities: TurnLiveActivityController
     ) {
         let signpostID = OSSignpostID(log: appLifecycleSignpostLog)
         os_signpost(.begin, log: appLifecycleSignpostLog, name: "AppDidEnterBackground", signpostID: signpostID)
         defer { os_signpost(.end, log: appLifecycleSignpostLog, name: "AppDidEnterBackground", signpostID: signpostID) }
+        let snapshot = appModel.snapshot
         hasEnteredBackgroundSinceLaunch = true
         hasRecoveredCurrentForegroundSession = false
         lastBackgroundedAt = Date()
@@ -123,6 +159,10 @@ final class AppLifecycleController {
         guard !activeThreads.isEmpty else { return }
 
         backgroundedTurnKeys = Set(activeThreads.map(\.key))
+        backgroundedTurnIds = Dictionary(
+            activeThreads.compactMap { thread in thread.activeTurnId.map { (thread.key, $0) } },
+            uniquingKeysWith: { first, _ in first }
+        )
         LLog.info(
             "lifecycle",
             "tracking background turn keys",
@@ -130,9 +170,7 @@ final class AppLifecycleController {
                 "trackedKeys": activeThreads.map(\.key.debugLabel)
             ]
         )
-        bgWakeCount = 0
-        liveActivities.sync(snapshot)
-        registerPushProxy()
+        liveActivities.markBackgrounded(snapshot)
 
         let bgID = UIApplication.shared.beginBackgroundTask { [weak self] in
             guard let self else { return }
@@ -141,6 +179,14 @@ final class AppLifecycleController {
             UIApplication.shared.endBackgroundTask(expiredID)
         }
         backgroundTaskID = bgID
+
+        let observationID = UUID()
+        backgroundObservationID = observationID
+        observeBackgroundTurnCompletion(
+            appModel: appModel,
+            liveActivities: liveActivities,
+            observationID: observationID
+        )
     }
 
     func appDidBecomeActive(
@@ -151,8 +197,10 @@ final class AppLifecycleController {
         let signpostID = OSSignpostID(log: appLifecycleSignpostLog)
         os_signpost(.begin, log: appLifecycleSignpostLog, name: "AppDidBecomeActive", signpostID: signpostID)
         defer { os_signpost(.end, log: appLifecycleSignpostLog, name: "AppDidBecomeActive", signpostID: signpostID) }
-        deregisterPushProxy()
+        backgroundObservationID = nil
         endBackgroundTaskIfNeeded()
+        // The user may have changed notification permission in Settings.
+        refreshPushRegistration(client: appModel.client)
         guard !hasActiveVoiceSession else { return }
         guard !hasRecoveredCurrentForegroundSession else { return }
         hasRecoveredCurrentForegroundSession = true
@@ -160,6 +208,7 @@ final class AppLifecycleController {
         let currentSnapshot = appModel.snapshot
         let backgroundedKeys = backgroundedTurnKeys
         backgroundedTurnKeys.removeAll()
+        backgroundedTurnIds.removeAll()
         let keysToRefresh = foregroundRecoveryKeys(
             snapshot: currentSnapshot,
             backgroundedKeys: backgroundedKeys
@@ -197,111 +246,69 @@ final class AppLifecycleController {
         }
     }
 
-    func handleBackgroundPush(
+    /// While the app still runs in background (the background task after
+    /// `appDidEnterBackground`), post the local completion fallback as soon as
+    /// the tracked turns end. There are no background push wakes anymore: once
+    /// iOS suspends the app, only host-reported pushes can notify (spec §8.2).
+    private func observeBackgroundTurnCompletion(
         appModel: AppModel,
-        liveActivities: TurnLiveActivityController
-    ) async {
-        let signpostID = OSSignpostID(log: appLifecycleSignpostLog)
-        os_signpost(.begin, log: appLifecycleSignpostLog, name: "HandleBackgroundPush", signpostID: signpostID)
-        defer { os_signpost(.end, log: appLifecycleSignpostLog, name: "HandleBackgroundPush", signpostID: signpostID) }
-        guard UIApplication.shared.applicationState != .active else {
-            LLog.info("push", "skipping background push reconciliation because app is active")
-            return
+        liveActivities: TurnLiveActivityController,
+        observationID: UUID
+    ) {
+        withObservationTracking {
+            _ = appModel.snapshot
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.handleBackgroundSnapshotChange(
+                    appModel: appModel,
+                    liveActivities: liveActivities,
+                    observationID: observationID
+                )
+            }
         }
-        bgWakeCount += 1
-        let keys = backgroundedTurnKeys
-        LLog.info(
-            "push",
-            "handling background push wake",
-            fields: [
-                "wakeCount": bgWakeCount,
-                "trackedKeyCount": keys.count,
-                "trackedKeys": Array(keys).map(\.debugLabel)
-            ]
-        )
-        guard !keys.isEmpty else { return }
-
-        // Do NOT proactively close the alleycat Connection on every push
-        // wake. The 30s push cadence matches iroh's idle window — closing
-        // the connection here tears down the very transport iOS just
-        // thawed us to use, costing a reconnect handshake out of our 30s
-        // budget. If the path is actually dead, the next request will
-        // fail and the transport's own reconnect logic will rebuild it
-        // (and `connect_remote_over_alleycat` short-circuits when a
-        // healthy session already exists). The longer foreground-resume
-        // path still uses `onLongResume` because there iroh's per-path
-        // idle has plausibly killed the path silently.
-        await reconnectSavedServers(appModel: appModel)
-        // refreshTrackedThreads uses the force-authoritative path so the
-        // store reconciles `active_turn_id` against the server's view —
-        // the only way to clear a stale `active_turn_id` for a turn that
-        // completed during the background freeze (no `TurnCompleted`
-        // event was ever delivered to this client). On paginated remotes
-        // the resume runs with `excludeTurns: true` and a tiny
-        // `thread/turns/list` probe drives the reconcile; on legacy
-        // remotes the resume falls back to the embedded turn list. The
-        // RPC also re-attaches the new `ConnectionId` to the per-thread
-        // subscription set so subsequent live events route correctly.
-        let reloadKeys = keys.filter { !shouldTrustLiveThreadState(for: $0, appModel: appModel) }
-        if !reloadKeys.isEmpty {
-            await refreshTrackedThreads(
-                appModel: appModel,
-                keys: Array(reloadKeys),
-                forceAuthoritative: true
-            )
-        } else {
-            LLog.info(
-                "push",
-                "background push skipped tracked thread reload because live state is recent",
-                fields: ["trackedKeys": Array(keys).map(\.debugLabel)]
-            )
-        }
-
-        guard let snapshot = appModel.snapshot else { return }
-        let trustedLiveKeys = Set(keys.filter { shouldTrustLiveThreadState(for: $0, appModel: appModel) })
-        let reconciliation = reconcileBackgroundedTurns(
-            snapshot: snapshot,
-            trackedKeys: keys,
-            trustedLiveKeys: trustedLiveKeys
-        )
-        backgroundedTurnKeys = reconciliation.remainingKeys
-        LLog.info(
-            "push",
-            "background push reconciliation finished",
-            fields: [
-                "remainingKeyCount": reconciliation.remainingKeys.count,
-                "remainingKeys": Array(reconciliation.remainingKeys).map(\.debugLabel),
-                "activeThreadCount": reconciliation.activeThreads.count,
-                "completedNotificationThread": reconciliation.completedNotificationThread?.key.debugLabel ?? ""
-            ]
-        )
-
-        for thread in reconciliation.activeThreads {
-            liveActivities.updateBackgroundWake(for: thread, pushCount: bgWakeCount)
-        }
-
-        if let thread = reconciliation.completedNotificationThread {
-            liveActivities.endCurrent(phase: .completed, snapshot: snapshot)
-            postLocalNotificationIfNeeded(
-                model: thread.resolvedModel,
-                threadPreview: thread.resolvedPreview,
-                threadKey: thread.key
-            )
-        }
-
-        if backgroundedTurnKeys.isEmpty {
-            deregisterPushProxy()
-        }
-
-        // Refresh the suspension marker so the next push wake (or
-        // foreground) measures from the end of this work, not from the
-        // original backgrounding. Otherwise a series of push wakes
-        // during one background session would tear down healthy
-        // connections every time.
-        lastBackgroundedAt = Date()
     }
 
-    func requestNotificationPermissionIfNeeded() {
+    private func handleBackgroundSnapshotChange(
+        appModel: AppModel,
+        liveActivities: TurnLiveActivityController,
+        observationID: UUID
+    ) {
+        guard backgroundObservationID == observationID,
+              UIApplication.shared.applicationState == .background,
+              !backgroundedTurnKeys.isEmpty,
+              let snapshot = appModel.snapshot else {
+            return
+        }
+        let reconciliation = reconcileBackgroundedTurns(
+            snapshot: snapshot,
+            trackedKeys: backgroundedTurnKeys
+        )
+        backgroundedTurnKeys = reconciliation.remainingKeys
+        if let thread = reconciliation.completedNotificationThread {
+            LLog.info(
+                "push",
+                "tracked background turns finished while app was running",
+                fields: ["completedNotificationThread": thread.key.debugLabel]
+            )
+            liveActivities.endCurrent(phase: .completed, snapshot: snapshot)
+            postLocalNotificationIfNeeded(
+                thread: thread,
+                turnId: backgroundedTurnIds[thread.key],
+                client: appModel.client
+            )
+        }
+        guard !backgroundedTurnKeys.isEmpty else {
+            backgroundObservationID = nil
+            return
+        }
+        observeBackgroundTurnCompletion(
+            appModel: appModel,
+            liveActivities: liveActivities,
+            observationID: observationID
+        )
+    }
+
+    func requestNotificationPermissionIfNeeded(client: AppClient) {
         guard !notificationPermissionRequested else { return }
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--ui-test-conversation-display") {
@@ -311,7 +318,11 @@ final class AppLifecycleController {
         #endif
         notificationPermissionRequested = true
         LLog.info("push", "requesting notification permission")
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { [weak self] _, _ in
+            Task { @MainActor [weak self] in
+                self?.refreshPushRegistration(client: client)
+            }
+        }
     }
 
     func reconcileBackgroundedTurns(
@@ -619,49 +630,6 @@ final class AppLifecycleController {
         }
     }
 
-    private func registerPushProxy() {
-        guard let tokenData = devicePushToken else { return }
-        guard pushProxyRegistrationId == nil else { return }
-        let token = tokenData.map { String(format: "%02x", $0) }.joined()
-        LLog.info("push", "registering push proxy")
-        Task {
-            do {
-                let regId = try await pushProxy.register(pushToken: token, interval: 30, ttl: 7200)
-                await MainActor.run {
-                    self.pushProxyRegistrationId = regId
-                    LLog.info("push", "push proxy registered", fields: ["registrationId": regId])
-                }
-            } catch {
-                await MainActor.run {
-                    LLog.error("push", "push proxy registration failed", error: error)
-                }
-            }
-        }
-    }
-
-    private func deregisterPushProxy() {
-        guard let regId = pushProxyRegistrationId else { return }
-        pushProxyRegistrationId = nil
-        LLog.info("push", "deregistering push proxy", fields: ["registrationId": regId])
-        Task {
-            do {
-                try await pushProxy.deregister(registrationId: regId)
-                await MainActor.run {
-                    LLog.info("push", "push proxy deregistered", fields: ["registrationId": regId])
-                }
-            } catch {
-                await MainActor.run {
-                    LLog.error(
-                        "push",
-                        "push proxy deregistration failed",
-                        error: error,
-                        fields: ["registrationId": regId]
-                    )
-                }
-            }
-        }
-    }
-
     private func endBackgroundTaskIfNeeded() {
         guard backgroundTaskID != .invalid else { return }
         UIApplication.shared.endBackgroundTask(backgroundTaskID)
@@ -698,24 +666,15 @@ final class AppLifecycleController {
         }
     }
 
-    static func notificationThreadKey(from userInfo: [AnyHashable: Any]) -> ThreadKey? {
-        guard let serverId = userInfo[notificationServerIdKey] as? String,
-              let threadId = userInfo[notificationThreadIdKey] as? String else {
-            return nil
-        }
-
-        let trimmedServerId = serverId.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedThreadId = threadId.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedServerId.isEmpty, !trimmedThreadId.isEmpty else { return nil }
-
-        return ThreadKey(serverId: trimmedServerId, threadId: trimmedThreadId)
-    }
-
+    /// Local completion fallback for a turn that ended while the app was still
+    /// running in background. Skipped when the host will push its own
+    /// notification for the turn.
     private func postLocalNotificationIfNeeded(
-        model: String,
-        threadPreview: String?,
-        threadKey: ThreadKey
+        thread: AppThreadSnapshot,
+        turnId: String?,
+        client: AppClient
     ) {
+        let threadKey = thread.key
         guard UIApplication.shared.applicationState != .active else {
             LLog.info(
                 "push",
@@ -724,20 +683,36 @@ final class AppLifecycleController {
             )
             return
         }
+        let pushState = client.turnPushState(key: threadKey, turnId: turnId)
+        guard PushNotificationSupport.shouldPostLocalCompletion(for: pushState) else {
+            LLog.info(
+                "push",
+                "skipping local notification because the host reports this turn",
+                fields: ["threadKey": threadKey.debugLabel, "pushState": String(describing: pushState)]
+            )
+            return
+        }
+        let model = thread.resolvedModel
+        let threadPreview = thread.resolvedPreview
         let content = UNMutableNotificationContent()
-        content.title = "Turn completed"
+        content.title = String(localized: "Turn completed")
         var bodyParts: [String] = []
-        if let preview = threadPreview, !preview.isEmpty { bodyParts.append(preview) }
+        if !threadPreview.isEmpty { bodyParts.append(threadPreview) }
         if !model.isEmpty { bodyParts.append(model) }
         content.body = bodyParts.joined(separator: " - ")
         content.sound = .default
-        content.categoryIdentifier = "agentbuddy.task.complete"
-        content.userInfo = [
-            Self.notificationServerIdKey: threadKey.serverId,
-            Self.notificationThreadIdKey: threadKey.threadId
+        content.threadIdentifier = threadKey.threadId
+        content.categoryIdentifier = PushNotificationSupport.completionCategoryIdentifier
+        var userInfo: [String: String] = [
+            PushNotificationSupport.serverIdKey: threadKey.serverId,
+            PushNotificationSupport.threadIdKey: threadKey.threadId
         ]
+        if let turnId {
+            userInfo[PushNotificationSupport.turnIdKey] = turnId
+        }
+        content.userInfo = userInfo
         let request = UNNotificationRequest(
-            identifier: UUID().uuidString,
+            identifier: PushNotificationSupport.localCompletionIdentifier(for: threadKey, turnId: turnId),
             content: content,
             trigger: nil
         )
@@ -746,8 +721,9 @@ final class AppLifecycleController {
             "posting local completion notification",
             fields: [
                 "threadKey": threadKey.debugLabel,
+                "pushState": String(describing: pushState),
                 "model": model,
-                "hasPreview": threadPreview?.isEmpty == false
+                "hasPreview": !threadPreview.isEmpty
             ]
         )
         UNUserNotificationCenter.current().add(request)

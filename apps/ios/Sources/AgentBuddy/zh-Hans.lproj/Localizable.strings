@@ -397,3 +397,6 @@
 "Saved SSH Host Key Unreadable" = "无法读取已保存的 SSH 主机密钥";
 "Forget Saved Host Key" = "忘记已保存的主机密钥";
 "The SSH host key saved on this device for %@ could not be read, so the connection was refused.\n\nForget the saved key to connect again; the server's current key will be saved as new.\n\nServer fingerprint:\n%@" = "本设备为 %1$@ 保存的 SSH 主机密钥无法读取，因此连接已被拒绝。\n\n忘记已保存的密钥即可重新连接；服务器当前的密钥将作为新密钥保存。\n\n服务器指纹：\n%2$@";
+
+/* === 任务完成本地通知（主机不上报完成通知时的兜底）=== */
+"Turn completed" = "任务已完成";

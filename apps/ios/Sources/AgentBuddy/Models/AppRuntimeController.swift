@@ -14,10 +14,20 @@ final class AppRuntimeController {
     @ObservationIgnored private var pendingLiveActivitySync = false
     @ObservationIgnored private var lastLiveActivitySyncTime: CFAbsoluteTime = 0
 
+    /// Conversation on top of the navigation stack, maintained by the UI. Used
+    /// to keep foreground notifications quiet for the thread being read.
+    @ObservationIgnored var visibleConversationKey: ThreadKey?
+    /// Thread a notification tap asked the UI to show; the navigation stack
+    /// consumes it.
+    private(set) var notificationNavigationRequest: ThreadKey?
+
+    /// Cold start: a notification tap can arrive before saved servers reconnect.
+    private static let notificationConnectTimeoutMs: UInt64 = 20_000
+
     func bind(appModel: AppModel, voiceRuntime: VoiceRuntimeController) {
         self.appModel = appModel
         self.voiceRuntime = voiceRuntime
-        lifecycle.requestNotificationPermissionIfNeeded()
+        lifecycle.requestNotificationPermissionIfNeeded(client: appModel.client)
         reachability.bind(appModel: appModel)
         reachability.start()
         loadAndPushAlleycatSecretKey(client: appModel.client)
@@ -70,7 +80,7 @@ final class AppRuntimeController {
     }
 
     func setDevicePushToken(_ token: Data) {
-        lifecycle.setDevicePushToken(token)
+        lifecycle.setDevicePushToken(token, client: appModel?.client)
     }
 
     func reconnectSavedServers() async {
@@ -96,23 +106,72 @@ final class AppRuntimeController {
             fields: ["serverId": key.serverId, "threadId": key.threadId]
         )
         lifecycle.markThreadOpenedFromNotification(key)
-        appModel.activateThread(key)
-
-        if let resolvedKey = await appModel.ensureThreadLoaded(key: key) {
-            lifecycle.markThreadOpenedFromNotification(resolvedKey)
-            LLog.info(
+        let connected = await appModel.client.awaitServerConnected(
+            serverId: key.serverId,
+            timeoutMs: Self.notificationConnectTimeoutMs
+        )
+        if !connected {
+            LLog.warn(
                 "push",
-                "notification thread resolved and activated",
-                fields: ["serverId": resolvedKey.serverId, "threadId": resolvedKey.threadId]
+                "notification server not connected before timeout; opening thread anyway",
+                fields: ["serverId": key.serverId, "threadId": key.threadId]
             )
-            appModel.activateThread(resolvedKey)
-            await appModel.refreshThreadSnapshot(key: resolvedKey)
-        } else {
+        }
+        appModel.activateThread(key)
+        notificationNavigationRequest = key
+
+        guard let resolvedKey = await appModel.ensureThreadLoaded(key: key) else {
             LLog.warn(
                 "push",
                 "notification thread could not be resolved",
                 fields: ["serverId": key.serverId, "threadId": key.threadId]
             )
+            return
+        }
+        lifecycle.markThreadOpenedFromNotification(resolvedKey)
+        appModel.activateThread(resolvedKey)
+        if resolvedKey != key {
+            notificationNavigationRequest = resolvedKey
+        }
+        // A cached snapshot can predate the turn's end (events missed while
+        // suspended): reconcile with the host instead of trusting the push.
+        if !(await refreshThreadAuthoritatively(resolvedKey, appModel: appModel)),
+           await appModel.client.awaitServerConnected(
+               serverId: resolvedKey.serverId,
+               timeoutMs: Self.notificationConnectTimeoutMs
+           ) {
+            // Foreground recovery may have replaced the connection meanwhile.
+            _ = await refreshThreadAuthoritatively(resolvedKey, appModel: appModel)
+        }
+        await appModel.refreshThreadSnapshot(key: resolvedKey)
+        LLog.info(
+            "push",
+            "notification thread resolved and activated",
+            fields: ["serverId": resolvedKey.serverId, "threadId": resolvedKey.threadId]
+        )
+    }
+
+    func consumeNotificationNavigationRequest() -> ThreadKey? {
+        let key = notificationNavigationRequest
+        notificationNavigationRequest = nil
+        return key
+    }
+
+    private func refreshThreadAuthoritatively(_ key: ThreadKey, appModel: AppModel) async -> Bool {
+        do {
+            try await appModel.forceRefreshThreadAuthoritative(key: key)
+            return true
+        } catch {
+            LLog.warn(
+                "push",
+                "authoritative refresh of notification thread failed",
+                fields: [
+                    "serverId": key.serverId,
+                    "threadId": key.threadId,
+                    "error": error.localizedDescription
+                ]
+            )
+            return false
         }
     }
 
@@ -139,7 +198,7 @@ final class AppRuntimeController {
         guard let appModel else { return }
         appModel.reconnectController.onAppEnteredBackground()
         lifecycle.appDidEnterBackground(
-            snapshot: appModel.snapshot,
+            appModel: appModel,
             hasActiveVoiceSession: voiceRuntime?.activeVoiceSession != nil,
             liveActivities: liveActivities
         )
@@ -160,15 +219,5 @@ final class AppRuntimeController {
             hasActiveVoiceSession: voiceRuntime?.activeVoiceSession != nil,
             liveActivities: liveActivities
         )
-    }
-
-    func handleBackgroundPush() async {
-        guard let appModel else { return }
-        LLog.info("push", "runtime handling background push")
-        await lifecycle.handleBackgroundPush(
-            appModel: appModel,
-            liveActivities: liveActivities
-        )
-        LLog.info("push", "runtime finished background push")
     }
 }
