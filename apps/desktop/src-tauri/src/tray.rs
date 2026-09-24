@@ -199,6 +199,23 @@ pub fn spawn_refresher(app: AppHandle) {
     });
 }
 
+async fn record_version_after_upgrade<F, Fut>(
+    settings: &mut Settings,
+    current: &str,
+    install: &InstallState,
+    upgrade: F,
+) -> Result<(), crate::error::HostError>
+where
+    F: FnOnce() -> Fut,
+    Fut: std::future::Future<Output = Result<(), crate::error::HostError>>,
+{
+    if needs_upgrade(settings.last_seen_version.as_deref(), current, install) {
+        upgrade().await?;
+    }
+    settings.last_seen_version = Some(current.to_owned());
+    Ok(())
+}
+
 pub fn spawn_upgrade_check(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         let current = app.package_info().version.to_string();
@@ -207,14 +224,12 @@ pub fn spawn_upgrade_check(app: AppHandle) {
             if should_show_on_launch(&s.install) {
                 show_window(&app, Some("overview"));
             }
-            if needs_upgrade(settings.last_seen_version.as_deref(), &current, &s.install) {
-                let state = app.state::<AppState>();
-                let _ = run_mutating(&app, &state, Subcommand::Upgrade).await;
+            let state = app.state::<AppState>();
+            if record_version_after_upgrade(&mut settings, &current, &s.install, || {
+                run_mutating(&app, &state, Subcommand::Upgrade)
+            }).await.is_ok() {
+                let _ = settings.save(&app);
             }
-        }
-        if settings.last_seen_version.as_deref() != Some(current.as_str()) {
-            settings.last_seen_version = Some(current);
-            let _ = settings.save(&app);
         }
         refresh(&app).await;
     });
@@ -288,6 +303,23 @@ mod tests {
             app_version: "0.1.0".into(),
             sidecar_path: "/x".into(),
         }
+    }
+
+    #[tokio::test]
+    async fn failed_upgrade_preserves_version_and_retries_on_next_launch() {
+        let mut settings = Settings { last_seen_version: Some("0.1.0".into()), ..Default::default() };
+        let failure = record_version_after_upgrade(&mut settings, "0.2.0", &InstallState::Installed, || async {
+            Err(crate::error::HostError::command_failed("upgrade", Some(1), "failed"))
+        }).await;
+        assert!(failure.is_err());
+        assert_eq!(settings.last_seen_version.as_deref(), Some("0.1.0"));
+        let mut retried = false;
+        record_version_after_upgrade(&mut settings, "0.2.0", &InstallState::Installed, || {
+            retried = true;
+            async { Ok(()) }
+        }).await.unwrap();
+        assert!(retried);
+        assert_eq!(settings.last_seen_version.as_deref(), Some("0.2.0"));
     }
 
     #[test]
