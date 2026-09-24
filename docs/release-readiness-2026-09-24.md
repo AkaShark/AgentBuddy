@@ -85,3 +85,32 @@
 - 再测手机直连：使用仅本地临时 Debug 入口调用实际 `PushProxyClient.register`，90 秒 TTL、30 秒间隔；手机返回 `NSURLErrorDomain -1005`（网络连接已中断），未取得注册 ID，不能判定直连通过。临时入口测试后已从源码移除，正常包重新构建成功。未再次用 Mac 代注册来掩盖该失败。
 
 - 用户调整网络后再次真机直连模拟：手机 `/register` 与 `/deregister` 均 HTTP 200，网络阻塞本轮未复现。Worker 两次 APNs sandbox 200，90 秒 TTL 到期清理；测试窗口内未见后台回调，重新打开 App 后收到推送，状态为 active，因此本轮不能判定后台唤醒通过。此前一轮已观察到 background handler 完成，但持续后台交付及真实任务状态刷新仍待验证。临时 Debug 入口已移除，正常包构建成功。
+
+## 主机上报推送（替代 30 秒静默保活）
+
+设计：`docs/superpowers/specs/2026-09-24-host-push-notifications-design.md`（协议 v2：设备 grant、主机签名、密封投递目标、`aud`）。
+
+**已完成**
+
+- alleycat fork 分支 `feat/host-push-notifications`，提交 `a5bdd83`，draft PR AkaShark/alleycat#1。主仓库 `services/kittylitter` 与 `shared/rust-bridge` 均固定到该提交；包装层设置默认 Worker 地址。
+- Worker v2 已部署：版本 `2ebaa288-d71f-4f70-95bb-5d744863d5df`（上一版 `6a28792f-5051-47a8-b820-1433f9087703`，回滚用 `wrangler rollback`）。新增 `HostChannel` DO（migration v3）、Secret `PUSH_TARGET_SEAL_KEY`（kid 1，私钥只在本机 `~/.config/agentbuddy/` 0600 文件与 Worker Secret 中）、Secret `DEBUG_PUSH_ADMIN_TOKEN`。`LEGACY_KEEPALIVE_ENABLED` 保持 `true`，旧客户端不受影响。
+- 调试接口本次部署时用 `--var DEBUG_PUSH_ENABLED:true` 临时开启；测试结束后需不带该参数重新部署关闭（`wrangler.toml` 提交值为 `false`）。
+- 线上冒烟：`/v2/health` 正常；未签名事件 401；调试接口无 token / 错误 token 401 且不调用 provider；有效管理员 token + 假设备 token → APNs 返回 400 BadDeviceToken（证明鉴权与单次 provider 调用正常，不代表送达）；旧 `/register` 与 `/deregister` 正常。
+- 测试：Worker 97/97；alleycat 111 + bridge-core 58；mobile Rust 867；Android 73；iOS 单测 219 项中 212 通过（7 项为与推送无关的既有失败）；iOS 签名真机构建（含 Watch、Live Activity）通过。
+- 安全审查发现的 HIGH（主机可凭 token 自造设备密钥持续推送）已通过密封投递目标修复，并补齐 MEDIUM/LOW 项。
+
+**四级证据（真机）**
+
+1. 主机观察到真实终态：未验证（待真机联调；本机未安装 Codex CLI，计划用 Claude agent 走 bridge 观察路径）。
+2. Worker 收到经鉴权的事件：未验证（仅有签名向量与本地 workerd 测试）。
+3. APNs/FCM 接受推送：调试接口已证明 Worker → APNs 调用链路可用，但用的是假 token；正式事件链路未验证。
+4. 手机展示通知并点击打开正确会话：未验证。
+
+Android 无真机/模拟器、无 NDK，FCM 送达与后台系统展示均未验证。
+
+**待办**
+
+- 真机联调（需要手机扫码配对、发起任务、切后台），按上面四级分别记录证据。
+- 联调通过后：不带 `--var DEBUG_PUSH_ENABLED:true` 重新部署关闭调试接口；按设计 §9 设 `LEGACY_KEEPALIVE_ENABLED=false` 停旧链路，旧 DO 在下次 alarm 自清理；确认无旧注册后用 migration v4 删除 `PushRegistration`。
+- 合并 AkaShark/alleycat#1 前不要运行 `AGENTBUDDY_REFRESH_ALLEYCAT=1`（会丢失推送支持）；PR 基于 `3c6dfe2`，与 fork `main` 在 `host.rs`/`agents.rs`/`daemon/*` 有机械冲突。
+
