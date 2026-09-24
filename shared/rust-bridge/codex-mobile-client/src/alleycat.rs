@@ -119,6 +119,127 @@ pub enum AgentWire {
     Jsonl,
 }
 
+/// Host-level capabilities advertised in the optional `host` field of a
+/// `list_agents` response (host push design §6.1). Legacy hosts omit the
+/// field entirely, which callers must treat as "no host features".
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct AlleycatHostInfo {
+    pub features: Vec<String>,
+    pub push: Option<AlleycatHostPush>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct AlleycatHostPush {
+    pub enabled: bool,
+    /// Alleycat agent names whose terminal state the host can observe in
+    /// its current run mode.
+    pub agents: Vec<String>,
+}
+
+pub const ALLEYCAT_FEATURE_PUSH_V1: &str = "push.v1";
+
+impl AlleycatHostInfo {
+    /// `true` when the host advertises `push.v1` and has push enabled.
+    pub fn supports_push_v1(&self) -> bool {
+        self.features
+            .iter()
+            .any(|feature| feature == ALLEYCAT_FEATURE_PUSH_V1)
+            && self.push.as_ref().is_some_and(|push| push.enabled)
+    }
+
+    /// Agents the host can report terminal state for; empty unless
+    /// `supports_push_v1()`.
+    pub fn push_agents(&self) -> &[String] {
+        match self.push.as_ref() {
+            Some(push) if self.supports_push_v1() => &push.agents,
+            _ => &[],
+        }
+    }
+}
+
+/// Target device for a `push_subscribe` request.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PushSubscribeTarget {
+    /// `ios` | `android`.
+    pub platform: String,
+    pub push_token: String,
+    /// `sandbox` | `production`; iOS only.
+    pub apns_environment: Option<String>,
+}
+
+/// Device-signed grant carried by `push_subscribe` (design §5.1).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PushSubscribeGrant {
+    pub device_id: String,
+    pub issued: u64,
+    pub expires: u64,
+    pub nonce: String,
+    pub signature: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PushSubscribeArgs {
+    pub agent: String,
+    pub thread_id: String,
+    pub turn_id: String,
+    pub target: PushSubscribeTarget,
+    pub grant: PushSubscribeGrant,
+}
+
+/// Scope of a `push_unsubscribe` request. The host only ever acts on the
+/// calling device's own subscriptions.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PushUnsubscribeScope {
+    All,
+    Turn {
+        agent: String,
+        thread_id: String,
+        turn_id: String,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PushSubscriptionStatus {
+    /// Host persisted the subscription and will register it with the Worker.
+    Pending,
+    /// Host already registered the subscription with the Worker.
+    Registered,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PushTerminal {
+    /// `completed` | `failed`.
+    pub kind: String,
+    pub occurred_at: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PushSubscribeOutcome {
+    pub subscription: PushSubscriptionStatus,
+    /// Set when the turn had already ended at subscribe time; the host then
+    /// reports the event immediately.
+    pub terminal: Option<PushTerminal>,
+}
+
+/// Failure of a one-shot push op.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum AlleycatPushError {
+    /// The host does not implement the op (legacy hosts close the stream
+    /// without a response) or replied `push_unsupported`.
+    #[error("host does not support push")]
+    Unsupported,
+    /// The host answered `ok: false` with another error code.
+    #[error("host rejected push request: {0}")]
+    Rejected(String),
+    /// Could not reach the host or the exchange broke mid-way.
+    #[error("push transport error: {0}")]
+    Transport(String),
+}
+
+pub const ALLEYCAT_PUSH_UNSUPPORTED_ERROR: &str = "push_unsupported";
+/// Upper bound for one push op round trip (connect + request + response).
+const PUSH_OP_TIMEOUT: Duration = Duration::from_secs(20);
+
 /// Reconnect strategy for an alleycat-backed session. The transport
 /// holds a clone of the app-wide shared iroh `Endpoint` (cheap — iroh's
 /// `Endpoint` is an `Arc`-backed handle) so reconnects open a fresh
@@ -317,11 +438,49 @@ enum Request {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         resume: Option<Resume>,
     },
+    PushSubscribe {
+        v: u32,
+        token: String,
+        agent: String,
+        thread_id: String,
+        turn_id: String,
+        target: PushTargetWire,
+        grant: PushGrantWire,
+    },
+    PushUnsubscribe {
+        v: u32,
+        token: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        agent: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        thread_id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        turn_id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        all: Option<bool>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]
 struct Resume {
     last_seq: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct PushTargetWire {
+    platform: String,
+    push_token: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    apns_environment: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct PushGrantWire {
+    device_id: String,
+    issued: u64,
+    expires: u64,
+    nonce: String,
+    signature: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -332,7 +491,65 @@ struct Response {
     agents: Vec<AgentInfoWire>,
     #[serde(default)]
     session: Option<SessionInfoWire>,
+    /// Optional host capabilities (`list_agents` only). Kept as raw JSON so
+    /// an unexpected shape from a future host degrades to "no features"
+    /// instead of failing the whole `list_agents` decode.
+    #[serde(default)]
+    host: Option<serde_json::Value>,
+    /// `push_subscribe` result.
+    #[serde(default)]
+    push: Option<PushResponseWire>,
     error: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct HostInfoWire {
+    #[serde(default)]
+    features: Vec<String>,
+    #[serde(default)]
+    push: Option<HostPushWire>,
+}
+
+#[derive(Debug, Deserialize)]
+struct HostPushWire {
+    #[serde(default)]
+    enabled: bool,
+    #[serde(default)]
+    agents: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct PushResponseWire {
+    subscription: String,
+    #[serde(default)]
+    terminal: Option<PushTerminalWire>,
+}
+
+#[derive(Debug, Deserialize)]
+struct PushTerminalWire {
+    #[serde(rename = "type")]
+    kind: String,
+    occurred_at: u64,
+}
+
+fn parse_host_info(value: Option<&serde_json::Value>) -> Option<AlleycatHostInfo> {
+    let value = value?;
+    if value.is_null() {
+        return None;
+    }
+    match serde_json::from_value::<HostInfoWire>(value.clone()) {
+        Ok(wire) => Some(AlleycatHostInfo {
+            features: wire.features,
+            push: wire.push.map(|push| AlleycatHostPush {
+                enabled: push.enabled,
+                agents: push.agents,
+            }),
+        }),
+        Err(error) => {
+            warn!("alleycat: ignoring malformed list_agents host field: {error}");
+            None
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -472,6 +689,17 @@ pub async fn list_agents(
     endpoint: &Endpoint,
     params: ParsedPairPayload,
 ) -> Result<Vec<AgentInfo>, AlleycatError> {
+    list_agents_with_host(endpoint, params)
+        .await
+        .map(|(agents, _host)| agents)
+}
+
+/// `list_agents` plus the optional host capability block. `None` host info
+/// means a legacy host (or a malformed field), i.e. no host features.
+pub async fn list_agents_with_host(
+    endpoint: &Endpoint,
+    params: ParsedPairPayload,
+) -> Result<(Vec<AgentInfo>, Option<AlleycatHostInfo>), AlleycatError> {
     let (conn, mut send, mut recv) = open_stream_on(endpoint, &params).await?;
     write_json_frame(
         &mut send,
@@ -486,7 +714,12 @@ pub async fn list_agents(
     // The probe connection is one-shot — close it gracefully so the host
     // doesn't have to wait on its idle timeout to drop the entry.
     conn.close(VarInt::from_u32(0), b"list_agents complete");
-    Ok(response
+    Ok(decode_list_agents_response(response))
+}
+
+fn decode_list_agents_response(response: Response) -> (Vec<AgentInfo>, Option<AlleycatHostInfo>) {
+    let host = parse_host_info(response.host.as_ref());
+    let agents = response
         .agents
         .into_iter()
         .map(|agent| AgentInfo {
@@ -497,7 +730,204 @@ pub async fn list_agents(
             presentation: agent.presentation.map(Into::into),
             capabilities: agent.capabilities.map(Into::into),
         })
-        .collect())
+        .collect();
+    (agents, host)
+}
+
+fn push_subscribe_request(token: String, args: PushSubscribeArgs) -> Request {
+    Request::PushSubscribe {
+        v: ALLEYCAT_PROTOCOL_VERSION,
+        token,
+        agent: args.agent,
+        thread_id: args.thread_id,
+        turn_id: args.turn_id,
+        target: PushTargetWire {
+            platform: args.target.platform,
+            push_token: args.target.push_token,
+            apns_environment: args.target.apns_environment,
+        },
+        grant: PushGrantWire {
+            device_id: args.grant.device_id,
+            issued: args.grant.issued,
+            expires: args.grant.expires,
+            nonce: args.grant.nonce,
+            signature: args.grant.signature,
+        },
+    }
+}
+
+fn push_unsubscribe_request(token: String, scope: PushUnsubscribeScope) -> Request {
+    match scope {
+        PushUnsubscribeScope::All => Request::PushUnsubscribe {
+            v: ALLEYCAT_PROTOCOL_VERSION,
+            token,
+            agent: None,
+            thread_id: None,
+            turn_id: None,
+            all: Some(true),
+        },
+        PushUnsubscribeScope::Turn {
+            agent,
+            thread_id,
+            turn_id,
+        } => Request::PushUnsubscribe {
+            v: ALLEYCAT_PROTOCOL_VERSION,
+            token,
+            agent: Some(agent),
+            thread_id: Some(thread_id),
+            turn_id: Some(turn_id),
+            all: None,
+        },
+    }
+}
+
+/// Register a turn-completion push subscription with the host (design
+/// §6.1 `push_subscribe`). Legacy hosts close the stream without replying,
+/// which surfaces as [`AlleycatPushError::Unsupported`].
+pub async fn push_subscribe(
+    endpoint: &Endpoint,
+    params: &ParsedPairPayload,
+    args: PushSubscribeArgs,
+) -> Result<PushSubscribeOutcome, AlleycatPushError> {
+    let request = push_subscribe_request(params.token.clone(), args);
+    let response = push_round_trip(endpoint, params, &request, b"push_subscribe complete").await?;
+    decode_push_subscribe_response(response)
+}
+
+/// Drop this device's push subscriptions on the host (design §6.1
+/// `push_unsubscribe`).
+pub async fn push_unsubscribe(
+    endpoint: &Endpoint,
+    params: &ParsedPairPayload,
+    scope: PushUnsubscribeScope,
+) -> Result<(), AlleycatPushError> {
+    let request = push_unsubscribe_request(params.token.clone(), scope);
+    let response =
+        push_round_trip(endpoint, params, &request, b"push_unsubscribe complete").await?;
+    validate_push_response(&response)
+}
+
+async fn push_round_trip(
+    endpoint: &Endpoint,
+    params: &ParsedPairPayload,
+    request: &Request,
+    close_reason: &'static [u8],
+) -> Result<Response, AlleycatPushError> {
+    let exchange = async {
+        let (conn, mut send, mut recv) = open_stream_on(endpoint, params)
+            .await
+            .map_err(|error| AlleycatPushError::Transport(error.to_string()))?;
+        write_json_frame(&mut send, request)
+            .await
+            .map_err(|error| AlleycatPushError::Transport(error.to_string()))?;
+        let response = read_push_response_frame(&mut recv).await;
+        conn.close(VarInt::from_u32(0), close_reason);
+        response
+    };
+    match tokio::time::timeout(PUSH_OP_TIMEOUT, exchange).await {
+        Ok(result) => result,
+        Err(_) => Err(AlleycatPushError::Transport(format!(
+            "push op timed out after {}s",
+            PUSH_OP_TIMEOUT.as_secs()
+        ))),
+    }
+}
+
+/// Read the single response frame of a push op. A stream that ends (or is
+/// closed by the host) before a complete, decodable frame arrives is how a
+/// legacy host rejects an unknown op, so those cases map to `Unsupported`.
+/// Timeouts and local failures stay `Transport` so they can be retried.
+async fn read_push_response_frame<R>(reader: &mut R) -> Result<Response, AlleycatPushError>
+where
+    R: AsyncRead + Unpin,
+{
+    let len = reader
+        .read_u32()
+        .await
+        .map_err(|error| classify_push_read_error(&error))? as usize;
+    if len > MAX_FRAME_BYTES {
+        return Err(AlleycatPushError::Unsupported);
+    }
+    let mut buf = vec![0u8; len];
+    reader
+        .read_exact(&mut buf)
+        .await
+        .map_err(|error| classify_push_read_error(&error))?;
+    serde_json::from_slice::<Response>(&buf).map_err(|error| {
+        debug!("alleycat: undecodable push response frame: {error}");
+        AlleycatPushError::Unsupported
+    })
+}
+
+fn classify_push_read_error(error: &std::io::Error) -> AlleycatPushError {
+    use iroh::endpoint::{ConnectionError, ReadError};
+    use std::io::ErrorKind;
+    match error.kind() {
+        ErrorKind::UnexpectedEof | ErrorKind::ConnectionReset => AlleycatPushError::Unsupported,
+        ErrorKind::NotConnected => {
+            let peer_closed = error
+                .get_ref()
+                .and_then(|inner| inner.downcast_ref::<ReadError>())
+                .is_some_and(|read| {
+                    matches!(
+                        read,
+                        ReadError::ClosedStream
+                            | ReadError::ConnectionLost(
+                                ConnectionError::ApplicationClosed(_)
+                                    | ConnectionError::ConnectionClosed(_)
+                            )
+                    )
+                });
+            if peer_closed {
+                AlleycatPushError::Unsupported
+            } else {
+                AlleycatPushError::Transport(format!("reading push response: {error}"))
+            }
+        }
+        _ => AlleycatPushError::Transport(format!("reading push response: {error}")),
+    }
+}
+
+fn validate_push_response(response: &Response) -> Result<(), AlleycatPushError> {
+    if response.v != ALLEYCAT_PROTOCOL_VERSION {
+        return Err(AlleycatPushError::Unsupported);
+    }
+    if !response.ok {
+        let error = response
+            .error
+            .clone()
+            .unwrap_or_else(|| "host rejected request".to_string());
+        if error == ALLEYCAT_PUSH_UNSUPPORTED_ERROR {
+            return Err(AlleycatPushError::Unsupported);
+        }
+        return Err(AlleycatPushError::Rejected(error));
+    }
+    Ok(())
+}
+
+fn decode_push_subscribe_response(
+    response: Response,
+) -> Result<PushSubscribeOutcome, AlleycatPushError> {
+    validate_push_response(&response)?;
+    let Some(push) = response.push else {
+        // `ok: true` without a `push` block: the host accepted the request,
+        // but we can't tell whether it reached the Worker yet.
+        return Ok(PushSubscribeOutcome {
+            subscription: PushSubscriptionStatus::Pending,
+            terminal: None,
+        });
+    };
+    let subscription = match push.subscription.as_str() {
+        "registered" => PushSubscriptionStatus::Registered,
+        _ => PushSubscriptionStatus::Pending,
+    };
+    Ok(PushSubscribeOutcome {
+        subscription,
+        terminal: push.terminal.map(|terminal| PushTerminal {
+            kind: terminal.kind,
+            occurred_at: terminal.occurred_at,
+        }),
+    })
 }
 
 pub async fn restart_agent(
@@ -1056,6 +1486,274 @@ mod tests {
         );
         assert!(agent.available);
         assert_eq!(AgentWire::from(agent.wire), AgentWire::Jsonl);
+    }
+
+    fn decode(json: &str) -> Response {
+        serde_json::from_str(json).expect("decode response")
+    }
+
+    fn frame(bytes: &[u8]) -> Vec<u8> {
+        let mut out = (bytes.len() as u32).to_be_bytes().to_vec();
+        out.extend_from_slice(bytes);
+        out
+    }
+
+    #[test]
+    fn list_agents_without_host_field_is_legacy_host() {
+        let (agents, host) = decode_list_agents_response(decode(
+            r#"{"v":1,"ok":true,"agents":[{"name":"codex","display_name":"Codex","wire":"websocket","available":true}]}"#,
+        ));
+        assert_eq!(agents.len(), 1);
+        assert_eq!(agents[0].name, "codex");
+        assert_eq!(host, None);
+    }
+
+    #[test]
+    fn list_agents_parses_host_push_capability() {
+        let (agents, host) = decode_list_agents_response(decode(
+            r#"{"v":1,"ok":true,"agents":[{"name":"codex","display_name":"Codex","wire":"websocket","available":true},{"name":"claude","display_name":"Claude","wire":"jsonl","available":true}],"host":{"features":["push.v1"],"push":{"enabled":true,"agents":["codex","claude"]}}}"#,
+        ));
+        assert_eq!(agents.len(), 2);
+        let host = host.expect("host info");
+        assert!(host.supports_push_v1());
+        assert_eq!(
+            host.push_agents(),
+            &["codex".to_string(), "claude".to_string()]
+        );
+    }
+
+    #[test]
+    fn list_agents_host_without_push_feature_is_unsupported() {
+        let (_, host) = decode_list_agents_response(decode(
+            r#"{"v":1,"ok":true,"agents":[],"host":{"features":["other"],"push":{"enabled":true,"agents":["codex"]}}}"#,
+        ));
+        let host = host.expect("host info");
+        assert!(!host.supports_push_v1());
+        assert!(host.push_agents().is_empty());
+    }
+
+    #[test]
+    fn list_agents_host_with_push_disabled_is_unsupported() {
+        let (_, host) = decode_list_agents_response(decode(
+            r#"{"v":1,"ok":true,"agents":[],"host":{"features":["push.v1"],"push":{"enabled":false,"agents":["codex"]}}}"#,
+        ));
+        let host = host.expect("host info");
+        assert!(!host.supports_push_v1());
+        assert!(host.push_agents().is_empty());
+    }
+
+    #[test]
+    fn list_agents_tolerates_malformed_host_field() {
+        let (agents, host) = decode_list_agents_response(decode(
+            r#"{"v":1,"ok":true,"agents":[{"name":"codex","display_name":"Codex","wire":"websocket","available":true}],"host":"future-shape"}"#,
+        ));
+        assert_eq!(agents.len(), 1);
+        assert_eq!(host, None);
+        let (_, host) =
+            decode_list_agents_response(decode(r#"{"v":1,"ok":true,"agents":[],"host":null}"#));
+        assert_eq!(host, None);
+    }
+
+    #[test]
+    fn push_subscribe_request_matches_wire_shape() {
+        let request = push_subscribe_request(
+            "pair-token".into(),
+            PushSubscribeArgs {
+                agent: "codex".into(),
+                thread_id: "thread-1".into(),
+                turn_id: "turn-1".into(),
+                target: PushSubscribeTarget {
+                    platform: "ios".into(),
+                    push_token: "a1a1".into(),
+                    apns_environment: Some("production".into()),
+                },
+                grant: PushSubscribeGrant {
+                    device_id: "dev".into(),
+                    issued: 1790300000,
+                    expires: 1790386400,
+                    nonce: "ffeeddccbbaa99887766554433221100".into(),
+                    signature: "sig".into(),
+                },
+            },
+        );
+        let value = serde_json::to_value(request).expect("serialize");
+        assert_eq!(
+            value,
+            serde_json::json!({
+                "op": "push_subscribe",
+                "v": 1,
+                "token": "pair-token",
+                "agent": "codex",
+                "thread_id": "thread-1",
+                "turn_id": "turn-1",
+                "target": {
+                    "platform": "ios",
+                    "push_token": "a1a1",
+                    "apns_environment": "production"
+                },
+                "grant": {
+                    "device_id": "dev",
+                    "issued": 1790300000u64,
+                    "expires": 1790386400u64,
+                    "nonce": "ffeeddccbbaa99887766554433221100",
+                    "signature": "sig"
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn push_subscribe_request_omits_apns_environment_for_android() {
+        let request = push_subscribe_request(
+            "t".into(),
+            PushSubscribeArgs {
+                agent: "claude".into(),
+                thread_id: "th".into(),
+                turn_id: "tu".into(),
+                target: PushSubscribeTarget {
+                    platform: "android".into(),
+                    push_token: "fcm".into(),
+                    apns_environment: None,
+                },
+                grant: PushSubscribeGrant {
+                    device_id: "dev".into(),
+                    issued: 1,
+                    expires: 2,
+                    nonce: "n".into(),
+                    signature: "s".into(),
+                },
+            },
+        );
+        let value = serde_json::to_value(request).expect("serialize");
+        assert_eq!(value["target"]["platform"], "android");
+        assert!(value["target"].get("apns_environment").is_none());
+    }
+
+    #[test]
+    fn push_unsubscribe_request_shapes() {
+        let all = serde_json::to_value(push_unsubscribe_request(
+            "t".into(),
+            PushUnsubscribeScope::All,
+        ))
+        .expect("serialize");
+        assert_eq!(
+            all,
+            serde_json::json!({"op": "push_unsubscribe", "v": 1, "token": "t", "all": true})
+        );
+        let turn = serde_json::to_value(push_unsubscribe_request(
+            "t".into(),
+            PushUnsubscribeScope::Turn {
+                agent: "codex".into(),
+                thread_id: "th".into(),
+                turn_id: "tu".into(),
+            },
+        ))
+        .expect("serialize");
+        assert_eq!(
+            turn,
+            serde_json::json!({
+                "op": "push_unsubscribe", "v": 1, "token": "t",
+                "agent": "codex", "thread_id": "th", "turn_id": "tu"
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn push_response_eof_without_frame_is_unsupported() {
+        let mut empty: &[u8] = &[];
+        let error = read_push_response_frame(&mut empty).await.unwrap_err();
+        assert_eq!(error, AlleycatPushError::Unsupported);
+    }
+
+    #[tokio::test]
+    async fn push_response_truncated_frame_is_unsupported() {
+        let mut bytes = frame(br#"{"v":1,"ok":true}"#);
+        bytes.truncate(bytes.len() - 3);
+        let mut reader: &[u8] = &bytes;
+        let error = read_push_response_frame(&mut reader).await.unwrap_err();
+        assert_eq!(error, AlleycatPushError::Unsupported);
+    }
+
+    #[tokio::test]
+    async fn push_response_invalid_json_frame_is_unsupported() {
+        let bytes = frame(b"not json");
+        let mut reader: &[u8] = &bytes;
+        let error = read_push_response_frame(&mut reader).await.unwrap_err();
+        assert_eq!(error, AlleycatPushError::Unsupported);
+    }
+
+    #[test]
+    fn push_read_error_classification() {
+        use std::io::{Error, ErrorKind};
+        assert_eq!(
+            classify_push_read_error(&Error::from(ErrorKind::UnexpectedEof)),
+            AlleycatPushError::Unsupported
+        );
+        assert_eq!(
+            classify_push_read_error(&Error::from(ErrorKind::ConnectionReset)),
+            AlleycatPushError::Unsupported
+        );
+        let closed: Error = iroh::endpoint::ReadError::ClosedStream.into();
+        assert_eq!(
+            classify_push_read_error(&closed),
+            AlleycatPushError::Unsupported
+        );
+        let timed_out: Error =
+            iroh::endpoint::ReadError::ConnectionLost(iroh::endpoint::ConnectionError::TimedOut)
+                .into();
+        assert!(matches!(
+            classify_push_read_error(&timed_out),
+            AlleycatPushError::Transport(_)
+        ));
+        assert!(matches!(
+            classify_push_read_error(&Error::from(ErrorKind::TimedOut)),
+            AlleycatPushError::Transport(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn push_subscribe_response_decodes_registered_and_terminal() {
+        let bytes = frame(
+            br#"{"v":1,"ok":true,"push":{"subscription":"registered","terminal":{"type":"completed","occurred_at":1790300123}}}"#,
+        );
+        let mut reader: &[u8] = &bytes;
+        let response = read_push_response_frame(&mut reader).await.expect("frame");
+        let outcome = decode_push_subscribe_response(response).expect("outcome");
+        assert_eq!(outcome.subscription, PushSubscriptionStatus::Registered);
+        assert_eq!(
+            outcome.terminal,
+            Some(PushTerminal {
+                kind: "completed".into(),
+                occurred_at: 1790300123
+            })
+        );
+        let outcome = decode_push_subscribe_response(decode(
+            r#"{"v":1,"ok":true,"push":{"subscription":"pending","terminal":null}}"#,
+        ))
+        .expect("outcome");
+        assert_eq!(outcome.subscription, PushSubscriptionStatus::Pending);
+        assert_eq!(outcome.terminal, None);
+    }
+
+    #[test]
+    fn push_subscribe_response_errors() {
+        assert_eq!(
+            decode_push_subscribe_response(decode(
+                r#"{"v":1,"ok":false,"error":"push_unsupported"}"#
+            ))
+            .unwrap_err(),
+            AlleycatPushError::Unsupported
+        );
+        assert_eq!(
+            decode_push_subscribe_response(decode(r#"{"v":1,"ok":false,"error":"bad_grant"}"#))
+                .unwrap_err(),
+            AlleycatPushError::Rejected("bad_grant".into())
+        );
+        assert_eq!(
+            validate_push_response(&decode(r#"{"v":2,"ok":true}"#)).unwrap_err(),
+            AlleycatPushError::Unsupported
+        );
+        assert!(validate_push_response(&decode(r#"{"v":1,"ok":true}"#)).is_ok());
     }
 
     /// `AlleycatReconnectTransport` must coerce to `Arc<dyn RemoteTransport>`

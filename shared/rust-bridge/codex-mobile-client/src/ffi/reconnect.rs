@@ -329,6 +329,9 @@ impl ReconnectController {
         self.inner
             .app_store
             .note_app_lifecycle_phase(AppLifecyclePhaseSnapshot::Background);
+        // Retry turn-completion push subscriptions that failed while the
+        // app was in the foreground.
+        self.inner.push_on_app_background();
     }
 
     pub async fn on_network_reachable(&self) -> Vec<ReconnectResult> {
@@ -513,7 +516,9 @@ async fn reconnect_server_inner(
         };
     }
 
-    inner.disconnect_server(&server_id);
+    // Reconnect rebuilds the session immediately; keep push subscriptions
+    // for turns still running on the host.
+    inner.disconnect_server_preserving_push(&server_id);
 
     if let Some(server) = saved_server {
         let credential_provider = credential_provider.lock().await;

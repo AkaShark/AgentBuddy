@@ -11,12 +11,14 @@ mod client;
 mod discovery;
 mod errors;
 mod parser;
+mod push;
 mod reconnect;
 mod remote_path;
 pub(crate) mod shared;
 mod ssh;
 mod terminal;
 
+pub use crate::push::{AppApnsEnvironment, AppPushPlatform, AppPushRegistration, AppTurnPushState};
 pub use crate::ssh_bridge::{AgentAvailabilityStatus, RemoteAgentAvailability, SshBridgeTransport};
 pub use alleycat::{
     AlleycatBridge, AppAlleycatAgentInfo, AppAlleycatAgentWire, AppAlleycatConnectResult,

@@ -1421,6 +1421,54 @@ impl AppStoreReducer {
             })
     }
 
+    /// Agent runtime kind and active turn id of `key`, without cloning the
+    /// thread. Used by the host push manager.
+    pub(crate) fn thread_push_context(
+        &self,
+        key: &ThreadKey,
+    ) -> Option<(crate::types::AgentRuntimeKind, Option<String>)> {
+        self.snapshot
+            .read()
+            .expect("app store lock poisoned")
+            .threads
+            .get(key)
+            .map(|thread| {
+                (
+                    thread.agent_runtime_kind.clone(),
+                    thread.active_turn_id.clone(),
+                )
+            })
+    }
+
+    /// Every thread with an active turn as `(key, turn_id, runtime_kind)`.
+    pub(crate) fn active_turns(&self) -> Vec<(ThreadKey, String, crate::types::AgentRuntimeKind)> {
+        self.snapshot
+            .read()
+            .expect("app store lock poisoned")
+            .threads
+            .iter()
+            .filter_map(|(key, thread)| {
+                thread
+                    .active_turn_id
+                    .clone()
+                    .map(|turn_id| (key.clone(), turn_id, thread.agent_runtime_kind.clone()))
+            })
+            .collect()
+    }
+
+    /// `(health, is_local)` of `server_id`, without cloning the snapshot.
+    pub(crate) fn server_health_and_locality(
+        &self,
+        server_id: &str,
+    ) -> Option<(ServerHealthSnapshot, bool)> {
+        self.snapshot
+            .read()
+            .expect("app store lock poisoned")
+            .servers
+            .get(server_id)
+            .map(|server| (server.health.clone(), server.is_local))
+    }
+
     pub fn server_pending_mutation_kind(
         &self,
         server_id: &str,

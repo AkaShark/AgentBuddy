@@ -155,6 +155,7 @@ pub mod pets;
 pub mod plugin_refs;
 pub mod preferences;
 pub mod project;
+pub mod push;
 pub mod reconnect;
 pub mod recorder;
 pub mod remote_path;

@@ -123,6 +123,9 @@ pub struct MobileClient {
     /// (events dropped), it re-fetches affected threads authoritatively and
     /// asks platforms for a `FullResync`.
     lag_recovery: Arc<StoreLagRecovery>,
+    /// Host-reported turn completion push subscriptions (per alleycat host
+    /// capability, per-turn subscription state).
+    pub(crate) push_manager: Arc<crate::push::PushManager>,
 }
 
 /// State for a single in-flight guided SSH connect.
@@ -703,10 +706,15 @@ impl MobileClient {
         let app_store = Arc::new(AppStoreReducer::new());
         let sessions = Arc::new(RwLock::new(HashMap::new()));
         let lag_recovery = StoreLagRecovery::new(Arc::clone(&app_store));
+        let alleycat_endpoint = Arc::new(tokio::sync::OnceCell::new());
+        let push_manager = Arc::new(crate::push::PushManager::new(Arc::new(
+            crate::push::IrohPushBackend::new(Arc::clone(&alleycat_endpoint)),
+        )));
         spawn_store_listener(
             Arc::clone(&app_store),
             Arc::clone(&sessions),
             Arc::clone(&lag_recovery),
+            Arc::clone(&push_manager),
             event_processor.subscribe(),
         );
         Self {
@@ -724,12 +732,13 @@ impl MobileClient {
             slingshot_credentials_directory: Arc::new(StdMutex::new(None)),
             direct_resumed_threads: Arc::new(StdMutex::new(HashSet::new())),
             thread_runtime_routes: Arc::new(StdMutex::new(HashMap::new())),
-            alleycat_endpoint: Arc::new(tokio::sync::OnceCell::new()),
+            alleycat_endpoint,
             alleycat_secret_key: Arc::new(StdMutex::new(None)),
             ssh_bootstrap_flows: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
             alleycat_restart_targets: Arc::new(StdMutex::new(HashMap::new())),
             terminal_sessions: Arc::new(StdMutex::new(HashMap::new())),
             lag_recovery,
+            push_manager,
         }
     }
 
@@ -1690,11 +1699,28 @@ impl MobileClient {
         &self,
         params: ParsedAlleycatPairPayload,
     ) -> Result<Vec<AlleycatAgentInfo>, TransportError> {
+        self.list_alleycat_agents_with_host(params)
+            .await
+            .map(|(agents, _host)| agents)
+    }
+
+    /// `list_alleycat_agents` plus the host capability block (`None` for
+    /// legacy hosts), used to record per-server push support.
+    async fn list_alleycat_agents_with_host(
+        &self,
+        params: ParsedAlleycatPairPayload,
+    ) -> Result<
+        (
+            Vec<AlleycatAgentInfo>,
+            Option<crate::alleycat::AlleycatHostInfo>,
+        ),
+        TransportError,
+    > {
         let endpoint = self
             .alleycat_endpoint()
             .await
             .map_err(|error| TransportError::ConnectionFailed(error.to_string()))?;
-        let agents = crate::alleycat::list_agents(&endpoint, params)
+        let (agents, host) = crate::alleycat::list_agents_with_host(&endpoint, params)
             .await
             .map_err(|error| TransportError::ConnectionFailed(error.to_string()))?;
         // Cache metadata so platforms can render labels/icons/capability
@@ -1706,7 +1732,7 @@ impl MobileClient {
                 presentation: agent.presentation.clone().map(Into::into),
                 capabilities: agent.capabilities.clone().map(Into::into),
             }));
-        Ok(agents)
+        Ok((agents, host))
     }
 
     fn runtime_supports_thread_permission_overrides(&self, runtime_kind: &str) -> bool {
@@ -1739,9 +1765,10 @@ impl MobileClient {
             .filter(|name| !name.is_empty())
             .collect::<std::collections::HashSet<_>>();
         let mut seen_runtime_kinds = std::collections::HashSet::new();
-        let requested_agents = self
-            .list_alleycat_agents(params.clone())
-            .await?
+        let (listed_agents, push_host) =
+            self.list_alleycat_agents_with_host(params.clone()).await?;
+        let push_runtime_agents = crate::push::runtime_agent_names(&listed_agents);
+        let requested_agents = listed_agents
             .into_iter()
             .filter_map(|agent| {
                 if !selected_agent_names.is_empty() && !selected_agent_names.contains(&agent.name) {
@@ -1786,6 +1813,7 @@ impl MobileClient {
         } else {
             server_id
         };
+        self.record_alleycat_push_host(&server_id, &params, push_host, push_runtime_agents);
 
         // Short-circuit if a healthy session for this server already
         // exists. Otherwise the saved-server reconnect path can race with
@@ -2376,6 +2404,16 @@ impl MobileClient {
     /// Otherwise removing a disconnected server pill from the UI would be a
     /// no-op because the snapshot would still carry it.
     pub fn disconnect_server(&self, server_id: &str) {
+        // A user-initiated disconnect / unpair revokes this device's
+        // turn-completion push subscriptions on that host.
+        self.push_on_server_removed(server_id);
+        self.disconnect_server_preserving_push(server_id);
+    }
+
+    /// `disconnect_server` for internal reconnects that tear the session
+    /// down only to rebuild it right away: push subscriptions for turns
+    /// still running on the host are kept.
+    pub(crate) fn disconnect_server_preserving_push(&self, server_id: &str) {
         let session = self.sessions_write().remove(server_id);
         self.clear_direct_resume_markers_for_server(server_id);
         match self.alleycat_restart_targets.lock() {

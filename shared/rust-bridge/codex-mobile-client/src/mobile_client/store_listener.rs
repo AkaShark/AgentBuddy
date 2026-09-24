@@ -18,6 +18,7 @@ pub(super) fn spawn_store_listener(
     app_store: Arc<AppStoreReducer>,
     sessions: Arc<RwLock<HashMap<String, Arc<ServerSession>>>>,
     lag_recovery: Arc<StoreLagRecovery>,
+    push_manager: Arc<crate::push::PushManager>,
     mut rx: broadcast::Receiver<UiEvent>,
 ) {
     MobileClient::spawn_detached(async move {
@@ -25,6 +26,7 @@ pub(super) fn spawn_store_listener(
             match rx.recv().await {
                 Ok(event) => {
                     app_store.apply_ui_event(&event);
+                    push_manager.observe_ui_event(&app_store, &event);
                     maybe_hydrate_collab_agent_metadata(
                         Arc::clone(&app_store),
                         Arc::clone(&sessions),
