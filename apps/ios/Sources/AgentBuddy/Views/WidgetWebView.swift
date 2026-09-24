@@ -522,11 +522,25 @@ struct WidgetWebView: UIViewRepresentable {
         window.webkit.messageHandlers.widget.postMessage({_type:'openLink', url: url});
     };
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/morphdom@2.7.4/dist/morphdom-umd.min.js"
-        onload="window._morphReady=true;if(window._pending){window._setContent(window._pending);window._pending=null;}"></script>
+    <script>
+    \(morphdomSource)
+    </script>
+    <script>window._morphReady=true;if(window._pending){window._setContent(window._pending);window._pending=null;}</script>
     </body></html>
     """
     }
+
+    /// morphdom 2.7.4 (MIT), bundled as `morphdom-umd.min.js` and inlined into
+    /// the shell so widgets render offline. If the resource is missing,
+    /// `_setContent` falls back to plain `innerHTML` replacement.
+    private static let morphdomSource: String = {
+        guard let url = Bundle.main.url(forResource: "morphdom-umd.min", withExtension: "js"),
+              let source = try? String(contentsOf: url, encoding: .utf8) else {
+            LLog.warn("widget", "bundled morphdom-umd.min.js missing; using innerHTML fallback")
+            return ""
+        }
+        return source
+    }()
 
     // MARK: - App-mode shell
 

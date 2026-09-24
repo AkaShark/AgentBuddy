@@ -58,6 +58,8 @@ targets:
       path: Sources/AgentBuddy/AgentBuddy.entitlements
       properties:
         aps-environment: development
+        com.apple.security.application-groups:
+          - group.com.akashark.agentbuddy
     attributes:
       SystemCapabilities:
         com.apple.Push:
@@ -103,6 +105,12 @@ targets:
         product: Nuke
       - package: Nuke
         product: NukeUI
+      # Embeds AgentBuddyLiveActivity.appex (PlugIns) and AgentBuddyWatch.app
+      # (Watch). AgentBuddyMac intentionally does not depend on these.
+      - target: AgentBuddyLiveActivity
+        embed: true
+      - target: AgentBuddyWatch
+        embed: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.akashark.agentbuddy
@@ -110,7 +118,6 @@ targets:
         INFOPLIST_FILE: Sources/AgentBuddy/Info.plist
         SWIFT_OBJC_BRIDGING_HEADER: Sources/AgentBuddy/Bridge/codex_bridge_objc.h
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        INFOPLIST_KEY_UIBackgroundModes: "audio fetch remote-notification picture-in-picture"
       configs:
         Debug:
           CODE_SIGN_STYLE: "$(APP_CODE_SIGN_STYLE)"

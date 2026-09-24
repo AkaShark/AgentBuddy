@@ -15,6 +15,7 @@
 		02324364235F504E9E8E2E0D /* LLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 878D64E841CC1DFA0E9CCBD9 /* LLog.swift */; };
 		02FB8586344407FA0CF7874B /* Network.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4A4DF5D7F0ED5D0DE32AB774 /* Network.framework */; };
 		030AD671D6A365A6DE974660 /* VoiceSessionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBB36E8BE76484E742A86A58 /* VoiceSessionModels.swift */; };
+		031A0549329A9672FE266222 /* AgentBuddyLiveActivity.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 60C027C06B7536D329FA25E1 /* AgentBuddyLiveActivity.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		040CE0C9647EDEFA26918D2F /* AgentLabelFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0997EADAA4F07200F0051D68 /* AgentLabelFormatter.swift */; };
 		04BD9F1278D017F065493D9B /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D80CC0F6781BE2E89329B174 /* QuartzCore.framework */; };
 		0596BBC62AAB6F54DD060D62 /* ProximityPairView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B838EDB838D9D9BEFCFC4B0F /* ProximityPairView.swift */; };
@@ -448,6 +449,7 @@
 		B2312713A606050FCBE009E1 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 072CE89345A6CE899E422BB7 /* Security.framework */; };
 		B2B3B9A2565CF4B23429BBEF /* PiPContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 788869046B23C527612E8261 /* PiPContentView.swift */; };
 		B2B429338DF6AF54232CCA62 /* SilentAudioKeeper.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBFA231A71F8873BF64E105F /* SilentAudioKeeper.swift */; };
+		B2C5F5DD1E119BEDD8EB1386 /* AgentBuddyWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 0BF47AB8E9C23F9D225C66FE /* AgentBuddyWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		B378C7BB097A21C2BCE08EC6 /* ConversationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AF206FB52ABEEBFA42D14B2 /* ConversationView.swift */; };
 		B3F3FC1DA73D89EF9329FB54 /* RealtimeWebRtcSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C153B2D8765F181D0C4B126 /* RealtimeWebRtcSession.swift */; };
 		B3F7A9947DB69460B11B6A59 /* PreviewSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 848C4E389E6ADBF83D884DF9 /* PreviewSupport.swift */; };
@@ -563,6 +565,7 @@
 		D9894575FB7ED3621980BF08 /* NearbyMacPairing.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A80BEE658A3828FF5D287D /* NearbyMacPairing.swift */; };
 		DBD6C44C649249B2329DBACF /* ConversationInfoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E725E0D1F6B7C78079681758 /* ConversationInfoView.swift */; };
 		DC5179C9706764A45534A658 /* WatchApprovalNotification.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DD0E335A9F83EC7800FB675 /* WatchApprovalNotification.swift */; };
+		DC612847D21662E1C3985858 /* morphdom-umd.min.js in Resources */ = {isa = PBXBuildFile; fileRef = B26DCF3000FC1039F80FDDA1 /* morphdom-umd.min.js */; };
 		DC7AB82DACC4BA8E28387965 /* LocalCodexBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5286F6BA530BFEF3822402A1 /* LocalCodexBootstrap.swift */; };
 		DD154680C04505040BC4FD86 /* laserwave.json in Resources */ = {isa = PBXBuildFile; fileRef = F63BD267F792D45BE3AE659C /* laserwave.json */; };
 		DE320BDFCBCD90C9D00F5EB9 /* WatchSnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1462A296A22160D9A25628C /* WatchSnapshotStore.swift */; };
@@ -616,6 +619,7 @@
 		F0C55B494DB21AF8936D69D9 /* AmbientSuggestionsList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F5C9109A04A6118BEFEE0E1 /* AmbientSuggestionsList.swift */; };
 		F1D7A626CA17CDAA41B26FA8 /* SavedAppsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E11832DAFA2DFC1DF6F1B609 /* SavedAppsStoreTests.swift */; };
 		F29CA8733889E75ADBE1F95E /* SessionReplySwipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D8FDAAA2B6C5589F7C69CCB /* SessionReplySwipe.swift */; };
+		F2A88838CB55B7946C1BC8E7 /* morphdom-umd.min.js in Resources */ = {isa = PBXBuildFile; fileRef = B26DCF3000FC1039F80FDDA1 /* morphdom-umd.min.js */; };
 		F3E3434BC4E72B9D00AAD585 /* AgentBuddyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48F05ECE1EE4B2DFE2B7EA78 /* AgentBuddyApp.swift */; };
 		F458A0345493FC0CB676E9A0 /* AnimatedSplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC674E788F3F9D0FC37DA704 /* AnimatedSplashView.swift */; };
 		F478524465E182DA026E8FEE /* WatchProjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A774C3DF3816D4F170CC65BD /* WatchProjection.swift */; };
@@ -660,6 +664,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		023DD2DB353C1C287D574D28 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0E8C034814FC5F71A994ABD0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8BE2CDF5AD2F2D41157094D5;
+			remoteInfo = AgentBuddyWatch;
+		};
 		0BE53C2CE79658654036F754 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 0E8C034814FC5F71A994ABD0 /* Project object */;
@@ -674,6 +685,13 @@
 			remoteGlobalIDString = FB10F64474F8F06D5D296857;
 			remoteInfo = AgentBuddy;
 		};
+		6163EEE6E61FD1F1A2223AF9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0E8C034814FC5F71A994ABD0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AC71C02D88C6FA436DE89517;
+			remoteInfo = AgentBuddyLiveActivity;
+		};
 		75DC1D2DF4E035C6B20BD20E /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 0E8C034814FC5F71A994ABD0 /* Project object */;
@@ -684,6 +702,28 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
+		C5ED334DEC296FE97C9D2988 /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				B2C5F5DD1E119BEDD8EB1386 /* AgentBuddyWatch.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DB45C3A59E4190907903FAEC /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				031A0549329A9672FE266222 /* AgentBuddyLiveActivity.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F58A38E9A1DA2B29A622A90F /* Embed Foundation Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -961,6 +1001,7 @@
 		AFD07BD4B9800779B77F27B1 /* solarized-dark.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "solarized-dark.json"; sourceTree = "<group>"; };
 		B0CE019D80CE6F481298C61E /* HomeComposerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeComposerView.swift; sourceTree = "<group>"; };
 		B259B6714E5C4F6F5DB6C6BC /* ConversationComposerContextBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationComposerContextBarView.swift; sourceTree = "<group>"; };
+		B26DCF3000FC1039F80FDDA1 /* morphdom-umd.min.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "morphdom-umd.min.js"; sourceTree = "<group>"; };
 		B583EE21F65EBD1725278791 /* usgc-epitaxy.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "usgc-epitaxy.json"; sourceTree = "<group>"; };
 		B5DEAAE6AB456E2C06D45823 /* AgentBuddyRunningTurnWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentBuddyRunningTurnWidget.swift; sourceTree = "<group>"; };
 		B72868A9F2FB1F2B93C61758 /* catppuccin-frappe.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "catppuccin-frappe.json"; sourceTree = "<group>"; };
@@ -1127,6 +1168,7 @@
 				0582C942F36CD23FA5ED923D /* brand_logo.svg */,
 				FCDF09BEABC188CC9791AAB6 /* home_cat_entrance.png */,
 				572DEADFDB70A0FD7B5B4C80 /* home_cat.png */,
+				B26DCF3000FC1039F80FDDA1 /* morphdom-umd.min.js */,
 				4D90AC6604B569E4FB6AE259 /* Fonts */,
 				3BAE5E7EDA6B7B527E77F891 /* Themes */,
 			);
@@ -1798,10 +1840,14 @@
 				2E98C0F6708C0D595A1F9F70 /* Sources */,
 				6A7EC57E58A6ECB36C988C20 /* Resources */,
 				02F36F6478F6552ABCE5A9E4 /* Frameworks */,
+				DB45C3A59E4190907903FAEC /* Embed Foundation Extensions */,
+				C5ED334DEC296FE97C9D2988 /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				DA9EEFCF650072F29983C903 /* PBXTargetDependency */,
+				C253F6FD5145992352C74080 /* PBXTargetDependency */,
 			);
 			name = AgentBuddy;
 			packageProductDependencies = (
@@ -1945,6 +1991,7 @@
 				E4A8BD3E8FAF34DFEFF03996 /* min-dark-.json in Resources */,
 				9433BC46119BEA352A66531A /* min-light.json in Resources */,
 				1C31C99A67961FB952E2C985 /* monokai.json in Resources */,
+				F2A88838CB55B7946C1BC8E7 /* morphdom-umd.min.js in Resources */,
 				3F330A8C4FC60150D86D0765 /* night-owl.json in Resources */,
 				FCC05E3DCA33B5DAE64F8CBA /* nord.json in Resources */,
 				C105FE3449602CE3ADDBD0BE /* notion-dark-BTRKJ-yg.json in Resources */,
@@ -2053,6 +2100,7 @@
 				63A4F2227E3D50B1199D3A73 /* min-dark-.json in Resources */,
 				B1A18EA70201CFABC1C91313 /* min-light.json in Resources */,
 				B43AF2E335105D941444B17B /* monokai.json in Resources */,
+				DC612847D21662E1C3985858 /* morphdom-umd.min.js in Resources */,
 				638FA6635792CFDB7510AE73 /* night-owl.json in Resources */,
 				D63E8ADD23B9FD7CFC66C7DA /* nord.json in Resources */,
 				2F413B3BCEFF5556180E8C9A /* notion-dark-BTRKJ-yg.json in Resources */,
@@ -2603,10 +2651,20 @@
 			target = 4D48484380B849DAFF0237D9 /* AgentBuddyWatchComplications */;
 			targetProxy = 75DC1D2DF4E035C6B20BD20E /* PBXContainerItemProxy */;
 		};
+		C253F6FD5145992352C74080 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8BE2CDF5AD2F2D41157094D5 /* AgentBuddyWatch */;
+			targetProxy = 023DD2DB353C1C287D574D28 /* PBXContainerItemProxy */;
+		};
 		C7802580270FE54596118099 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = FB10F64474F8F06D5D296857 /* AgentBuddy */;
 			targetProxy = 0BE53C2CE79658654036F754 /* PBXContainerItemProxy */;
+		};
+		DA9EEFCF650072F29983C903 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AC71C02D88C6FA436DE89517 /* AgentBuddyLiveActivity */;
+			targetProxy = 6163EEE6E61FD1F1A2223AF9 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -2653,7 +2711,6 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				INFOPLIST_FILE = Sources/AgentBuddy/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = AgentBuddy;
-				INFOPLIST_KEY_UIBackgroundModes = "audio fetch remote-notification picture-in-picture";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -2855,7 +2912,6 @@
 				CODE_SIGN_STYLE = "$(APP_CODE_SIGN_STYLE)";
 				INFOPLIST_FILE = Sources/AgentBuddy/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = AgentBuddy;
-				INFOPLIST_KEY_UIBackgroundModes = "audio fetch remote-notification picture-in-picture";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -3280,7 +3336,6 @@
 				CODE_SIGN_STYLE = "$(APP_CODE_SIGN_STYLE)";
 				INFOPLIST_FILE = Sources/AgentBuddy/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = AgentBuddy;
-				INFOPLIST_KEY_UIBackgroundModes = "audio fetch remote-notification picture-in-picture";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
