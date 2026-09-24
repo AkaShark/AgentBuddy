@@ -81,3 +81,5 @@
 
 - 用户选择模拟测试：Mac 使用真机 token 注册 30 秒间隔、150 秒 TTL 的 sandbox 推送。Worker 记录三次 `APNs sandbox → 200 OK`；iPhone 在 `applicationState=background` 收到静默推送，执行 runtime handler 并完成 `newData`。测试注册已主动注销。
 - 完整业务流程仍未验收：手机进入后台时，自行调用 Worker `/register` 报“无法连接服务器”；Mac 代注册仅验证了服务端到 APNs 到真机后台接收，未证明手机到 Worker 的网络路径，也未验证有运行任务时的状态刷新。后续应检查手机网络对 workers.dev 的可达性，必要时配置可访问的自有域名。
+
+- 再测手机直连：使用仅本地临时 Debug 入口调用实际 `PushProxyClient.register`，90 秒 TTL、30 秒间隔；手机返回 `NSURLErrorDomain -1005`（网络连接已中断），未取得注册 ID，不能判定直连通过。临时入口测试后已从源码移除，正常包重新构建成功。未再次用 Mac 代注册来掩盖该失败。
