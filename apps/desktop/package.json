@@ -8,7 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "test": "vitest run && node --test scripts/sync-version.test.mjs",
+    "test": "vitest run && node --test scripts/*.test.mjs",
     "test:watch": "vitest"
   },
   "dependencies": {

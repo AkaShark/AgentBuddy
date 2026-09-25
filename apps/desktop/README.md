@@ -27,6 +27,9 @@ AGENTBUDDY_SIDECAR="$PWD/binaries/agentbuddy-$(rustc --print host-tuple)" cargo 
 "$PWD/binaries/agentbuddy-$(rustc --print host-tuple)" stop   # pair 会顺带拉起一个守护进程
 ```
 
+测试按 `pair` → `status --json` 顺序检查同一个守护进程，每条命令限时 90 秒。
+CI 将停止守护进程放在独立的 `always()` 步骤中，测试失败也会清理。
+
 ## 发布
 
 ```bash
@@ -38,7 +41,12 @@ make desktop-dist
 
 CI：打 `desktop-vX.Y.Z` tag 触发 `.github/workflows/desktop-release.yml`，产出 arm64 与 x86_64 两个 dmg
 到同一个 GitHub Releases 草稿。配置了 `MAC_DEVELOPER_ID_CERT_*` 与 `ASC_*` secrets 时会签名并公证，否则产出未签名包。
-该 workflow 还没在 GitHub 上实际跑过：第一次打 tag 前请先在 Actions 页手动触发一次（workflow_dispatch）。
+构建签名与公证分开执行：`scripts/notarize-dmg.sh` 提交 DMG 后立即保存 submission ID，
+最多等待 60 分钟，仅在 `Accepted` 后 staple、validate 并上传 Release 草稿。
+失败或仍为 `In Progress` 时，DMG 和诊断 JSON/log 仍保存在 Actions 的
+`desktop-<target>` artifact；这种 DMG 不代表已通过公证，不会上传 Release 草稿。
+Apple 超时后仍会继续处理，可用保存的 ID 执行 `xcrun notarytool info <id>` / `log <id>`
+（带同一套认证参数）检查结果；确认 Accepted 后可对保留的 DMG 执行 `xcrun stapler staple` / `validate`。
 
 ## 目录
 
