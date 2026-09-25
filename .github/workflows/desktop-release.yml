@@ -3,8 +3,7 @@ name: Desktop release
 # Builds the AgentBuddy macOS host app (apps/desktop, Tauri v2) for Apple
 # Silicon and Intel and attaches both dmgs to one draft GitHub Release.
 # Trigger: push a `desktop-vX.Y.Z` tag, or run manually (creates a
-# `desktop-dev-<run>` draft prerelease). Not yet exercised on GitHub:
-# run it once via workflow_dispatch before the first tag.
+# `desktop-dev-<run>` draft prerelease).
 #
 # Signing + notarization run only when the secrets below are configured;
 # without them the job still produces unsigned dmgs so CI stays useful:
@@ -22,12 +21,11 @@ permissions:
   contents: write
 
 jobs:
-  # One draft release that both matrix legs upload into (tauri-action's
-  # recommended pattern; two legs creating their own drafts would race).
+  # One draft release that both matrix legs upload into.
   create-release:
     runs-on: ubuntu-latest
     outputs:
-      release_id: ${{ steps.create.outputs.result }}
+      release_tag: ${{ steps.create.outputs.release_tag }}
     steps:
       - id: create
         uses: actions/github-script@v7
@@ -35,6 +33,7 @@ jobs:
           script: |
             const isTag = context.ref.startsWith('refs/tags/');
             const tag = isTag ? context.ref.replace('refs/tags/', '') : `desktop-dev-${context.runNumber}`;
+            core.setOutput('release_tag', tag);
             const { data } = await github.rest.repos.createRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -55,7 +54,7 @@ jobs:
           - target: aarch64-apple-darwin
           - target: x86_64-apple-darwin
     runs-on: macos-15
-    timeout-minutes: 90
+    timeout-minutes: 120
     env:
       CARGO_TERM_COLOR: always
       HAS_SIGNING: ${{ secrets.MAC_DEVELOPER_ID_CERT_P12_B64 != '' }}
@@ -92,12 +91,17 @@ jobs:
 
       - name: Sidecar contract test
         if: matrix.target == 'aarch64-apple-darwin'
+        timeout-minutes: 5
         working-directory: apps/desktop/src-tauri
         env:
           AGENTBUDDY_SIDECAR: ${{ github.workspace }}/apps/desktop/src-tauri/binaries/agentbuddy-${{ matrix.target }}
         run: |
-          cargo test --test sidecar_contract
-          "$AGENTBUDDY_SIDECAR" stop || true
+          cargo test --test sidecar_contract -- --nocapture
+
+      - name: Stop test daemon
+        if: always() && matrix.target == 'aarch64-apple-darwin'
+        timeout-minutes: 1
+        run: '"apps/desktop/src-tauri/binaries/agentbuddy-${{ matrix.target }}" stop'
 
       - name: Frontend tests
         if: matrix.target == 'aarch64-apple-darwin'
@@ -118,33 +122,55 @@ jobs:
           security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security set-keychain-settings -t 3600 -u build.keychain
+          security set-keychain-settings -t 7200 -u build.keychain
           security import "$RUNNER_TEMP/cert.p12" -k build.keychain -P "$CERT_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
           IDENTITY="$(security find-identity -v -p codesigning build.keychain | grep 'Developer ID Application' | head -1 | awk -F'"' '{print $2}')"
           test -n "$IDENTITY"
           echo "APPLE_SIGNING_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
 
-      - name: Configure notarization
-        if: env.HAS_SIGNING == 'true' && env.HAS_NOTARY == 'true'
-        env:
-          ASC_PRIVATE_KEY_P8_B64: ${{ secrets.ASC_PRIVATE_KEY_P8_B64 }}
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-        run: |
-          echo "$ASC_PRIVATE_KEY_P8_B64" | base64 --decode > "$RUNNER_TEMP/AuthKey.p8"
-          {
-            echo "APPLE_API_KEY_PATH=$RUNNER_TEMP/AuthKey.p8"
-            echo "APPLE_API_KEY=$ASC_KEY_ID"
-            echo "APPLE_API_ISSUER=$ASC_ISSUER_ID"
-          } >> "$GITHUB_ENV"
-
-      - name: Build and notarize DMG
+      # Do not expose APPLE_API_* to Tauri: its internal notarytool wait
+      # hides the submission ID and can consume the entire build timeout.
+      - name: Build signed DMG
         uses: tauri-apps/tauri-action@v0
-        timeout-minutes: 45
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        timeout-minutes: 30
         with:
           projectPath: apps/desktop
-          releaseId: ${{ needs.create-release.outputs.release_id }}
           args: --target ${{ matrix.target }} --bundles dmg
+
+      - name: Notarize and staple DMG
+        if: env.HAS_SIGNING == 'true' && env.HAS_NOTARY == 'true'
+        timeout-minutes: 70
+        env:
+          ASC_PRIVATE_KEY_P8_B64: ${{ secrets.ASC_PRIVATE_KEY_P8_B64 }}
+          APPLE_API_KEY: ${{ secrets.ASC_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.ASC_ISSUER_ID }}
+          APPLE_API_KEY_PATH: ${{ runner.temp }}/AuthKey.p8
+        run: |
+          umask 077
+          echo "$ASC_PRIVATE_KEY_P8_B64" | base64 --decode > "$APPLE_API_KEY_PATH"
+          trap 'rm -f "$APPLE_API_KEY_PATH"' EXIT
+          ./apps/desktop/scripts/notarize-dmg.sh \
+            apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/dmg \
+            "$RUNNER_TEMP/notarization"
+
+      - name: Preserve DMG and notarization diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.target }}
+          path: |
+            apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
+            ${{ runner.temp }}/notarization/
+          if-no-files-found: warn
+
+      # A failed/pending notarization remains a failed job. Its build is
+      # retained above for diagnosis, but is never uploaded to the release.
+      - name: Upload DMG to draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.create-release.outputs.release_tag }}
+        run: |
+          gh release upload "$RELEASE_TAG" \
+            apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg \
+            --clobber
