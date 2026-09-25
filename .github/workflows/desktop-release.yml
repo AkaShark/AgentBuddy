@@ -55,6 +55,7 @@ jobs:
           - target: aarch64-apple-darwin
           - target: x86_64-apple-darwin
     runs-on: macos-15
+    timeout-minutes: 90
     env:
       CARGO_TERM_COLOR: always
       HAS_SIGNING: ${{ secrets.MAC_DEVELOPER_ID_CERT_P12_B64 != '' }}
@@ -138,7 +139,9 @@ jobs:
             echo "APPLE_API_ISSUER=$ASC_ISSUER_ID"
           } >> "$GITHUB_ENV"
 
-      - uses: tauri-apps/tauri-action@v0
+      - name: Build and notarize DMG
+        uses: tauri-apps/tauri-action@v0
+        timeout-minutes: 45
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
