@@ -1,6 +1,7 @@
 name: Mobile CI
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - 'Makefile'
@@ -155,10 +156,11 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - name: Install Android platforms and NDK
         run: |
-          yes | sdkmanager --licenses
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" "ndk;30.0.14904198"
 
       - name: Install system deps
@@ -222,6 +224,14 @@ jobs:
 
       - name: Assemble debug
         run: apps/android/gradlew -p apps/android :app:assembleDebug
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentbuddy-android-debug
+          path: apps/android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 7
 
   ios:
     needs: shared-prep
@@ -334,7 +344,22 @@ jobs:
             -project apps/ios/AgentBuddy.xcodeproj \
             -scheme AgentBuddy \
             -configuration Debug \
+            -derivedDataPath "$RUNNER_TEMP/ios-build" \
             -destination "id=$IOS_SIMULATOR_UDID" \
             ARCHS=arm64 \
             ONLY_ACTIVE_ARCH=YES \
             build
+
+      - name: Package simulator app
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$RUNNER_TEMP/ios-build/Build/Products/Debug-iphonesimulator/AgentBuddy.app" \
+            "$RUNNER_TEMP/AgentBuddy-simulator.zip"
+
+      - name: Upload simulator app
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentbuddy-ios-simulator
+          path: ${{ runner.temp }}/AgentBuddy-simulator.zip
+          if-no-files-found: error
+          retention-days: 7
