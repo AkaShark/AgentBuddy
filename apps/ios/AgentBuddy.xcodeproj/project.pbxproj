@@ -208,7 +208,6 @@
 		4D3C937879C0BAA2FF2C4AE8 /* ChatTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2FEE10CC33D047F3F791E0C /* ChatTypes.swift */; };
 		4DBAC1EE3BE027A00854263F /* ProjectChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B81124A0CC4E9BEAD47C0B6 /* ProjectChip.swift */; };
 		4E0C20136A98F702A7156024 /* PetSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 398B047BB6408B08E53BC426 /* PetSettingsView.swift */; };
-		4E2918365396C3B07ECA2426 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 08A103DA4E3F07089ADA9781 /* InfoPlist.strings */; };
 		4ECE903EA4550FB4A1D9EE41 /* DebugSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8B6D7A057EA498588C5CB84 /* DebugSettings.swift */; };
 		4F2CBA69E9A6425C98F71D50 /* GhosttyBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = 12CCE173DC41BD7626350A74 /* GhosttyBridge.m */; };
 		4F44E891426A35BEBA7C7C0F /* AgentBuddyUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5262DCB2E28EA99FA8A894A /* AgentBuddyUITests.swift */; };
@@ -253,7 +252,6 @@
 		5D1AA198BFF03A6B16DFC434 /* BerkeleyMono-Bold.otf in Resources */ = {isa = PBXBuildFile; fileRef = A13224DD5E63681C0D327A6F /* BerkeleyMono-Bold.otf */; };
 		5D298A2EF7B75CBC30FB88CE /* ConversationComposerContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD05B69563960F011DFB399A /* ConversationComposerContentView.swift */; };
 		5DA752F0C9CF2FADBA204029 /* matrix-dark.json in Resources */ = {isa = PBXBuildFile; fileRef = 5E92537469ABCE99DD9802A2 /* matrix-dark.json */; };
-		5E60635DB427BEACE974CD4D /* Info-Catalyst-InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 18EFF83AC6E900A28D762D15 /* Info-Catalyst-InfoPlist.strings */; };
 		5E7629A9A34F3D786DBE77B5 /* CatalystRuntimeStubs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AFD36FA239C4238F432DBDD /* CatalystRuntimeStubs.swift */; };
 		5EBA956444867A93AA62480D /* usgc-epitaxy.json in Resources */ = {isa = PBXBuildFile; fileRef = B583EE21F65EBD1725278791 /* usgc-epitaxy.json */; };
 		5F4B74FA64702A939D8F60E4 /* brand_logo.svg in Resources */ = {isa = PBXBuildFile; fileRef = 0582C942F36CD23FA5ED923D /* brand_logo.svg */; };
@@ -1894,7 +1892,7 @@
 					};
 					FB10F64474F8F06D5D296857 = {
 						DevelopmentTeam = HNKUYWPBVC;
-						SystemCapabilities = "[\"com.apple.BackgroundModes\": [\"enabled\": true], \"com.apple.Push\": [\"enabled\": true]]";
+						SystemCapabilities = "[\"com.apple.Push\": [\"enabled\": true], \"com.apple.BackgroundModes\": [\"enabled\": true]]";
 					};
 				};
 			};
@@ -1941,7 +1939,6 @@
 				BD008FDE36BB0133916D7977 /* BerkeleyMono-Oblique.otf in Resources */,
 				FEC1129D7C76677ADA1BED0D /* BerkeleyMono-Regular.otf in Resources */,
 				47E8D3ACA1AFFB9B47CDFFB9 /* Info-Catalyst-InfoPlist.strings in Resources */,
-				4E2918365396C3B07ECA2426 /* InfoPlist.strings in Resources */,
 				AF7BB8612AED87DA06A48EF2 /* Localizable.strings in Resources */,
 				5A29D99DDBE1881CDFCB6328 /* absolutely-dark.json in Resources */,
 				40AB5F65397FD379C8DDCCCA /* absolutely-light.json in Resources */,
@@ -2048,7 +2045,6 @@
 				5D1AA198BFF03A6B16DFC434 /* BerkeleyMono-Bold.otf in Resources */,
 				69AC895C29EBBFC3CFB79590 /* BerkeleyMono-Oblique.otf in Resources */,
 				890FA9BA2213A5804212CE90 /* BerkeleyMono-Regular.otf in Resources */,
-				5E60635DB427BEACE974CD4D /* Info-Catalyst-InfoPlist.strings in Resources */,
 				5054597BBEBAE4873F5218E6 /* Info-Catalyst.plist in Resources */,
 				8532B2DF813E8A311FA15287 /* InfoPlist.strings in Resources */,
 				EDDA7388DCA58787BBB2BEE2 /* Localizable.strings in Resources */,

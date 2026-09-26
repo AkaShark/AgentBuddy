@@ -71,6 +71,7 @@ targets:
         excludes:
           - "**/*.h"
           - "AppIcon.icon"
+          - "**/Info-Catalyst-InfoPlist.strings"
       - path: Sources/AgentBuddy/Bridge/UniFFICodexClient.generated.swift
       - path: Sources/AgentBuddyLiveActivity/CodexTurnLiveActivity.swift
       - path: Sources/AgentBuddyWatch/Models/WatchModels.swift
@@ -160,6 +161,9 @@ targets:
         excludes:
           - CarPlay/**
           - Info.plist
+          # Xcode maps Info-Catalyst-InfoPlist.strings to InfoPlist.strings
+          # for this target; including both produces the same output twice.
+          - "**/InfoPlist.strings"
           - AgentBuddy.entitlements
           - AgentBuddy-Catalyst.entitlements
           - AgentBuddy-Catalyst-DeveloperID.entitlements
