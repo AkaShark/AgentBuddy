@@ -2,8 +2,11 @@ package com.akashark.agentbuddy.android.ui.discovery
 
 import android.content.Context
 import android.net.Uri
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import com.akashark.agentbuddy.android.state.AppModel
 import com.akashark.agentbuddy.android.state.SavedServer
 import com.akashark.agentbuddy.android.state.SavedServerStore
 import com.akashark.agentbuddy.android.state.isConnected
@@ -17,9 +20,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import uniffi.codex_mobile_client.AppServerSnapshot
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.State
-import com.akashark.agentbuddy.android.state.AppModel
 import uniffi.codex_mobile_client.AppSnapshotRecord
 
 /**

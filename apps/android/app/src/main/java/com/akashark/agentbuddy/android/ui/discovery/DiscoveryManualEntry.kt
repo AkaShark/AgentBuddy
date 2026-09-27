@@ -1,30 +1,27 @@
 package com.akashark.agentbuddy.android.ui.discovery
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import com.akashark.agentbuddy.android.state.SavedServer
-import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyBanner
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyBannerTone
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyBottomSheet
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyButton
 import java.net.URI
 
+/** 「SSH 或地址」 sheet: manual Codex URL or SSH host entry with validation. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun ManualEntryDialog(
+internal fun ManualEntrySheet(
     onDismiss: () -> Unit,
     onSubmit: (ManualEntryAction) -> Unit,
 ) {
@@ -35,126 +32,156 @@ internal fun ManualEntryDialog(
     var wakeMac by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("添加服务器") },
-        text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = mode == ManualConnectionMode.CODEX,
-                        onClick = { mode = ManualConnectionMode.CODEX },
-                        label = { Text(ManualConnectionMode.CODEX.label) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = AgentBuddyTheme.accent.copy(alpha = 0.18f),
-                            selectedLabelColor = AgentBuddyTheme.textPrimary,
+    BuddyBottomSheet(onDismissRequest = onDismiss) {
+        ManualEntryContent(
+            mode = mode,
+            onModeChange = { mode = it },
+            codexUrl = codexUrl,
+            onCodexUrlChange = {
+                codexUrl = it
+                errorMessage = null
+            },
+            host = host,
+            onHostChange = {
+                host = it
+                errorMessage = null
+            },
+            sshPort = sshPort,
+            onSshPortChange = {
+                sshPort = it
+                errorMessage = null
+            },
+            wakeMac = wakeMac,
+            onWakeMacChange = {
+                wakeMac = it
+                errorMessage = null
+            },
+            errorMessage = errorMessage,
+            onCancel = onDismiss,
+            onSubmit = {
+                errorMessage = when (val action = buildManualEntryAction(
+                    mode,
+                    codexUrl,
+                    host,
+                    sshPort,
+                    wakeMac,
+                )) {
+                    is ManualEntryBuild.Action -> {
+                        onSubmit(action.action)
+                        null
+                    }
+
+                    is ManualEntryBuild.Error -> action.message
+                }
+            },
+        )
+    }
+}
+
+/** Stateless body of [ManualEntrySheet] (also rendered by the gallery). */
+@Composable
+internal fun ManualEntryContent(
+    mode: ManualConnectionMode,
+    onModeChange: (ManualConnectionMode) -> Unit,
+    codexUrl: String,
+    onCodexUrlChange: (String) -> Unit,
+    host: String,
+    onHostChange: (String) -> Unit,
+    sshPort: String,
+    onSshPortChange: (String) -> Unit,
+    wakeMac: String,
+    onWakeMacChange: (String) -> Unit,
+    errorMessage: String?,
+    onCancel: () -> Unit,
+    onSubmit: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    DiscoverySheetScaffold(
+        modifier = modifier,
+        header = {
+            DiscoverySheetHeader(title = "SSH 或地址", actionTitle = "取消", onAction = onCancel)
+        },
+        bottomBar = {
+            BuddyButton(text = mode.primaryButtonTitle, onClick = onSubmit)
+        },
+    ) {
+        DiscoveryFormSection(title = "连接方式") {
+            DiscoverySegmentedPicker(
+                options = ManualConnectionMode.entries.map { it to it.label },
+                selection = mode,
+                onSelect = onModeChange,
+            )
+        }
+
+        when (mode) {
+            ManualConnectionMode.CODEX -> {
+                DiscoveryFormSection(
+                    title = "Codex 服务器",
+                    footer = "建议使用 SSH 流程 —— 它会在远程绑定 127.0.0.1 并转发端口。" +
+                        "若手动运行，请自行绑定环回地址并建立隧道：" +
+                        "codex app-server --listen ws://127.0.0.1:8390",
+                ) {
+                    MintTextField(
+                        value = codexUrl,
+                        onValueChange = onCodexUrlChange,
+                        placeholder = "ws://host:8390 或 host:8390",
+                        label = "Codex URL",
+                        monospaced = true,
+                        isError = errorMessage != null,
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Uri,
+                            imeAction = ImeAction.Go,
+                        ),
+                        keyboardActions = KeyboardActions(onGo = { onSubmit() }),
+                    )
+                }
+            }
+
+            ManualConnectionMode.SSH -> {
+                DiscoveryFormSection(title = "SSH 主机") {
+                    MintTextField(
+                        value = host,
+                        onValueChange = onHostChange,
+                        placeholder = "主机名或 IP",
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Uri,
+                            imeAction = ImeAction.Next,
                         ),
                     )
-                    FilterChip(
-                        selected = mode == ManualConnectionMode.SSH,
-                        onClick = { mode = ManualConnectionMode.SSH },
-                        label = { Text(ManualConnectionMode.SSH.label) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = AgentBuddyTheme.accent.copy(alpha = 0.18f),
-                            selectedLabelColor = AgentBuddyTheme.textPrimary,
+                }
+                DiscoveryFormSection(title = "SSH 端口") {
+                    MintTextField(
+                        value = sshPort,
+                        onValueChange = onSshPortChange,
+                        placeholder = "22",
+                        label = "SSH 端口",
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Number,
+                            imeAction = ImeAction.Next,
                         ),
                     )
                 }
-
-                when (mode) {
-                    ManualConnectionMode.CODEX -> {
-                        OutlinedTextField(
-                            value = codexUrl,
-                            onValueChange = {
-                                codexUrl = it
-                                errorMessage = null
-                            },
-                            label = { Text("Codex URL") },
-                            placeholder = { Text("ws://host:8390 或 host:8390") },
-                            singleLine = true,
-                        )
-                        Text(
-                            text = "建议使用 SSH 流程 —— 它会在远程绑定 127.0.0.1 并转发端口。" +
-                                "若手动运行，请自行绑定环回地址并建立隧道：" +
-                                "codex app-server --listen ws://127.0.0.1:8390",
-                            color = AgentBuddyTheme.textMuted,
-                            fontSize = 11.sp,
-                        )
-                    }
-
-                    ManualConnectionMode.SSH -> {
-                        OutlinedTextField(
-                            value = host,
-                            onValueChange = {
-                                host = it
-                                errorMessage = null
-                            },
-                            label = { Text("SSH 主机") },
-                            placeholder = { Text("主机名或 IP") },
-                            singleLine = true,
-                        )
-                        OutlinedTextField(
-                            value = sshPort,
-                            onValueChange = {
-                                sshPort = it
-                                errorMessage = null
-                            },
-                            label = { Text("SSH 端口") },
-                            singleLine = true,
-                        )
-                        OutlinedTextField(
-                            value = wakeMac,
-                            onValueChange = {
-                                wakeMac = it
-                                errorMessage = null
-                            },
-                            label = { Text("唤醒 MAC（可选）") },
-                            placeholder = { Text("aa:bb:cc:dd:ee:ff") },
-                            singleLine = true,
-                        )
-                    }
-                }
-
-                if (errorMessage != null) {
-                    Text(
-                        text = errorMessage!!,
-                        color = AgentBuddyTheme.danger,
-                        fontSize = 12.sp,
+                DiscoveryFormSection(
+                    title = "唤醒 MAC（可选）",
+                    footer = "填写后，连接前会先向这台电脑发送网络唤醒包。",
+                ) {
+                    MintTextField(
+                        value = wakeMac,
+                        onValueChange = onWakeMacChange,
+                        placeholder = "aa:bb:cc:dd:ee:ff",
+                        label = "唤醒 MAC（可选）",
+                        monospaced = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
+                        keyboardActions = KeyboardActions(onGo = { onSubmit() }),
                     )
                 }
             }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    errorMessage = when (val action = buildManualEntryAction(
-                        mode,
-                        codexUrl,
-                        host,
-                        sshPort,
-                        wakeMac,
-                    )) {
-                        is ManualEntryBuild.Action -> {
-                            onSubmit(action.action)
-                            null
-                        }
+        }
 
-                        is ManualEntryBuild.Error -> action.message
-                    }
-                },
-            ) {
-                Text(mode.primaryButtonTitle)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("取消")
-            }
-        },
-    )
+        if (errorMessage != null) {
+            BuddyBanner(tone = BuddyBannerTone.DANGER, message = errorMessage)
+        }
+    }
 }
 
 internal sealed interface ManualEntryAction {
@@ -167,7 +194,7 @@ private sealed interface ManualEntryBuild {
     data class Error(val message: String) : ManualEntryBuild
 }
 
-private enum class ManualConnectionMode(
+internal enum class ManualConnectionMode(
     val label: String,
     val primaryButtonTitle: String,
 ) {

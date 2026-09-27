@@ -1,100 +1,107 @@
 package com.akashark.agentbuddy.android.ui.discovery
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.outlined.DesktopWindows
+import androidx.compose.material.icons.outlined.PowerSettingsNew
+import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material.icons.outlined.Terminal
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
+import com.akashark.agentbuddy.android.ui.common.AgentIconView
 import com.akashark.agentbuddy.android.ui.common.AgentRuntimeKind
+import com.akashark.agentbuddy.android.ui.common.runtimeLabel
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyBanner
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyBannerTone
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyChevron
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyIconTile
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddySurfaceTone
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyTileContent
+import com.akashark.agentbuddy.android.ui.designsystem.components.buddyCard
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyChromeTypeLimit
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyShapes
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySpacing
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyTextStyle
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyTextStyle
 
-/** Title and connection-method cards at the top of [DiscoveryScreen]. */
+/**
+ * 「添加主机」 chooser of [DiscoveryScreen]: title, explanation and one Mint card
+ * per connection method. QR pairing is the recommended option (brand tile
+ * and a 「推荐」 tag); [wakingHostName] shows while a manual connect is waking
+ * the host and probing its ports.
+ */
 @Composable
 internal fun DiscoveryChooser(
     onPairWithAgentBuddy: () -> Unit,
     onConnectedComputers: () -> Unit,
     onSshOrCodexUrl: () -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+    wakingHostName: String? = null,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
+    DiscoverySheetScaffold(
+        modifier = modifier,
+        contentSpacing = BuddySpacing.sm,
+        header = {
+            DiscoverySheetHeader(
+                title = "添加主机",
+                actionTitle = "关闭",
+                onAction = onClose,
+                subtitle = "选择你的连接方式。任务会在那台电脑上运行，你在这里随时跟进。",
+            )
+        },
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(
-                text = "添加服务器",
-                color = AgentBuddyTheme.textPrimary,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.weight(1f),
+        if (wakingHostName != null) {
+            BuddyBanner(
+                tone = BuddyBannerTone.INFO,
+                icon = Icons.Outlined.PowerSettingsNew,
+                message = "正在唤醒 $wakingHostName 并等待它响应，最多需要 18 秒。",
             )
         }
-
-        Spacer(Modifier.height(8.dp))
-
-        Text(
-            text = "选择你的连接方式。",
-            color = AgentBuddyTheme.textSecondary,
-            fontSize = 12.sp,
+        ChooserCard(
+            title = "扫描电脑上的二维码",
+            subtitle = "在电脑上打开搭子，扫描它显示的配对二维码。",
+            icon = Icons.Outlined.QrCodeScanner,
+            supportedAgents = AgentBuddyAgents,
+            isRecommended = true,
+            onClick = onPairWithAgentBuddy,
         )
-
-        Spacer(Modifier.height(14.dp))
-
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            ChooserCard(
-                title = "与 搭子 配对",
-                subtitle = "在 Mac 上安装 AgentBuddy 桌面版，打开「配对」页后扫码。",
-                badge = "推荐",
-                icon = Icons.Default.QrCodeScanner,
-                supportedAgents = AgentBuddyAgents,
-                isRecommended = true,
-                onClick = onPairWithAgentBuddy,
-            )
-
-            ChooserCard(
-                title = "已连接电脑",
-                subtitle = "连接一台已使用此 ChatGPT 账号登录并运行 Codex 的电脑。",
-                badge = null,
-                icon = Icons.Outlined.DesktopWindows,
-                supportedAgents = CodexOnlyAgents,
-                isRecommended = false,
-                onClick = onConnectedComputers,
-            )
-
-            ChooserCard(
-                title = "SSH 或 Codex URL",
-                subtitle = "通过 SSH 连接，或粘贴 ws:// codex URL。",
-                badge = null,
-                icon = Icons.Outlined.Terminal,
-                supportedAgents = CodexOnlyAgents,
-                isRecommended = false,
-                onClick = onSshOrCodexUrl,
-            )
-        }
+        ChooserCard(
+            title = "已连接的电脑",
+            subtitle = "登录同一 ChatGPT 账号并运行 Codex 的电脑。",
+            icon = Icons.Outlined.DesktopWindows,
+            supportedAgents = CodexOnlyAgents,
+            isRecommended = false,
+            onClick = onConnectedComputers,
+        )
+        ChooserCard(
+            title = "SSH 或地址",
+            subtitle = "通过 SSH 登录，或输入 ws:// Codex 地址。",
+            icon = Icons.Outlined.Terminal,
+            supportedAgents = CodexOnlyAgents,
+            isRecommended = false,
+            onClick = onSshOrCodexUrl,
+        )
     }
 }
 
@@ -123,109 +130,48 @@ private val CodexOnlyAgents: List<AgentRuntimeKind> = listOf("codex")
 private fun ChooserCard(
     title: String,
     subtitle: String,
-    badge: String?,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     supportedAgents: List<AgentRuntimeKind>,
     isRecommended: Boolean,
     onClick: () -> Unit,
 ) {
-    val borderColor = if (isRecommended) {
-        AgentBuddyTheme.accent.copy(alpha = 0.45f)
-    } else {
-        AgentBuddyTheme.accent.copy(alpha = 0.18f)
-    }
-    val backgroundColor = if (isRecommended) {
-        AgentBuddyTheme.surface.copy(alpha = 0.85f)
-    } else {
-        AgentBuddyTheme.surface.copy(alpha = 0.6f)
-    }
-    val iconBubble = AgentBuddyTheme.accent.copy(alpha = if (isRecommended) 0.16f else 0.10f)
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(backgroundColor, RoundedCornerShape(14.dp))
-            .border(
-                width = if (isRecommended) 1.dp else 0.8.dp,
-                color = borderColor,
-                shape = RoundedCornerShape(14.dp),
-            )
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .clip(BuddyShapes.card)
+            .clickable(role = Role.Button, onClick = onClick)
+            .buddyCard(BuddySurfaceTone.SURFACE),
+        verticalArrangement = Arrangement.spacedBy(BuddySpacing.md),
     ) {
         Row(
+            horizontalArrangement = Arrangement.spacedBy(BuddySpacing.md),
             verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            modifier = Modifier.fillMaxWidth(),
         ) {
-            Box(
-                modifier = Modifier
-                    .padding(top = 2.dp)
-                    .size(36.dp)
-                    .background(iconBubble, RoundedCornerShape(50)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = AgentBuddyTheme.accent,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
+            BuddyIconTile(
+                content = BuddyTileContent.Symbol(icon),
+                fill = if (isRecommended) AgentBuddyTheme.brand else AgentBuddyTheme.surfaceSoft,
+                foreground = if (isRecommended) AgentBuddyTheme.onBrand else AgentBuddyTheme.textPrimary,
+            )
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(BuddySpacing.xxs),
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(
-                        text = title,
-                        color = AgentBuddyTheme.textPrimary,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    if (badge != null) {
-                        Box(
-                            modifier = Modifier
-                                .background(
-                                    AgentBuddyTheme.accent.copy(alpha = 0.14f),
-                                    RoundedCornerShape(50),
-                                )
-                                .border(
-                                    width = 0.6.dp,
-                                    color = AgentBuddyTheme.accent.copy(alpha = 0.45f),
-                                    shape = RoundedCornerShape(50),
-                                )
-                                .padding(horizontal = 6.dp, vertical = 2.dp),
-                        ) {
-                            Text(
-                                text = badge,
-                                color = AgentBuddyTheme.accent,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 0.5.sp,
-                            )
-                        }
-                    }
+                if (isRecommended) {
+                    RecommendedTag()
                 }
                 Text(
+                    text = title,
+                    style = buddyTextStyle(BuddyTextStyle.HEADING),
+                    color = AgentBuddyTheme.textPrimary,
+                )
+                Text(
                     text = subtitle,
+                    style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.Normal),
                     color = AgentBuddyTheme.textSecondary,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(top = 2.dp),
                 )
             }
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = AgentBuddyTheme.textMuted,
-                modifier = Modifier.padding(top = 10.dp),
-            )
+            BuddyChevron(Modifier.padding(top = BuddySpacing.sm))
         }
-
         if (supportedAgents.isNotEmpty()) {
             SupportedAgentsStrip(supportedAgents)
         }
@@ -233,26 +179,60 @@ private fun ChooserCard(
 }
 
 @Composable
-private fun SupportedAgentsStrip(agents: List<AgentRuntimeKind>) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
+private fun RecommendedTag() {
+    BuddyChromeTypeLimit {
         Text(
-            text = "兼容",
-            color = AgentBuddyTheme.textMuted,
-            fontSize = 10.sp,
-            letterSpacing = 0.4.sp,
+            text = "推荐",
+            style = buddyTextStyle(BuddyTextStyle.CAPTION, FontWeight.SemiBold),
+            color = AgentBuddyTheme.onBrand,
+            modifier = Modifier
+                .background(AgentBuddyTheme.brand, CircleShape)
+                .padding(horizontal = BuddySpacing.xs, vertical = 2.dp),
+        )
+    }
+}
+
+/** 「兼容」 caption followed by one small chip (icon + name) per agent. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SupportedAgentsStrip(agents: List<AgentRuntimeKind>) {
+    BuddyChromeTypeLimit {
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                text = "兼容",
+                style = buddyTextStyle(BuddyTextStyle.CAPTION, FontWeight.Medium),
+                color = AgentBuddyTheme.textSecondary,
+                modifier = Modifier
+                    .heightIn(min = 28.dp)
+                    .padding(top = 5.dp, end = 2.dp),
+            )
+            agents.forEach { agent -> AgentChip(agent) }
+        }
+    }
+}
+
+@Composable
+private fun AgentChip(agent: AgentRuntimeKind) {
+    Row(
+        modifier = Modifier
+            .heightIn(min = 28.dp)
+            .background(AgentBuddyTheme.surfaceSoft, BuddyShapes.control)
+            .padding(start = 4.dp, end = BuddySpacing.xs),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.clearAndSetSemantics {}) {
+            AgentIconView(kind = agent, sizeDp = 20)
+        }
+        Text(
+            text = agent.runtimeLabel,
+            style = buddyTextStyle(BuddyTextStyle.CAPTION, FontWeight.Medium),
+            color = AgentBuddyTheme.textPrimary,
             maxLines = 1,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            agents.forEach { agent ->
-                com.akashark.agentbuddy.android.ui.common.AgentIconView(
-                    kind = agent,
-                    sizeDp = 18,
-                )
-            }
-        }
     }
 }

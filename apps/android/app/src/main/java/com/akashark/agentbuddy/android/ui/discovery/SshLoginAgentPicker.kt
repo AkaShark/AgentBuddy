@@ -1,47 +1,35 @@
 package com.akashark.agentbuddy.android.ui.discovery
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.outlined.Terminal
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.SheetValue
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.akashark.agentbuddy.android.state.SavedServer
 import com.akashark.agentbuddy.android.state.SavedSshCredential
-import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
-import com.akashark.agentbuddy.android.ui.common.AgentIconView
-import com.akashark.agentbuddy.android.ui.common.BetaBadge
-import com.akashark.agentbuddy.android.ui.common.isBeta
-import kotlinx.coroutines.launch
-import uniffi.codex_mobile_client.AgentAvailabilityStatus
 import com.akashark.agentbuddy.android.ui.common.AgentRuntimeKind
+import com.akashark.agentbuddy.android.ui.common.isBeta
 import com.akashark.agentbuddy.android.ui.common.metadata
 import com.akashark.agentbuddy.android.ui.common.runtimeLabel
 import com.akashark.agentbuddy.android.ui.common.runtimeSortIndex
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyBanner
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyBannerTone
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyBottomSheet
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyButton
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyButtonKind
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySpacing
+import kotlinx.coroutines.launch
+import uniffi.codex_mobile_client.AgentAvailabilityStatus
 import uniffi.codex_mobile_client.RemoteAgentAvailability
 
 internal data class SshBridgeAgentContext(
@@ -52,8 +40,14 @@ internal data class SshBridgeAgentContext(
     val credential: SavedSshCredential,
 )
 
+/**
+ * 「远程智能体」 sheet shown after an SSH login found SSH-bridge agents. Pick
+ * the agents to start over the probed session, or fall back to Codex over
+ * SSH. The sheet cannot be dismissed while connecting.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun SSHAgentPickerDialog(
+internal fun SSHAgentPickerSheet(
     context: SshBridgeAgentContext,
     onDismiss: () -> Unit,
     onUseCodex: () -> Unit,
@@ -68,120 +62,109 @@ internal fun SSHAgentPickerDialog(
     }
     var isConnecting by remember(context.sessionId) { mutableStateOf(false) }
     var errorMessage by remember(context.sessionId) { mutableStateOf<String?>(null) }
-
-    AlertDialog(
-        onDismissRequest = { if (!isConnecting) onDismiss() },
-        title = { Text("远程智能体") },
-        text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-            ) {
-                Text(
-                    text = "${context.server.name.ifBlank { context.host }}\n${context.host}",
-                    color = AgentBuddyTheme.textPrimary,
-                    fontSize = 13.sp,
-                )
-                context.availability.forEach { agent ->
-                    val enabled = isSshBridgeKind(agent.kind) &&
-                        agent.status == AgentAvailabilityStatus.AVAILABLE &&
-                        !isConnecting
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(enabled = enabled) {
-                                selectedKinds = if (agent.kind in selectedKinds) {
-                                    selectedKinds - agent.kind
-                                } else {
-                                    selectedKinds + agent.kind
-                                }
-                            }
-                            .padding(vertical = 4.dp),
-                    ) {
-                        AgentIconView(
-                            kind = agent.kind,
-                            sizeDp = 22,
-                            modifier = Modifier.alpha(
-                                if (agent.status == AgentAvailabilityStatus.AVAILABLE) 1f else 0.45f,
-                            ),
-                        )
-                        Spacer(Modifier.width(10.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = sshRuntimeLabel(agent.kind),
-                                    color = if (agent.status == AgentAvailabilityStatus.AVAILABLE) {
-                                        AgentBuddyTheme.textPrimary
-                                    } else {
-                                        AgentBuddyTheme.textSecondary
-                                    },
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                )
-                                if (agent.kind.isBeta) {
-                                    Spacer(Modifier.width(6.dp))
-                                    BetaBadge()
-                                }
-                            }
-                            Text(
-                                text = sshAgentStatusLabel(agent),
-                                color = AgentBuddyTheme.textSecondary,
-                                fontSize = 11.sp,
-                            )
-                        }
-                        if (agent.kind in selectedKinds) {
-                            Icon(
-                                imageVector = Icons.Filled.CheckCircle,
-                                contentDescription = null,
-                                tint = AgentBuddyTheme.accent,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        }
-                    }
-                }
-                if (errorMessage != null) {
-                    Text(
-                        text = errorMessage!!,
-                        color = AgentBuddyTheme.danger,
-                        fontSize = 12.sp,
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                enabled = !isConnecting && selectedKinds.isNotEmpty(),
-                onClick = {
-                    scope.launch {
-                        isConnecting = true
-                        errorMessage = onConnect(selectedKinds.sortedBy(::sshRuntimeSortRank))
-                        isConnecting = false
-                    }
-                },
-            ) {
-                if (isConnecting) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(14.dp),
-                        strokeWidth = 2.dp,
-                        color = AgentBuddyTheme.accent,
-                    )
-                } else {
-                    Text("连接")
-                }
-            }
-        },
-        dismissButton = {
-            Row {
-                TextButton(onClick = onUseCodex, enabled = !isConnecting) {
-                    Text("使用 Codex SSH")
-                }
-                TextButton(onClick = onDismiss, enabled = !isConnecting) {
-                    Text("取消")
-                }
-            }
-        },
+    val connecting by rememberUpdatedState(isConnecting)
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { it != SheetValue.Hidden || !connecting },
     )
+    val options = context.availability.map { agent ->
+        val bridgeKind = isSshBridgeKind(agent.kind)
+        DiscoveryAgentOption(
+            key = agent.kind,
+            kind = agent.kind,
+            title = sshRuntimeLabel(agent.kind),
+            detail = when {
+                agent.status != AgentAvailabilityStatus.AVAILABLE -> sshAgentStatusLabel(agent)
+                !bridgeKind -> "不能通过 SSH 桥接启动"
+                else -> sshAgentStatusLabel(agent)
+            },
+            isBeta = agent.kind.isBeta,
+            selectable = bridgeKind && agent.status == AgentAvailabilityStatus.AVAILABLE,
+            selected = agent.kind in selectedKinds,
+        )
+    }
+
+    BuddyBottomSheet(
+        onDismissRequest = { if (!isConnecting) onDismiss() },
+        sheetState = sheetState,
+    ) {
+        SshAgentPickerContent(
+            serverName = context.server.name.ifBlank { context.host },
+            host = context.host,
+            options = options,
+            isConnecting = isConnecting,
+            canConnect = !isConnecting && selectedKinds.isNotEmpty(),
+            errorMessage = errorMessage,
+            onToggle = { option, checked ->
+                selectedKinds = if (checked) selectedKinds + option.kind else selectedKinds - option.kind
+            },
+            onConnect = {
+                scope.launch {
+                    isConnecting = true
+                    errorMessage = onConnect(selectedKinds.sortedBy(::sshRuntimeSortRank))
+                    isConnecting = false
+                }
+            },
+            onUseCodex = onUseCodex,
+            onCancel = onDismiss,
+        )
+    }
+}
+
+/** Stateless body of [SSHAgentPickerSheet] (also rendered by the gallery). */
+@Composable
+internal fun SshAgentPickerContent(
+    serverName: String,
+    host: String,
+    options: List<DiscoveryAgentOption>,
+    isConnecting: Boolean,
+    canConnect: Boolean,
+    errorMessage: String?,
+    onToggle: (DiscoveryAgentOption, Boolean) -> Unit,
+    onConnect: () -> Unit,
+    onUseCodex: () -> Unit,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    DiscoverySheetScaffold(
+        modifier = modifier,
+        header = {
+            DiscoverySheetHeader(
+                title = "远程智能体",
+                actionTitle = "取消",
+                onAction = onCancel,
+                actionEnabled = !isConnecting,
+                subtitle = "选择要通过 SSH 在这台电脑上启动的智能体。",
+            )
+        },
+        bottomBar = {
+            Column(verticalArrangement = Arrangement.spacedBy(BuddySpacing.xs)) {
+                BuddyButton(
+                    text = "连接",
+                    onClick = onConnect,
+                    enabled = canConnect,
+                    isLoading = isConnecting,
+                )
+                BuddyButton(
+                    text = "改用 Codex SSH",
+                    onClick = onUseCodex,
+                    kind = BuddyButtonKind.SECONDARY,
+                    enabled = !isConnecting,
+                )
+            }
+        },
+    ) {
+        DiscoveryHostSummary(icon = Icons.Outlined.Terminal, name = serverName, address = host)
+        DiscoveryFormSection(title = "智能体") {
+            DiscoveryAgentList(options = options, onToggle = onToggle, enabled = !isConnecting)
+        }
+        if (errorMessage != null) {
+            BuddyBanner(
+                tone = BuddyBannerTone.DANGER,
+                message = "$errorMessage\n可以少选几个智能体再试，或改用 Codex SSH。",
+            )
+        }
+    }
 }
 
 internal fun availableSshBridgeKinds(agents: List<RemoteAgentAvailability>): List<AgentRuntimeKind> =

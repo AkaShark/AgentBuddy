@@ -40,4 +40,13 @@ val mintGalleryPages: List<MintGalleryPage> =
         MintGalleryPage("terminal-config", "终端设置") { GalleryTerminalConfigPage() },
         MintGalleryPage("conversation", "会话时间线") { GalleryConversationPage() },
         MintGalleryPage("conversation-long", "会话长内容") { GalleryConversationLongPage() },
+        MintGalleryPage("discovery", "添加主机") { GalleryDiscoveryPage() },
+        MintGalleryPage("discovery-waking", "添加主机（唤醒中）") { GalleryDiscoveryPage(wakingHostName = "studio.local") },
+        MintGalleryPage("pair", "扫码配对") { GalleryPairPage() },
+        MintGalleryPage("pair-empty", "扫码配对（粘贴 JSON）") { GalleryPairPage(empty = true) },
+        MintGalleryPage("pair-scan", "扫描二维码") { GalleryPairScanPage() },
+        MintGalleryPage("manual-entry", "SSH 或地址") { GalleryManualEntryPage() },
+        MintGalleryPage("ssh-login", "SSH 登录") { GallerySshLoginPage() },
+        MintGalleryPage("ssh-agents", "远程智能体") { GallerySshAgentsPage() },
+        MintGalleryPage("slingshot", "已连接电脑") { GallerySlingshotPage() },
     )

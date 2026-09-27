@@ -1,117 +1,41 @@
 package com.akashark.agentbuddy.android.ui.discovery
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.outlined.Terminal
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.SheetValue
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.akashark.agentbuddy.android.state.SavedServer
 import com.akashark.agentbuddy.android.state.SavedSshCredential
 import com.akashark.agentbuddy.android.state.SshAuthMethod
-import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
-import com.akashark.agentbuddy.android.ui.LocalAppModel
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyBanner
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyBannerTone
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyBottomSheet
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyButton
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyIconButton
 import kotlinx.coroutines.launch
-import uniffi.codex_mobile_client.AppSshHostKeyMismatch
-import uniffi.codex_mobile_client.AppSshHostKeyMismatchKind
 
 /**
- * An SSH connect refused because the server's host key no longer matches the
- * key pinned on this device, or because that saved key could not be read
- * (typed Rust [AppSshHostKeyMismatch]). Carries what is needed to retry the
- * same login after the user trusts the new key or forgets the unreadable one.
+ * 「SSH 登录」 (presented as a Mint bottom sheet). [onConnect] returns an inline error, or null once the
+ * login moved on (connected, agent picker or host-key prompt). The sheet
+ * cannot be dismissed while a connect is in flight.
  */
-internal data class SshHostKeyChangePrompt(
-    val server: SavedServer,
-    val credential: SavedSshCredential,
-    val rememberCredentials: Boolean,
-    val mismatch: AppSshHostKeyMismatch,
-)
-
-/**
- * Confirmation for a changed SSH host key. "信任新密钥" pins exactly the
- * displayed fingerprint before calling [onConfirm], so the caller's retry
- * only succeeds if the server still presents that key (otherwise it prompts
- * again). When the saved key could not be read
- * ([AppSshHostKeyMismatchKind.TRUST_STORE_UNAVAILABLE]), "忘记已保存的主机密钥"
- * removes it before [onConfirm], so the retry treats the host as new.
- */
-@Composable
-internal fun SshHostKeyChangedDialog(
-    mismatch: AppSshHostKeyMismatch,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit,
-) {
-    val appModel = LocalAppModel.current
-    val port = mismatch.port.toInt()
-    val hostDisplay = if (port == 22) mismatch.host else "${mismatch.host}:$port"
-    val savedKeyUnreadable = mismatch.kind == AppSshHostKeyMismatchKind.TRUST_STORE_UNAVAILABLE
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(if (savedKeyUnreadable) "无法读取已保存的 SSH 主机密钥" else "SSH 主机密钥已变更") },
-        text = {
-            if (savedKeyUnreadable) {
-                Text(
-                    "本设备为 $hostDisplay 保存的 SSH 主机密钥无法读取，因此连接已被拒绝。\n\n" +
-                        "忘记已保存的密钥即可重新连接；服务器当前的密钥将作为新密钥保存。\n\n" +
-                        "服务器指纹：\n${mismatch.fingerprint}",
-                )
-            } else {
-                Text(
-                    "$hostDisplay 的 SSH 主机密钥与本设备保存的不一致。服务器重装后会出现这种情况，" +
-                        "但也可能意味着有人正在拦截连接。\n\n新指纹：\n${mismatch.fingerprint}\n\n" +
-                        "仅在你预期到此变更时才信任新密钥。",
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    if (savedKeyUnreadable) {
-                        appModel.sshTrustStore.unpin(mismatch.host, mismatch.port)
-                    } else {
-                        appModel.sshTrustStore.pin(mismatch.host, mismatch.port, mismatch.fingerprint)
-                    }
-                    onConfirm()
-                },
-            ) {
-                Text(
-                    if (savedKeyUnreadable) "忘记已保存的主机密钥" else "信任新密钥",
-                    color = AgentBuddyTheme.danger,
-                )
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("取消")
-            }
-        },
-    )
-}
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SSHLoginDialog(
     server: SavedServer,
@@ -137,180 +61,206 @@ internal fun SSHLoginDialog(
     } else {
         "${server.hostname}:${server.resolvedSshPort}"
     }
+    val connecting by rememberUpdatedState(isConnecting)
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { it != SheetValue.Hidden || !connecting },
+    )
+    val canConnect = !isConnecting && username.isNotBlank() && when (authMethod) {
+        SshAuthMethod.PASSWORD -> password.isNotBlank()
+        SshAuthMethod.KEY -> privateKey.isNotBlank()
+    }
 
-    AlertDialog(
+    fun connect() {
+        if (!canConnect) return
+        val credential = when (authMethod) {
+            SshAuthMethod.PASSWORD -> SavedSshCredential(
+                username = username.trim(),
+                method = SshAuthMethod.PASSWORD,
+                password = password,
+                unlockMacosKeychain = unlockMacosKeychain,
+            )
+
+            SshAuthMethod.KEY -> SavedSshCredential(
+                username = username.trim(),
+                method = SshAuthMethod.KEY,
+                privateKey = privateKey,
+                passphrase = passphrase.ifBlank { null },
+                unlockMacosKeychain = false,
+            )
+        }
+        scope.launch {
+            isConnecting = true
+            errorMessage = onConnect(credential, rememberCredentials)
+            isConnecting = false
+        }
+    }
+
+    BuddyBottomSheet(
         onDismissRequest = { if (!isConnecting) onDismiss() },
-        title = { Text("SSH 登录") },
-        text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-            ) {
-                Text(
-                    text = "${server.name.ifBlank { server.hostname }}\n$hostDisplay",
-                    color = AgentBuddyTheme.textPrimary,
-                    fontSize = 13.sp,
-                )
-                OutlinedTextField(
-                    value = username,
-                    onValueChange = { username = it },
-                    label = { Text("用户名") },
-                    singleLine = true,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(
-                        onClick = { authMethod = SshAuthMethod.PASSWORD },
-                        enabled = !isConnecting,
-                    ) {
-                        Text(if (authMethod == SshAuthMethod.PASSWORD) "密码 *" else "密码")
-                    }
-                    TextButton(
-                        onClick = {
-                            authMethod = SshAuthMethod.KEY
-                            isPasswordVisible = false
-                        },
-                        enabled = !isConnecting,
-                    ) {
-                        Text(if (authMethod == SshAuthMethod.KEY) "SSH 密钥 *" else "SSH 密钥")
-                    }
-                }
-                if (authMethod == SshAuthMethod.PASSWORD) {
-                    OutlinedTextField(
-                        value = password,
-                        onValueChange = { password = it },
-                        label = { Text("密码") },
-                        singleLine = true,
-                        visualTransformation = if (isPasswordVisible) {
-                            VisualTransformation.None
-                        } else {
-                            PasswordVisualTransformation()
-                        },
-                        trailingIcon = {
-                            IconButton(
-                                onClick = { isPasswordVisible = !isPasswordVisible },
-                                enabled = !isConnecting,
-                            ) {
-                                Icon(
-                                    imageVector = if (isPasswordVisible) {
-                                        Icons.Filled.VisibilityOff
-                                    } else {
-                                        Icons.Filled.Visibility
-                                    },
-                                    contentDescription = if (isPasswordVisible) {
-                                        "隐藏密码"
-                                    } else {
-                                        "显示密码"
-                                    },
-                                )
-                            }
-                        },
-                    )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        Switch(
-                            checked = unlockMacosKeychain,
-                            onCheckedChange = { unlockMacosKeychain = it },
+        sheetState = sheetState,
+    ) {
+        SshLoginContent(
+            serverName = server.name.ifBlank { server.hostname },
+            hostDisplay = hostDisplay,
+            username = username,
+            onUsernameChange = { username = it },
+            authMethod = authMethod,
+            onAuthMethodChange = { method ->
+                authMethod = method
+                if (method == SshAuthMethod.KEY) isPasswordVisible = false
+            },
+            password = password,
+            onPasswordChange = { password = it },
+            isPasswordVisible = isPasswordVisible,
+            onTogglePasswordVisible = { isPasswordVisible = !isPasswordVisible },
+            privateKey = privateKey,
+            onPrivateKeyChange = { privateKey = it },
+            passphrase = passphrase,
+            onPassphraseChange = { passphrase = it },
+            unlockMacosKeychain = unlockMacosKeychain,
+            onUnlockMacosKeychainChange = { unlockMacosKeychain = it },
+            rememberCredentials = rememberCredentials,
+            onRememberCredentialsChange = { rememberCredentials = it },
+            isConnecting = isConnecting,
+            canConnect = canConnect,
+            errorMessage = errorMessage,
+            onCancel = onDismiss,
+            onConnect = ::connect,
+        )
+    }
+}
+
+/** Stateless body of [SSHLoginDialog] (also rendered by the gallery). */
+@Composable
+internal fun SshLoginContent(
+    serverName: String,
+    hostDisplay: String,
+    username: String,
+    onUsernameChange: (String) -> Unit,
+    authMethod: SshAuthMethod,
+    onAuthMethodChange: (SshAuthMethod) -> Unit,
+    password: String,
+    onPasswordChange: (String) -> Unit,
+    isPasswordVisible: Boolean,
+    onTogglePasswordVisible: () -> Unit,
+    privateKey: String,
+    onPrivateKeyChange: (String) -> Unit,
+    passphrase: String,
+    onPassphraseChange: (String) -> Unit,
+    unlockMacosKeychain: Boolean,
+    onUnlockMacosKeychainChange: (Boolean) -> Unit,
+    rememberCredentials: Boolean,
+    onRememberCredentialsChange: (Boolean) -> Unit,
+    isConnecting: Boolean,
+    canConnect: Boolean,
+    errorMessage: String?,
+    onCancel: () -> Unit,
+    onConnect: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    DiscoverySheetScaffold(
+        modifier = modifier,
+        header = {
+            DiscoverySheetHeader(
+                title = "SSH 登录",
+                actionTitle = "取消",
+                onAction = onCancel,
+                actionEnabled = !isConnecting,
+            )
+        },
+        bottomBar = {
+            BuddyButton(
+                text = "连接",
+                onClick = onConnect,
+                enabled = canConnect,
+                isLoading = isConnecting,
+            )
+        },
+    ) {
+        DiscoveryHostSummary(icon = Icons.Outlined.Terminal, name = serverName, address = hostDisplay)
+
+        DiscoveryFormSection(title = "用户名") {
+            MintTextField(
+                value = username,
+                onValueChange = onUsernameChange,
+                placeholder = "用户名",
+                enabled = !isConnecting,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Next),
+            )
+        }
+
+        DiscoveryFormSection(title = "身份验证") {
+            DiscoverySegmentedPicker(
+                options = listOf(SshAuthMethod.PASSWORD to "密码", SshAuthMethod.KEY to "SSH 密钥"),
+                selection = authMethod,
+                onSelect = onAuthMethodChange,
+                enabled = !isConnecting,
+            )
+            if (authMethod == SshAuthMethod.PASSWORD) {
+                MintTextField(
+                    value = password,
+                    onValueChange = onPasswordChange,
+                    placeholder = "密码",
+                    enabled = !isConnecting,
+                    visualTransformation = if (isPasswordVisible) {
+                        VisualTransformation.None
+                    } else {
+                        PasswordVisualTransformation()
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                    trailing = {
+                        BuddyIconButton(
+                            icon = if (isPasswordVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                            contentDescription = if (isPasswordVisible) "隐藏密码" else "显示密码",
+                            onClick = onTogglePasswordVisible,
                             enabled = !isConnecting,
                         )
-                        Column {
-                            Text(
-                                text = "解锁钥匙串 (macOS)",
-                                color = AgentBuddyTheme.textPrimary,
-                                fontSize = 12.sp,
-                            )
-                            Text(
-                                text = "在无头引导启动期间使用你的 SSH/登录密码。gh CLI 认证等工具需要此项。",
-                                color = AgentBuddyTheme.textSecondary,
-                                fontSize = 11.sp,
-                            )
-                        }
-                    }
-                } else {
-                    OutlinedTextField(
-                        value = privateKey,
-                        onValueChange = { privateKey = it },
-                        label = { Text("私钥") },
-                        minLines = 5,
-                    )
-                    OutlinedTextField(
-                        value = passphrase,
-                        onValueChange = { passphrase = it },
-                        label = { Text("口令（可选）") },
-                        singleLine = true,
-                        visualTransformation = PasswordVisualTransformation(),
-                    )
-                }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Switch(
-                        checked = rememberCredentials,
-                        onCheckedChange = { rememberCredentials = it },
-                        enabled = !isConnecting,
-                    )
-                    Text(
-                        text = "在此设备上记住凭据",
-                        color = AgentBuddyTheme.textSecondary,
-                        fontSize = 12.sp,
-                    )
-                }
-                if (errorMessage != null) {
-                    Text(
-                        text = errorMessage!!,
-                        color = AgentBuddyTheme.danger,
-                        fontSize = 12.sp,
-                    )
-                }
+                    },
+                )
+                DiscoveryToggleRow(
+                    title = "解锁钥匙串 (macOS)",
+                    detail = "在无头引导启动期间使用你的 SSH/登录密码。gh CLI 认证等工具需要此项。",
+                    checked = unlockMacosKeychain,
+                    onCheckedChange = onUnlockMacosKeychainChange,
+                    enabled = !isConnecting,
+                )
+            } else {
+                MintTextField(
+                    value = privateKey,
+                    onValueChange = onPrivateKeyChange,
+                    placeholder = "在此粘贴私钥...",
+                    label = "私钥",
+                    singleLine = false,
+                    minLines = 5,
+                    monospaced = true,
+                    enabled = !isConnecting,
+                )
+                MintTextField(
+                    value = passphrase,
+                    onValueChange = onPassphraseChange,
+                    placeholder = "密钥口令（可选）",
+                    enabled = !isConnecting,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                )
             }
-        },
-        confirmButton = {
-            TextButton(
-                enabled = !isConnecting && username.isNotBlank() && when (authMethod) {
-                    SshAuthMethod.PASSWORD -> password.isNotBlank()
-                    SshAuthMethod.KEY -> privateKey.isNotBlank()
-                },
-                onClick = {
-                    val credential = when (authMethod) {
-                        SshAuthMethod.PASSWORD -> SavedSshCredential(
-                            username = username.trim(),
-                            method = SshAuthMethod.PASSWORD,
-                            password = password,
-                            unlockMacosKeychain = unlockMacosKeychain,
-                        )
+        }
 
-                        SshAuthMethod.KEY -> SavedSshCredential(
-                            username = username.trim(),
-                            method = SshAuthMethod.KEY,
-                            privateKey = privateKey,
-                            passphrase = passphrase.ifBlank { null },
-                            unlockMacosKeychain = false,
-                        )
-                    }
-                    scope.launch {
-                        isConnecting = true
-                        errorMessage = onConnect(credential, rememberCredentials)
-                        isConnecting = false
-                    }
-                },
-            ) {
-                if (isConnecting) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(14.dp),
-                        strokeWidth = 2.dp,
-                        color = AgentBuddyTheme.accent,
-                    )
-                } else {
-                    Text("连接")
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !isConnecting) {
-                Text("取消")
-            }
-        },
-    )
+        DiscoveryFormSection(title = "已保存凭据") {
+            DiscoveryToggleRow(
+                title = "在此设备上记住凭据",
+                checked = rememberCredentials,
+                onCheckedChange = onRememberCredentialsChange,
+                enabled = !isConnecting,
+            )
+        }
+
+        if (errorMessage != null) {
+            BuddyBanner(
+                tone = BuddyBannerTone.DANGER,
+                message = "$errorMessage\n请检查主机地址、用户名和凭据，然后再点「连接」。",
+            )
+        }
+    }
 }

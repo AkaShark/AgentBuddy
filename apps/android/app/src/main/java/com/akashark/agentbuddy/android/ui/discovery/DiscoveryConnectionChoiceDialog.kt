@@ -1,16 +1,12 @@
 package com.akashark.agentbuddy.android.ui.discovery
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Lan
+import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.akashark.agentbuddy.android.state.SavedServer
-import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyButton
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyButtonKind
 
 /** Lets the user pick a direct Codex port or SSH for a server that offers both. */
 @Composable
@@ -20,40 +16,32 @@ internal fun DiscoveryConnectionChoiceDialog(
     onUseCodexPort: (Int) -> Unit,
     onUseSsh: () -> Unit,
 ) {
-    AlertDialog(
+    MintAlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("连接 ${server.name.ifBlank { server.hostname }}") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    connectionChoiceMessage(server),
-                    color = AgentBuddyTheme.textSecondary,
-                )
-                server.availableDirectCodexPorts.forEach { port ->
-                    TextButton(
-                        onClick = { onUseCodexPort(port) },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("使用 Codex ($port)")
-                    }
-                }
-                if (server.canConnectViaSsh) {
-                    TextButton(
-                        onClick = onUseSsh,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("通过 SSH 连接", color = AgentBuddyTheme.accent)
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("取消")
-            }
-        },
-        dismissButton = {},
-    )
+        title = "连接 ${server.name.ifBlank { server.hostname }}",
+        message = connectionChoiceMessage(server),
+        confirmTitle = "取消",
+        confirmKind = BuddyButtonKind.SECONDARY,
+        onConfirm = onDismiss,
+        dismissTitle = null,
+    ) {
+        server.availableDirectCodexPorts.forEach { port ->
+            BuddyButton(
+                text = "使用 Codex ($port)",
+                onClick = { onUseCodexPort(port) },
+                kind = BuddyButtonKind.SOFT,
+                icon = Icons.Outlined.Lan,
+            )
+        }
+        if (server.canConnectViaSsh) {
+            BuddyButton(
+                text = "通过 SSH 连接",
+                onClick = onUseSsh,
+                kind = BuddyButtonKind.SOFT,
+                icon = Icons.Outlined.Terminal,
+            )
+        }
+    }
 }
 
 private fun connectionChoiceMessage(server: SavedServer): String {

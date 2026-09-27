@@ -1,39 +1,200 @@
 package com.akashark.agentbuddy.android.ui.discovery
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material3.Checkbox
+import androidx.compose.material.icons.outlined.ContentPaste
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.KeyboardArrowUp
+import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
-import com.akashark.agentbuddy.android.ui.common.AgentIconView
-import com.akashark.agentbuddy.android.ui.common.BetaBadge
-import com.akashark.agentbuddy.android.ui.common.isBetaAgentName
-import uniffi.codex_mobile_client.AppAlleycatAgentInfo
-import uniffi.codex_mobile_client.AppAlleycatAgentWire
+import com.akashark.agentbuddy.android.ui.LocalTextScale
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyBanner
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyBannerTone
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyButton
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyButtonKind
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyDivider
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyIconTile
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddySurfaceTone
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyTileContent
+import com.akashark.agentbuddy.android.ui.designsystem.components.buddyCard
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BUDDY_CHROME_MAX_FONT_SCALE
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyShapes
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySize
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySpacing
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyTextStyle
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyTextStyle
 import uniffi.codex_mobile_client.AppAlleycatPairPayload
+
+/** Render state of the QR pairing sheet ([AlleycatAddServerSheet]). */
+internal data class AlleycatPairViewState(
+    val params: AppAlleycatPairPayload?,
+    val displayName: String,
+    val agentOptions: List<DiscoveryAgentOption>,
+    val hasAvailableAgents: Boolean,
+    val allAgentsSelected: Boolean,
+    val isLoadingAgents: Boolean,
+    val parseError: String?,
+    val agentError: String?,
+    val connectError: String?,
+    val isConnecting: Boolean,
+    val canConnect: Boolean,
+    val cameraDenied: Boolean,
+    val showPaste: Boolean,
+    val pasteJson: String,
+)
+
+/** User actions of the QR pairing sheet. */
+internal class AlleycatPairCallbacks(
+    val onCancel: () -> Unit,
+    val onScan: () -> Unit,
+    val onOpenSettings: () -> Unit,
+    val onTogglePaste: () -> Unit,
+    val onPasteJsonChange: (String) -> Unit,
+    val onPasteFromClipboard: () -> Unit,
+    val onParse: () -> Unit,
+    val onDisplayNameChange: (String) -> Unit,
+    val onToggleAllAgents: () -> Unit,
+    val onAgentToggle: (DiscoveryAgentOption, Boolean) -> Unit,
+    val onConnect: () -> Unit,
+)
+
+/**
+ * Stateless 「扫码配对」 form: scan / rescan card, paste-JSON fallback, the
+ * scanned host with display name and partner multi-select, errors with their
+ * next step, and the 「连接」 button.
+ */
+@Composable
+internal fun AlleycatPairContent(
+    state: AlleycatPairViewState,
+    actions: AlleycatPairCallbacks,
+    modifier: Modifier = Modifier,
+) {
+    DiscoverySheetScaffold(
+        modifier = modifier,
+        header = {
+            DiscoverySheetHeader(
+                title = "扫码配对",
+                actionTitle = "取消",
+                onAction = actions.onCancel,
+                actionEnabled = !state.isConnecting,
+            )
+        },
+        bottomBar = {
+            BuddyButton(
+                text = "连接",
+                onClick = actions.onConnect,
+                enabled = state.canConnect,
+                isLoading = state.isConnecting,
+            )
+        },
+    ) {
+        DiscoveryFormSection(title = "配对") {
+            PairScanCard(rescan = state.params != null, onScan = actions.onScan)
+            if (state.cameraDenied) {
+                BuddyBanner(
+                    tone = BuddyBannerTone.WARNING,
+                    message = "扫描配对二维码需要相机权限。请在系统设置中授予权限，或在下方粘贴 JSON。",
+                    actionTitle = "打开设置",
+                    onAction = actions.onOpenSettings,
+                )
+            }
+            AlleycatPastePairJsonSection(
+                showPaste = state.showPaste,
+                onTogglePaste = actions.onTogglePaste,
+                pasteJson = state.pasteJson,
+                onPasteJsonChange = actions.onPasteJsonChange,
+                onPasteFromClipboard = actions.onPasteFromClipboard,
+                parsedParams = state.params,
+                onParse = actions.onParse,
+            )
+        }
+
+        state.parseError?.let { message ->
+            BuddyBanner(
+                tone = BuddyBannerTone.WARNING,
+                message = "$message\n请重新扫描电脑上显示的二维码，或粘贴完整的配对 JSON。",
+            )
+        }
+
+        val params = state.params
+        if (params == null) {
+            DiscoveryFormSection(title = "没有装桌面端？在要连接的主机上运行：") {
+                AlleycatPairCommandRow()
+            }
+        } else {
+            AlleycatScannedHostSection(
+                params = params,
+                displayName = state.displayName,
+                onDisplayNameChange = actions.onDisplayNameChange,
+            )
+            AlleycatAgentSection(state = state, actions = actions)
+        }
+
+        state.agentError?.let { message ->
+            BuddyBanner(
+                tone = BuddyBannerTone.WARNING,
+                message = "$message\n确认电脑上的搭子正在运行，然后重新扫描二维码。",
+            )
+        }
+        state.connectError?.let { message ->
+            BuddyBanner(
+                tone = BuddyBannerTone.DANGER,
+                message = "$message\n确认电脑在线并已打开搭子，然后再点「连接」。",
+            )
+        }
+    }
+}
+
+@Composable
+private fun PairScanCard(rescan: Boolean, onScan: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .buddyCard(BuddySurfaceTone.BRAND),
+        verticalArrangement = Arrangement.spacedBy(BuddySpacing.md),
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(BuddySpacing.md), verticalAlignment = Alignment.Top) {
+            BuddyIconTile(
+                content = BuddyTileContent.Symbol(Icons.Outlined.QrCodeScanner),
+                fill = AgentBuddyTheme.brandChipFill,
+                foreground = AgentBuddyTheme.onBrand,
+            )
+            Text(
+                text = "配对二维码来自电脑上的搭子。先在电脑上打开搭子，再用这台手机扫码。",
+                style = buddyTextStyle(BuddyTextStyle.BODY),
+                color = AgentBuddyTheme.onBrand,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        BuddyButton(
+            text = if (rescan) "重新扫描二维码" else "扫描配对二维码",
+            onClick = onScan,
+            kind = if (rescan) BuddyButtonKind.SECONDARY else BuddyButtonKind.PRIMARY,
+            icon = Icons.Outlined.QrCodeScanner,
+        )
+    }
+}
 
 /** Collapsible paste-JSON fallback of [AlleycatAddServerSheet]. */
 @Composable
@@ -46,255 +207,181 @@ internal fun AlleycatPastePairJsonSection(
     parsedParams: AppAlleycatPairPayload?,
     onParse: () -> Unit,
 ) {
-    DisclosureRow(
-        expanded = showPaste,
-        label = "粘贴配对 JSON",
-        onToggle = onTogglePaste,
-    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(BuddyShapes.control)
+            .clickable(role = Role.Button, onClick = onTogglePaste)
+            .semantics { stateDescription = if (showPaste) "已展开" else "已折叠" }
+            .heightIn(min = BuddySize.minHitTarget),
+        horizontalArrangement = Arrangement.spacedBy(BuddySpacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "粘贴配对 JSON",
+            style = buddyTextStyle(BuddyTextStyle.LABEL),
+            color = AgentBuddyTheme.textPrimary,
+            modifier = Modifier.weight(1f),
+        )
+        Icon(
+            imageVector = if (showPaste) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
+            contentDescription = null,
+            tint = AgentBuddyTheme.textSecondary,
+            modifier = Modifier.size(BuddySize.icon),
+        )
+    }
     if (showPaste) {
-        OutlinedTextField(
+        MintTextField(
             value = pasteJson,
             onValueChange = onPasteJsonChange,
-            placeholder = {
-                Text(
-                    text = "{\"v\":1,\"node_id\":\"...\",\"token\":\"...\",\"relay\":\"https://...\"}",
-                    color = AgentBuddyTheme.textMuted,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 11.sp,
-                )
-            },
+            placeholder = "{\"v\":1,\"node_id\":\"...\",\"token\":\"...\",\"relay\":\"https://...\"}",
+            label = "配对 JSON",
+            singleLine = false,
             minLines = 3,
             maxLines = 6,
-            modifier = Modifier.fillMaxWidth(),
+            monospaced = true,
         )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TextButton(
-                onClick = onPasteFromClipboard,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ContentCopy,
-                    contentDescription = null,
-                    tint = AgentBuddyTheme.accent,
-                    modifier = Modifier.size(16.dp),
+        MintButtonPair(
+            first = { buttonModifier ->
+                BuddyButton(
+                    text = "从剪贴板粘贴",
+                    onClick = onPasteFromClipboard,
+                    kind = BuddyButtonKind.SOFT,
+                    icon = Icons.Outlined.ContentPaste,
+                    modifier = buttonModifier,
                 )
-                Spacer(Modifier.width(6.dp))
-                Text("从剪贴板粘贴", color = AgentBuddyTheme.accent)
-            }
-            TextButton(
-                onClick = onParse,
-                enabled = pasteJson.trim().isNotEmpty(),
-            ) {
-                Text(
+            },
+            second = { buttonModifier ->
+                BuddyButton(
                     text = if (parsedParams == null) "解析 JSON" else "重新解析 JSON",
-                    color = AgentBuddyTheme.accent,
+                    onClick = onParse,
+                    kind = BuddyButtonKind.SECONDARY,
+                    enabled = pasteJson.trim().isNotEmpty(),
+                    modifier = buttonModifier,
                 )
-            }
-        }
+            },
+        )
     }
 }
 
-/** Scanned-host preview, display name and agent multi-select of [AlleycatAddServerSheet]. */
+/** Scanned-host preview and display name of [AlleycatAddServerSheet]. */
 @Composable
 internal fun AlleycatScannedHostSection(
     params: AppAlleycatPairPayload,
     displayName: String,
     onDisplayNameChange: (String) -> Unit,
-    agents: List<AppAlleycatAgentInfo>,
-    availableAgents: List<AppAlleycatAgentInfo>,
-    selectedAgents: List<AppAlleycatAgentInfo>,
-    selectedAgentNames: Set<String>,
-    isLoadingAgents: Boolean,
-    onToggleAllAgents: () -> Unit,
-    onAgentCheckedChange: (AppAlleycatAgentInfo, Boolean) -> Unit,
 ) {
-    SectionHeader(label = "扫描到的主机")
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(AgentBuddyTheme.surface, RoundedCornerShape(8.dp))
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        PreviewRow("node", shortNodeId(params.nodeId))
-        PreviewRow("protocol", "v${params.v.toInt()}")
-        params.relay?.takeIf { it.isNotBlank() }?.let {
-            PreviewRow("relay", it)
-        }
-        params.hostName?.takeIf { it.isNotBlank() }?.let {
-            PreviewRow("host", it)
-        }
-    }
-
-    OutlinedTextField(
-        value = displayName,
-        onValueChange = onDisplayNameChange,
-        label = { Text("显示名称（可选）") },
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
-    )
-
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        SectionHeader(label = "智能体", modifier = Modifier.weight(1f))
-        if (availableAgents.isNotEmpty()) {
-            TextButton(
-                onClick = onToggleAllAgents,
-            ) {
-                Text(
-                    text = if (selectedAgents.size == availableAgents.size) "无" else "全部",
-                    color = AgentBuddyTheme.accent,
-                    fontSize = 12.sp,
-                )
+    DiscoveryFormSection(title = "扫描到的主机") {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .buddyCard(BuddySurfaceTone.SURFACE, shape = BuddyShapes.detailCard, padding = null)
+                .padding(horizontal = BuddySpacing.md),
+        ) {
+            PreviewRow("node", shortNodeId(params.nodeId))
+            BuddyDivider()
+            PreviewRow("protocol", "v${params.v.toInt()}")
+            params.relay?.takeIf { it.isNotBlank() }?.let {
+                BuddyDivider()
+                PreviewRow("relay", it)
+            }
+            params.hostName?.takeIf { it.isNotBlank() }?.let {
+                BuddyDivider()
+                PreviewRow("host", it)
             }
         }
+        MintTextField(
+            value = displayName,
+            onValueChange = onDisplayNameChange,
+            placeholder = "显示名称（可选）",
+            modifier = Modifier.padding(top = BuddySpacing.xxs),
+        )
     }
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(AgentBuddyTheme.surface, RoundedCornerShape(8.dp))
-            .padding(vertical = 4.dp),
-    ) {
+}
+
+@Composable
+private fun AlleycatAgentSection(state: AlleycatPairViewState, actions: AlleycatPairCallbacks) {
+    Column(verticalArrangement = Arrangement.spacedBy(BuddySpacing.xs)) {
+        DiscoveryAgentListHeader(
+            showsToggle = state.hasAvailableAgents,
+            allSelected = state.allAgentsSelected,
+            onToggleAll = actions.onToggleAllAgents,
+        )
         when {
-            isLoadingAgents -> Row(
+            state.isLoadingAgents -> Row(
+                modifier = Modifier
+                    .heightIn(min = BuddySize.control)
+                    .semantics(mergeDescendants = true) {},
+                horizontalArrangement = Arrangement.spacedBy(BuddySpacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(8.dp),
             ) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(18.dp),
                     strokeWidth = 2.dp,
-                    color = AgentBuddyTheme.accent,
+                    color = AgentBuddyTheme.textSecondary,
                 )
-                Spacer(Modifier.width(8.dp))
-                Text("正在加载智能体", color = AgentBuddyTheme.textSecondary, fontSize = 12.sp)
-            }
-            agents.isEmpty() -> Text(
-                text = "此主机上没有可用的智能体。",
-                color = AgentBuddyTheme.textMuted,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(8.dp),
-            )
-            else -> agents.forEach { agent ->
-                AgentRow(
-                    agent = agent,
-                    selected = agent.name in selectedAgentNames,
-                    onCheckedChange = { checked -> onAgentCheckedChange(agent, checked) },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun AgentRow(
-    agent: AppAlleycatAgentInfo,
-    selected: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    // Plain clickable Row instead of TextButton — TextButton injects
-    // Material's minimum touch target (~48dp) plus internal content
-    // padding, which made each agent row much taller than the actual
-    // text content needed and forced the agent list to take far more
-    // vertical space than necessary on small screens.
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(
-                if (agent.available) {
-                    Modifier.clickable { onCheckedChange(!selected) }
-                } else {
-                    Modifier
-                },
-            )
-            .padding(horizontal = 12.dp, vertical = 4.dp),
-    ) {
-        AgentIconView(
-            kind = agent.name,
-            sizeDp = 22,
-            modifier = Modifier.alpha(if (agent.available) 1f else 0.45f),
-        )
-        Spacer(Modifier.width(10.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = agent.displayName,
-                    color = if (agent.available) AgentBuddyTheme.textPrimary else AgentBuddyTheme.textMuted,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium,
+                    text = "正在加载智能体",
+                    style = buddyTextStyle(BuddyTextStyle.BODY),
+                    color = AgentBuddyTheme.textSecondary,
                 )
-                if (isBetaAgentName(agent.name, agent.displayName)) {
-                    Spacer(Modifier.width(6.dp))
-                    BetaBadge()
-                }
             }
-            Text(
-                text = wireLabel(agent.wire),
+
+            state.agentOptions.isEmpty() -> Text(
+                text = "此主机上没有可用的智能体。",
+                style = buddyTextStyle(BuddyTextStyle.BODY),
                 color = AgentBuddyTheme.textSecondary,
-                fontSize = 11.sp,
             )
-        }
-        if (!agent.available) {
-            Text("不可用", color = AgentBuddyTheme.textMuted, fontSize = 11.sp)
-        } else {
-            Checkbox(
-                checked = selected,
-                onCheckedChange = onCheckedChange,
-                enabled = true,
-                modifier = Modifier.size(28.dp),
-            )
+
+            else -> DiscoveryAgentList(options = state.agentOptions, onToggle = actions.onAgentToggle)
         }
     }
-}
-
-@Composable
-internal fun SectionHeader(label: String, modifier: Modifier = Modifier) {
-    Text(
-        text = label.uppercase(),
-        color = AgentBuddyTheme.textSecondary,
-        fontSize = 10.sp,
-        fontWeight = FontWeight.SemiBold,
-        modifier = modifier.padding(top = 4.dp),
-    )
 }
 
 @Composable
 private fun PreviewRow(label: String, value: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    // Side by side at normal sizes; label above value once text is enlarged.
+    val stacked = LocalDensity.current.fontScale * LocalTextScale.current > BUDDY_CHROME_MAX_FONT_SCALE
+    val labelText: @Composable () -> Unit = {
         Text(
             text = label,
+            style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.Normal),
             color = AgentBuddyTheme.textSecondary,
-            fontSize = 11.sp,
-            modifier = Modifier.width(96.dp),
-        )
-        Text(
-            text = value,
-            color = AgentBuddyTheme.textPrimary,
-            fontSize = 12.sp,
-            fontFamily = FontFamily.Monospace,
         )
     }
-}
-
-@Composable
-private fun DisclosureRow(
-    expanded: Boolean,
-    label: String,
-    onToggle: () -> Unit,
-) {
-    TextButton(onClick = onToggle, modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = (if (expanded) "▾ " else "▸ ") + label,
-            color = AgentBuddyTheme.textSecondary,
-            fontSize = 12.sp,
-            modifier = Modifier.fillMaxWidth(),
-        )
+    if (stacked) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = BuddySize.minHitTarget)
+                .padding(vertical = BuddySpacing.xs)
+                .semantics(mergeDescendants = true) {},
+        ) {
+            labelText()
+            Text(
+                text = value,
+                style = buddyTextStyle(BuddyTextStyle.CODE),
+                color = AgentBuddyTheme.textPrimary,
+            )
+        }
+    } else {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = BuddySize.minHitTarget)
+                .semantics(mergeDescendants = true) {},
+            horizontalArrangement = Arrangement.spacedBy(BuddySpacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            labelText()
+            Text(
+                text = value,
+                style = buddyTextStyle(BuddyTextStyle.CODE),
+                color = AgentBuddyTheme.textPrimary,
+                maxLines = 2,
+                modifier = Modifier.weight(1f),
+                textAlign = TextAlign.End,
+            )
+        }
     }
-}
-
-private fun wireLabel(wire: AppAlleycatAgentWire): String = when (wire) {
-    AppAlleycatAgentWire.WEBSOCKET -> "websocket"
-    AppAlleycatAgentWire.JSONL -> "jsonl"
 }

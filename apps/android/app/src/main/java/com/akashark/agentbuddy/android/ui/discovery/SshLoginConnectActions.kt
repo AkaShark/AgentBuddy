@@ -1,21 +1,21 @@
 package com.akashark.agentbuddy.android.ui.discovery
 
 import android.content.Context
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import com.akashark.agentbuddy.android.state.AppModel
 import com.akashark.agentbuddy.android.state.SavedServer
 import com.akashark.agentbuddy.android.state.SavedServerStore
 import com.akashark.agentbuddy.android.state.SavedSshCredential
 import com.akashark.agentbuddy.android.state.SshAuthMethod
 import com.akashark.agentbuddy.android.state.SshCredentialStore
 import com.akashark.agentbuddy.android.state.promptableSshHostKey
+import com.akashark.agentbuddy.android.ui.common.AgentRuntimeKind
 import com.akashark.agentbuddy.android.util.LLog
 import java.io.File
-import com.akashark.agentbuddy.android.ui.common.AgentRuntimeKind
 import uniffi.codex_mobile_client.AppSshSessionResult
 import uniffi.codex_mobile_client.SshBridgeTransport
-import androidx.compose.runtime.MutableState
-import com.akashark.agentbuddy.android.state.AppModel
 
 /** The in-flight guided SSH connect, kept so a host-key refusal can offer a retry. */
 internal data class GuidedSshAttempt(

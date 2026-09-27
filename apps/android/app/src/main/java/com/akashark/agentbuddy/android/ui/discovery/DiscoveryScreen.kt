@@ -1,11 +1,6 @@
 package com.akashark.agentbuddy.android.ui.discovery
 
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -18,18 +13,21 @@ import androidx.compose.ui.platform.LocalContext
 import com.akashark.agentbuddy.android.state.SavedServer
 import com.akashark.agentbuddy.android.state.SavedServerStore
 import com.akashark.agentbuddy.android.state.SshCredentialStore
-import com.akashark.agentbuddy.android.state.isPromptable
 import com.akashark.agentbuddy.android.state.isConnected
-import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
+import com.akashark.agentbuddy.android.state.isPromptable
 import com.akashark.agentbuddy.android.ui.LocalAppModel
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyBottomSheet
 import kotlinx.coroutines.launch
-import uniffi.codex_mobile_client.AppServerHealth
 import uniffi.codex_mobile_client.AppDiscoveredServer
+import uniffi.codex_mobile_client.AppServerHealth
 
 /**
- * Server discovery and connection screen.
- * Displays discovered + saved servers merged.
+ * 「添加主机」 sheet content: the connection chooser plus every connect flow it
+ * opens (QR pairing, connected computers, SSH / Codex URL, SSH login, agent
+ * picker, host-key prompts). Closes itself through [onDismiss] once the new
+ * host is connected.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiscoveryScreen(
     discoveredServers: List<AppDiscoveredServer>,
@@ -60,6 +58,8 @@ fun DiscoveryScreen(
     val pendingAutoNavigateServerIdState = remember { mutableStateOf<String?>(null) }
     var pendingAutoNavigateServerId by pendingAutoNavigateServerIdState
     val wakingServerIdState = remember { mutableStateOf<String?>(null) }
+    val wakingServerId by wakingServerIdState
+    var lastConnectEntry by remember { mutableStateOf<SavedServer?>(null) }
     val connectErrorState = remember { mutableStateOf<String?>(null) }
     var connectError by connectErrorState
     val sshHostKeyChangeState = remember { mutableStateOf<SshHostKeyChangePrompt?>(null) }
@@ -140,15 +140,20 @@ fun DiscoveryScreen(
         onPairWithAgentBuddy = { showAlleycatSheet = true },
         onConnectedComputers = { showSlingshotComputers = true },
         onSshOrCodexUrl = { showManualEntry = true },
+        onClose = onDismiss,
+        wakingHostName = lastConnectEntry
+            ?.takeIf { it.id == wakingServerId }
+            ?.let { it.name.ifBlank { it.hostname } },
     )
 
     if (showManualEntry) {
-        ManualEntryDialog(
+        ManualEntrySheet(
             onDismiss = { showManualEntry = false },
             onSubmit = { action ->
                 when (action) {
                     is ManualEntryAction.Connect -> {
                         showManualEntry = false
+                        lastConnectEntry = action.server
                         scope.launch { connectActions.connectSelectedServer(action.server) }
                     }
 
@@ -212,7 +217,7 @@ fun DiscoveryScreen(
     }
 
     sshAgentContext?.let { agentContext ->
-        SSHAgentPickerDialog(
+        SSHAgentPickerSheet(
             context = agentContext,
             onDismiss = {
                 scope.launch {
@@ -231,40 +236,18 @@ fun DiscoveryScreen(
     }
 
     connectError?.let { message ->
-        AlertDialog(
-            onDismissRequest = { connectError = null },
-            title = { Text("连接失败") },
-            text = { Text(message) },
-            confirmButton = {
-                TextButton(onClick = { connectError = null }) {
-                    Text("确定")
-                }
-            },
-        )
+        DiscoveryConnectErrorDialog(message = message, onDismiss = { connectError = null })
     }
 
     if (showAlleycatSheet) {
-        @OptIn(ExperimentalMaterial3Api::class)
-        ModalBottomSheet(
-            onDismissRequest = { showAlleycatSheet = false },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = AgentBuddyTheme.background,
-        ) {
+        BuddyBottomSheet(onDismissRequest = { showAlleycatSheet = false }) {
             AlleycatAddServerSheet(
                 onDismiss = { showAlleycatSheet = false },
                 startScanningOnAppear = true,
                 onConnected = { result ->
                     showAlleycatSheet = false
                     scope.launch {
-                        SavedServerStore.rememberAlleycat(
-                            context = context,
-                            serverId = result.serverId,
-                            displayName = result.displayName,
-                            nodeId = result.nodeId,
-                            relay = result.params.relay,
-                            agentName = result.agentName,
-                            agentWire = alleycatWireStorageValue(result.agentWire),
-                        )
+                        saveAlleycatPairing(context, result)
                         connectActions.reloadSavedServers()
                         appModel.refreshSnapshot()
                         pendingAutoNavigateServerId = result.serverId
