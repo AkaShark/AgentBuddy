@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -25,14 +24,18 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.input.pointer.pointerInteropFilter
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.akashark.agentbuddy.android.state.CachedPetPackage
 import com.akashark.agentbuddy.android.state.PetAvatarState
 import com.akashark.agentbuddy.android.state.PetOverlayController
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyShapes
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySpacing
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyTextStyle
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyTextStyle
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -381,6 +384,7 @@ private fun pointerSpan(event: MotionEvent): Float {
     return kotlin.math.hypot(dx.toDouble(), dy.toDouble()).toFloat()
 }
 
+/** Short status bubble above the pet: surface capsule with a hairline border, Caption type. */
 @Composable
 private fun PetSpeechBubble(
     text: String,
@@ -390,19 +394,11 @@ private fun PetSpeechBubble(
         text = text,
         modifier = modifier
             .widthIn(max = BubbleMaxWidth)
-            .background(
-                color = AgentBuddyTheme.surface.copy(alpha = 0.94f),
-                shape = RoundedCornerShape(8.dp),
-            )
-            .border(
-                width = 1.dp,
-                color = AgentBuddyTheme.border.copy(alpha = 0.9f),
-                shape = RoundedCornerShape(8.dp),
-            )
-            .padding(horizontal = 8.dp, vertical = 5.dp),
+            .background(color = AgentBuddyTheme.surface, shape = BuddyShapes.control)
+            .border(width = 1.dp, color = AgentBuddyTheme.border, shape = BuddyShapes.control)
+            .padding(horizontal = BuddySpacing.xs, vertical = BuddySpacing.xxs),
+        style = buddyTextStyle(BuddyTextStyle.CAPTION, FontWeight.Medium),
         color = AgentBuddyTheme.textPrimary,
-        fontFamily = AgentBuddyTheme.monoFont,
-        fontSize = 11.sp,
         maxLines = 2,
         overflow = TextOverflow.Ellipsis,
     )
