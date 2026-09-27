@@ -25,6 +25,7 @@ struct HomeNavigationView: View {
     @State var hasSeededInitialConversationRoute = false
     @State var pendingWallpaperConfig: WallpaperConfig?
     @State var pendingWallpaperImage: UIImage?
+    @State var isNewTaskSheetPresented = false
     let topInset: CGFloat
     let bottomInset: CGFloat
 
@@ -176,6 +177,9 @@ struct HomeNavigationView: View {
                 )
             }
             .environment(appModel)
+        }
+        .sheet(isPresented: $isNewTaskSheetPresented) {
+            newTaskSheet
         }
         .sheet(isPresented: $showProjectPicker) {
             ProjectPickerSheet(

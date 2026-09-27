@@ -8,14 +8,17 @@ extension HomeNavigationView {
                     if isEmbeddedInSplit {
                         splitDetailRoot
                     } else {
-                        homeDashboard
+                        homeShell
                     }
                 } else {
                     AgentBuddyTheme.backgroundGradient.ignoresSafeArea()
                 }
             }
             .overlay(alignment: .bottomLeading) {
+                // Phone home carries voice inside its composer pill; only the
+                // split layout still floats the orb over the detail pane.
                 if isHomeRouteActive,
+                   isEmbeddedInSplit,
                    experimentalFeatures.isEnabled(.realtimeVoice),
                    homeInputMode == .collapsed {
                     homeVoiceLauncher

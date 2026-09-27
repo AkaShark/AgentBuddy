@@ -15,7 +15,7 @@ extension HomeNavigationView {
         .padding(.bottom, 4)
     }
 
-    private func startHomeVoiceSession() {
+    func startHomeVoiceSession() {
         guard !isStartingVoice else { return }
         isStartingVoice = true
         actionErrorMessage = nil
