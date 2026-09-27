@@ -3,7 +3,9 @@ package com.akashark.agentbuddy.android.ui.conversation
 import android.graphics.Typeface
 import android.text.SpannableStringBuilder
 import android.text.Spanned
-import android.text.style.BackgroundColorSpan
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.text.style.LineBackgroundSpan
 import android.text.style.ForegroundColorSpan
 import android.view.View
 import android.view.ViewGroup
@@ -18,7 +20,6 @@ import androidx.core.content.res.ResourcesCompat
 import androidx.core.widget.TextViewCompat
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.isUnspecified
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.akashark.agentbuddy.android.ui.AgentBuddyTextStyle
 import com.akashark.agentbuddy.android.ui.LocalTextScale
@@ -79,7 +80,8 @@ internal fun SyntaxHighlightedDiffBlock(
             HorizontalScrollView(context).apply {
                 overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
                 isHorizontalScrollBarEnabled = true
-                isFillViewport = false
+                // Fill the viewport so line bands span the whole code area.
+                isFillViewport = true
                 addView(
                     TextView(context).apply {
                         layoutParams = ViewGroup.LayoutParams(
@@ -134,12 +136,15 @@ private fun buildHighlightedDiff(
         )
 
         val lineEnd = builder.length
-        builder.setSpan(
-            BackgroundColorSpan(kind.background(palette)),
-            lineStart,
-            lineEnd,
-            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
-        )
+        val background = kind.background(palette)
+        if (background != android.graphics.Color.TRANSPARENT) {
+            builder.setSpan(
+                DiffLineBackgroundSpan(background),
+                lineStart,
+                lineEnd,
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+            )
+        }
 
         if (index < lines.lastIndex) {
             builder.append('\n')
@@ -147,6 +152,28 @@ private fun buildHighlightedDiff(
     }
 
     return builder
+}
+
+/** Paints a full-width band behind one diff line (not just behind its glyphs). */
+private class DiffLineBackgroundSpan(private val color: Int) : LineBackgroundSpan {
+    override fun drawBackground(
+        canvas: Canvas,
+        paint: Paint,
+        left: Int,
+        right: Int,
+        top: Int,
+        baseline: Int,
+        bottom: Int,
+        text: CharSequence,
+        start: Int,
+        end: Int,
+        lineNumber: Int,
+    ) {
+        val previous = paint.color
+        paint.color = color
+        canvas.drawRect(left.toFloat(), top.toFloat(), right.toFloat(), bottom.toFloat(), paint)
+        paint.color = previous
+    }
 }
 
 private data class DiffSyntaxPalette(

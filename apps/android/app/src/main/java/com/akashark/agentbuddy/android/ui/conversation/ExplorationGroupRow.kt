@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -119,13 +120,26 @@ fun ExplorationGroupRow(
         }
 
         if (!expanded && showsCollapsedPreview && entries.isNotEmpty()) {
+            val previewFill = timelineCodeFill(nested = true)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(start = BuddySpacing.md, end = BuddySpacing.md, bottom = BuddySpacing.sm)
                     .heightIn(min = 56.dp, max = previewHeight)
                     .clip(timelineCodeShape(nested = true))
-                    .background(timelineCodeFill(nested = true))
+                    .background(previewFill)
+                    .drawWithContent {
+                        drawContent()
+                        // Soft top fade over entries that scrolled away.
+                        val fadeHeight = BuddySpacing.lg.toPx()
+                        drawRect(
+                            brush = Brush.verticalGradient(
+                                listOf(previewFill, previewFill, Color.Transparent),
+                                endY = fadeHeight,
+                            ),
+                            size = Size(size.width, fadeHeight),
+                        )
+                    }
                     .padding(horizontal = BuddySpacing.sm, vertical = BuddySpacing.xs)
                     .verticalScroll(previewScrollState),
                 verticalArrangement = Arrangement.spacedBy(BuddySpacing.xxs),

@@ -1,6 +1,7 @@
 package com.akashark.agentbuddy.android.ui.conversation
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
 import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySpacing
@@ -207,12 +209,18 @@ internal fun DiffSection(
             SectionLabel(label)
         }
         LimitedToolTextBlock(content) { display ->
+            // Diffs keep the code background with a hairline border so the
+            // success / danger line bands stay distinct from the card.
+            val shape = timelineCodeShape(nested = true)
             SyntaxHighlightedDiffBlock(
                 diff = display,
                 titleHint = label.ifEmpty { null },
                 fontSize = BuddyTextStyle.CODE.size.sp,
                 modifier = Modifier
-                    .nestedCodeSurface()
+                    .fillMaxWidth()
+                    .clip(shape)
+                    .background(timelineCodeFill(nested = false))
+                    .border(1.dp, AgentBuddyTheme.border, shape)
                     .padding(horizontal = BuddySpacing.sm, vertical = BuddySpacing.xs),
             )
         }
