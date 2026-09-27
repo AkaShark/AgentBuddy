@@ -25,12 +25,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyReduceMotion
 
 /**
  * Shared visual language for "this thing's current state" — used for task
  * rows (active / hydrating / hydrated / idle) and server pills (connected /
- * connecting / failed / idle). Colors are fixed green/orange/red so the
- * meaning reads the same across themes.
+ * connecting / failed / idle). Colours come from the semantic success /
+ * warning / danger roles. The dot only supports text next to it: callers
+ * pair it with a label so the state never depends on colour alone.
+ *
+ * With reduced motion the pulses stop: ACTIVE shows a ring around a solid
+ * dot and PENDING a solid dot, so they stay distinguishable without motion.
  */
 enum class StatusDotState {
     /** Solid green. Something is done / healthy. */
@@ -45,25 +50,30 @@ enum class StatusDotState {
     IDLE,
 }
 
-private val Green = Color(0xFF22C55E)
-private val Orange = Color(0xFFF59E0B)
-private val Red = Color(0xFFEF4444)
-
 @Composable
 fun StatusDot(
     state: StatusDotState,
     modifier: Modifier = Modifier,
     size: Dp = 10.dp,
 ) {
+    val reduceMotion = buddyReduceMotion
+    val success = AgentBuddyTheme.success
+    val warning = AgentBuddyTheme.warning
     Box(
         modifier = modifier.size(size + 2.dp),
         contentAlignment = androidx.compose.ui.Alignment.Center,
     ) {
         when (state) {
-            StatusDotState.OK -> SolidDot(Green, size)
-            StatusDotState.ACTIVE -> PulsingDot(Green, size, withShimmer = true)
-            StatusDotState.PENDING -> PulsingDot(Orange, size, withShimmer = false)
-            StatusDotState.ERROR -> SolidDot(Red, size)
+            StatusDotState.OK -> SolidDot(success, size)
+            StatusDotState.ACTIVE ->
+                if (reduceMotion) {
+                    RingedDot(success, size)
+                } else {
+                    PulsingDot(success, size, withShimmer = true)
+                }
+            StatusDotState.PENDING ->
+                if (reduceMotion) SolidDot(warning, size) else PulsingDot(warning, size, withShimmer = false)
+            StatusDotState.ERROR -> SolidDot(AgentBuddyTheme.danger, size)
             StatusDotState.IDLE -> Box(
                 modifier = Modifier
                     .size(size + 2.dp)
@@ -82,6 +92,19 @@ private fun SolidDot(color: Color, size: Dp) {
             .clip(CircleShape)
             .background(color),
     )
+}
+
+/** Static stand-in for the ACTIVE pulse: a solid dot inside a thin ring. */
+@Composable
+private fun RingedDot(color: Color, size: Dp) {
+    Box(
+        modifier = Modifier
+            .size(size + 2.dp)
+            .border(1.5.dp, color.copy(alpha = 0.55f), CircleShape),
+        contentAlignment = androidx.compose.ui.Alignment.Center,
+    ) {
+        SolidDot(color, size * 0.6f)
+    }
 }
 
 @Composable

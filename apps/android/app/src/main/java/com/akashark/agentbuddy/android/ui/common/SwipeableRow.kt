@@ -30,27 +30,30 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyTextStyle
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyReduceMotion
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyTextStyle
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
  * Describes one swipe-revealed action slot. The caller supplies icon, label,
- * tint, and an `onTrigger` callback that fires once the gesture commits.
+ * fill (`tint`, normally `AgentBuddyTheme.swipeFill(...)`), and an
+ * `onTrigger` callback that fires once the gesture commits. The label and
+ * icon are drawn in white on the fill, so pass a strong colour.
  */
 data class SwipeAction(
     val icon: ImageVector,
     val label: String,
     val tint: Color,
     val onTrigger: () -> Unit,
-    /**
-     * Solid slot fill (use `AgentBuddyTheme.swipeFill`). When set, the icon and
-     * label are white so they stay readable in both appearances; otherwise the
-     * slot is a faint wash of [tint].
-     */
+    /** Solid slot fill that overrides [tint] (use `AgentBuddyTheme.swipeFill`). */
     val fill: Color? = null,
 )
 
@@ -59,6 +62,10 @@ data class SwipeAction(
  * swipe (drag left) reveal action slots behind the row. Releasing past the
  * commit threshold fires the action with a haptic; otherwise the row
  * springs back.
+ *
+ * Both actions are also exposed to TalkBack as custom actions, since a
+ * swipe is not discoverable without sight. With reduced motion the row
+ * snaps back instead of springing.
  */
 @Composable
 fun SwipeableRow(
@@ -70,6 +77,7 @@ fun SwipeableRow(
     val density = LocalDensity.current
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
+    val reduceMotion = buddyReduceMotion
 
     // Commit threshold and max reveal mirror iOS: commit at ~35% of 260dp ≈ 90dp,
     // with extra reveal room up to 140dp.
@@ -91,9 +99,7 @@ fun SwipeableRow(
                 action = leadingAction,
                 alignment = Alignment.CenterStart,
                 progress = progress,
-                modifier = Modifier
-                    .matchParentSize()
-                    .padding(start = 16.dp),
+                modifier = Modifier.matchParentSize(),
             )
         }
 
@@ -104,9 +110,7 @@ fun SwipeableRow(
                 action = trailingAction,
                 alignment = Alignment.CenterEnd,
                 progress = progress,
-                modifier = Modifier
-                    .matchParentSize()
-                    .padding(end = 16.dp),
+                modifier = Modifier.matchParentSize(),
             )
         }
 
@@ -114,7 +118,15 @@ fun SwipeableRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .offset { IntOffset(offsetX.value.roundToInt(), 0) }
-                .pointerInput(leadingAction, trailingAction) {
+                .semantics {
+                    customActions = listOfNotNull(leadingAction, trailingAction).map { action ->
+                        CustomAccessibilityAction(action.label) {
+                            action.onTrigger()
+                            true
+                        }
+                    }
+                }
+                .pointerInput(leadingAction, trailingAction, reduceMotion) {
                     var activated = false
 
                     detectHorizontalDragGestures(
@@ -131,21 +143,26 @@ fun SwipeableRow(
                                 trigger.onTrigger()
                             }
                             scope.launch {
-                                offsetX.animateTo(
-                                    targetValue = 0f,
-                                    animationSpec = spring(
-                                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                                        stiffness = Spring.StiffnessMediumLow,
-                                    ),
-                                )
+                                if (reduceMotion) {
+                                    offsetX.snapTo(0f)
+                                } else {
+                                    offsetX.animateTo(
+                                        targetValue = 0f,
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                                            stiffness = Spring.StiffnessMediumLow,
+                                        ),
+                                    )
+                                }
                             }
                         },
                         onDragCancel = {
                             scope.launch {
-                                offsetX.animateTo(
-                                    0f,
-                                    animationSpec = tween(durationMillis = 180),
-                                )
+                                if (reduceMotion) {
+                                    offsetX.snapTo(0f)
+                                } else {
+                                    offsetX.animateTo(0f, animationSpec = tween(durationMillis = 180))
+                                }
                             }
                         },
                         onHorizontalDrag = { change, dragAmount ->
@@ -177,20 +194,12 @@ private fun BoxScope.ActionSlot(
     progress: Float,
     modifier: Modifier = Modifier,
 ) {
-    val content = if (action.fill != null) Color.White else action.tint
-    if (action.fill != null) {
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .background(action.fill.copy(alpha = action.fill.alpha * progress)),
-        )
-    }
+    // Solid fill as soon as the row moves; the white label fades in with the
+    // drag so the commit point stays legible in light and dark mode.
     Box(
-        modifier = if (action.fill != null) {
-            modifier
-        } else {
-            modifier.background(action.tint.copy(alpha = 0.18f * progress))
-        },
+        modifier = modifier
+            .then(if (progress > 0f) Modifier.background(action.fill ?: action.tint) else Modifier)
+            .padding(horizontal = 20.dp),
         contentAlignment = alignment,
     ) {
         Row(
@@ -199,15 +208,15 @@ private fun BoxScope.ActionSlot(
         ) {
             Icon(
                 imageVector = action.icon,
-                contentDescription = action.label,
-                tint = content,
-                modifier = Modifier.size(18.dp),
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(20.dp),
             )
             Spacer(Modifier.width(6.dp))
             Text(
                 text = action.label,
-                color = content,
-                fontSize = 12.sp,
+                color = Color.White,
+                style = buddyTextStyle(BuddyTextStyle.LABEL),
             )
         }
     }
