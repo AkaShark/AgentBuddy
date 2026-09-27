@@ -1,5 +1,6 @@
 package com.akashark.agentbuddy.android.ui.settings
 
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -36,6 +37,9 @@ fun SettingsSheet(
         )
     }
 
+    // Kept here so returning from a sub-screen restores the list position.
+    val topLevelListState = rememberLazyListState()
+
     when (subScreen) {
         SettingsSubScreen.Appearance -> AppearanceScreen(onBack = { subScreen = null })
         SettingsSubScreen.Experimental -> ExperimentalScreen(onBack = { subScreen = null })
@@ -49,6 +53,7 @@ fun SettingsSheet(
             onOpenDebug = { subScreen = SettingsSubScreen.Debug },
             onOpenAccount = onOpenAccount,
             onOpenApps = onOpenApps,
+            listState = topLevelListState,
         )
     }
 }

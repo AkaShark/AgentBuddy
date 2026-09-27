@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.KeyboardActions
@@ -151,6 +153,7 @@ internal fun SettingsPage(
     onBack: (() -> Unit)? = null,
     onDone: (() -> Unit)? = null,
     headerTrailing: (@Composable RowScope.() -> Unit)? = null,
+    listState: LazyListState = rememberLazyListState(),
     content: LazyListScope.() -> Unit,
 ) {
     Column(
@@ -163,6 +166,7 @@ internal fun SettingsPage(
         SettingsPageHeader(title = title, onBack = onBack, onDone = onDone, trailing = headerTrailing)
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
             LazyColumn(
+                state = listState,
                 modifier = Modifier.widthIn(max = SettingsMaxContentWidth).fillMaxWidth(),
                 contentPadding =
                     PaddingValues(

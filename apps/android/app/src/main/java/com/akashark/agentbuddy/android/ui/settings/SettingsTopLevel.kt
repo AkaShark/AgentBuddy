@@ -1,5 +1,6 @@
 package com.akashark.agentbuddy.android.ui.settings
 
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -41,6 +42,7 @@ internal fun SettingsTopLevel(
     onOpenDebug: () -> Unit,
     onOpenAccount: (serverId: String) -> Unit,
     onOpenApps: (() -> Unit)?,
+    listState: LazyListState,
 ) {
     val appModel = LocalAppModel.current
     val context = LocalContext.current
@@ -208,6 +210,7 @@ internal fun SettingsTopLevel(
                 }
             },
         ),
+        listState = listState,
     )
 
     renameTarget?.let { server ->

@@ -1,5 +1,7 @@
 package com.akashark.agentbuddy.android.ui.settings
 
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.BugReport
@@ -60,8 +62,9 @@ internal fun SettingsTopLevelContent(
     state: SettingsTopLevelState,
     actions: SettingsTopLevelActions,
     modifier: Modifier = Modifier,
+    listState: LazyListState = rememberLazyListState(),
 ) {
-    SettingsPage(title = "设置", onDone = actions.onDone, modifier = modifier) {
+    SettingsPage(title = "设置", onDone = actions.onDone, modifier = modifier, listState = listState) {
         settingsSection("主题", key = "theme") {
             SettingsNavRow("外观", onClick = actions.onOpenAppearance, icon = Icons.Outlined.Palette)
         }
