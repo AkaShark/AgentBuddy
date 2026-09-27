@@ -1,9 +1,6 @@
 package com.akashark.agentbuddy.android.ui.common
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.heightIn
@@ -16,9 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
@@ -42,12 +37,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.akashark.agentbuddy.android.state.ampReasoningEffortLocked
 import com.akashark.agentbuddy.android.ui.AgentBuddyTextStyle
@@ -57,11 +48,8 @@ import com.akashark.agentbuddy.android.ui.scaled
 import uniffi.codex_mobile_client.AppModeKind
 import uniffi.codex_mobile_client.AppThreadPermissionPreset
 import uniffi.codex_mobile_client.AppThreadSnapshot
-import com.akashark.agentbuddy.android.ui.common.AgentRuntimeKind
 import uniffi.codex_mobile_client.ModelInfo
-import uniffi.codex_mobile_client.ReasoningEffort
 import uniffi.codex_mobile_client.threadPermissionPreset
-import java.util.Locale
 
 /**
  * Reusable model/reasoning/plan/permissions/fast-mode panel shared by the
@@ -448,211 +436,4 @@ fun ModelSelectorPanel(
             )
         }
     }
-}
-
-internal fun effortLabel(value: ReasoningEffort): String = when (value) {
-    ReasoningEffort.NONE -> "none"
-    ReasoningEffort.MINIMAL -> "minimal"
-    ReasoningEffort.LOW -> "low"
-    ReasoningEffort.MEDIUM -> "medium"
-    ReasoningEffort.HIGH -> "high"
-    ReasoningEffort.X_HIGH -> "xhigh"
-    ReasoningEffort.MAX -> "max"
-}
-
-private fun ModelInfo.defaultReasoningEffortSelection(): String? =
-    if (supportedReasoningEfforts.isEmpty()) null else effortLabel(defaultReasoningEffort)
-
-private val AmpVisibleModes = setOf("smart", "rush", "deep")
-
-private fun normalizedAmpModeName(value: String): String =
-    value.trim()
-        .lowercase(Locale.ROOT)
-        .removePrefix("amp/")
-        .removePrefix("amp:")
-
-private fun ModelInfo.ampModeName(): String =
-    normalizedAmpModeName(id)
-        .ifEmpty {
-            normalizedAmpModeName(model)
-        }
-
-internal fun ModelInfo.modelPickerDisplayName(): String =
-    if (agentRuntimeKind == "amp") {
-        ampModeName().ifEmpty { displayName.ifBlank { id } }
-    } else {
-        displayName.ifBlank { id }
-    }
-
-private fun ModelInfo.isVisibleModelOption(): Boolean =
-    agentRuntimeKind != "amp" || ampModeName() in AmpVisibleModes
-
-private data class RuntimeModelBucket(
-    val kind: AgentRuntimeKind,
-    val count: Int,
-)
-
-private const val MaxModelSearchResults = 80
-
-private class ModelSearchIndex(models: List<ModelInfo>) {
-    private data class Row(
-        val model: ModelInfo,
-        val searchableText: String,
-    )
-
-    private val rows = models.map { model ->
-        Row(
-            model = model,
-            searchableText = buildString {
-                append(model.id)
-                append('\n')
-                append(model.model)
-                append('\n')
-                append(model.agentRuntimeKind)
-                append('\n')
-                append(model.modelPickerDisplayName())
-                append('\n')
-                append(model.description)
-            }.lowercase(Locale.ROOT),
-        )
-    }
-
-    fun results(query: String): List<ModelInfo> {
-        val normalizedQuery = query.trim().lowercase(Locale.ROOT)
-        if (normalizedQuery.isEmpty()) {
-            return rows.map { it.model }
-        }
-
-        val matches = ArrayList<ModelInfo>(minOf(MaxModelSearchResults, rows.size))
-        for (row in rows) {
-            if (row.searchableText.contains(normalizedQuery)) {
-                matches += row.model
-                if (matches.size == MaxModelSearchResults) {
-                    break
-                }
-            }
-        }
-        return matches
-    }
-}
-
-internal fun ModelInfo.matchesModelSelection(
-    selection: String?,
-    runtimeKind: AgentRuntimeKind? = null,
-): Boolean {
-    val trimmed = selection?.trim().orEmpty()
-    if (trimmed.isEmpty()) return false
-    if (runtimeKind != null && agentRuntimeKind != runtimeKind) return false
-    return id == trimmed || model == trimmed
-}
-
-@Composable
-private fun RuntimeFilterChip(
-    label: String,
-    count: Int,
-    selected: Boolean,
-    onClick: () -> Unit,
-    leadingIcon: (@Composable () -> Unit)? = null,
-) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        leadingIcon = leadingIcon,
-        label = {
-            Text(
-                text = "$label $count",
-                fontSize = AgentBuddyTextStyle.caption2.scaled,
-                maxLines = 1,
-            )
-        },
-        colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = AgentBuddyTheme.accent,
-            selectedLabelColor = Color.Black,
-        ),
-    )
-}
-
-@Composable
-private fun ModelOptionRow(
-    model: ModelInfo,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    val shape = RoundedCornerShape(8.dp)
-    val background = if (selected) {
-        AgentBuddyTheme.accent.copy(alpha = 0.14f)
-    } else {
-        AgentBuddyTheme.surface.copy(alpha = 0.55f)
-    }
-    val borderColor = if (selected) {
-        AgentBuddyTheme.accent
-    } else {
-        AgentBuddyTheme.textMuted.copy(alpha = 0.32f)
-    }
-    val title = model.modelPickerDisplayName()
-    val detail = model.description
-        .takeIf { it.isNotBlank() }
-        ?: model.model.takeIf { it.isNotBlank() && it != title && it != model.id }
-    val runtimeLabel = model.agentRuntimeKind.runtimeLabel
-        .takeUnless { model.agentRuntimeKind == "amp" }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(background)
-            .border(0.8.dp, borderColor, shape)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        ModelRuntimeIcon(model.agentRuntimeKind)
-        Column(modifier = Modifier.weight(1f)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Text(
-                    text = title,
-                    color = AgentBuddyTheme.textPrimary,
-                    fontSize = AgentBuddyTextStyle.caption.scaled,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                if (runtimeLabel != null) {
-                    Text(
-                        text = runtimeLabel,
-                        color = AgentBuddyTheme.textSecondary,
-                        fontSize = AgentBuddyTextStyle.caption2.scaled,
-                        maxLines = 1,
-                    )
-                }
-            }
-            if (detail != null) {
-                Text(
-                    text = detail,
-                    color = AgentBuddyTheme.textMuted,
-                    fontSize = AgentBuddyTextStyle.caption2.scaled,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-        if (selected) {
-            Icon(
-                imageVector = Icons.Default.Check,
-                contentDescription = "已选模型",
-                tint = AgentBuddyTheme.accent,
-                modifier = Modifier.size(18.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun ModelRuntimeIcon(kind: AgentRuntimeKind) {
-    AgentIconView(kind = kind, sizeDp = 16)
 }
