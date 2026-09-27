@@ -23,6 +23,7 @@ struct StreamingAssistantBubble: View {
     var themeVersion: Int = 0
     var onSnapshotRendered: (() -> Void)? = nil
     private let contentFontSize: CGFloat
+    private let codeFontSize = AgentBuddyFont.mintCodePointSize
 
     /// Renderer is resolved once during init. For streaming items, this
     /// creates the renderer eagerly (before deltas arrive) so the `if let`
@@ -36,7 +37,7 @@ struct StreamingAssistantBubble: View {
         isStreaming: Bool = false,
         label: String? = nil,
         themeVersion: Int = 0,
-        bodySize: CGFloat = AgentBuddyFont.conversationBodyPointSize,
+        bodySize: CGFloat = AgentBuddyFont.mintBodyPointSize,
         onSnapshotRendered: (() -> Void)? = nil
     ) {
         self.itemId = itemId
@@ -85,11 +86,11 @@ struct StreamingAssistantBubble: View {
 
     private var streamingMarkdownBody: some View {
         HStack(alignment: .top, spacing: 0) {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: BuddySpacing.sm) {
                 if let label {
                     Text(label)
-                        .agentBuddyFont(.caption2, weight: .semibold)
-                        .foregroundColor(AgentBuddyTheme.textSecondary)
+                        .buddyText(.caption, weight: .medium)
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
                 }
                 if let resolvedRenderer {
                     StreamingMarkdownContentView(renderer: resolvedRenderer)
@@ -98,7 +99,7 @@ struct StreamingAssistantBubble: View {
                         .revealGranularity(typingConfig.effectiveGranularity)
                         .agentBuddyContentMarkdown(
                             bodySize: contentFontSize,
-                            codeSize: contentFontSize,
+                            codeSize: codeFontSize,
                             selectionEnabled: !isStreaming
                         )
                         .transaction { $0.animation = nil }
@@ -107,7 +108,7 @@ struct StreamingAssistantBubble: View {
                         markdown: text,
                         style: .content,
                         bodySize: contentFontSize,
-                        codeSize: contentFontSize
+                        codeSize: codeFontSize
                     )
                     .fixedSize(horizontal: false, vertical: true)
                     .tokenReveal(.disabled)

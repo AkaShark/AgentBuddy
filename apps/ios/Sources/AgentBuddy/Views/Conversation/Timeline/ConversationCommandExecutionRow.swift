@@ -20,7 +20,7 @@ struct ConversationCommandExecutionRow: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: expanded ? 8 : 0) {
+        VStack(alignment: .leading, spacing: expanded ? BuddySpacing.xxs : 0) {
             shellHeader
             if expanded {
                 ConversationCommandOutputViewport(
@@ -28,16 +28,12 @@ struct ConversationCommandExecutionRow: View {
                     status: data.status.toolCallStatus,
                     durationText: nil
                 )
+                .padding(.bottom, BuddySpacing.sm)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
-        .background(AgentBuddyTheme.surface)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(AgentBuddyTheme.border, lineWidth: 0.5)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(.horizontal, BuddySpacing.md)
+        .padding(.vertical, BuddySpacing.xxs)
+        .timelineDetailCard()
         .animation(.spring(duration: 0.35, bounce: 0.15), value: expanded)
         .onChange(of: isPreferredExpanded) { _, newValue in
             expanded = newValue
@@ -48,41 +44,35 @@ struct ConversationCommandExecutionRow: View {
     }
 
     private var shellHeader: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text("$")
-                .agentBuddyMonoFont(size: 12, weight: .semibold)
-                .foregroundColor(AgentBuddyTheme.warning)
+        HStack(alignment: .center, spacing: BuddySpacing.sm) {
+            TimelineStatusGlyph(status: data.status.toolCallStatus, fallbackSystemImage: "terminal")
 
-            Text(expanded ? displayedCommand : collapsedCommand)
-                .agentBuddyMonoFont(size: 12)
-                .foregroundColor(AgentBuddyTheme.textSystem)
-                .textSelection(.enabled)
-                .lineLimit(expanded ? nil : 1)
-                .truncationMode(.tail)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(alignment: .firstTextBaseline, spacing: BuddySpacing.xs) {
+                Text(verbatim: "$")
+                    .buddyText(.code, weight: .semibold)
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
+                    .accessibilityHidden(true)
+
+                Text(expanded ? displayedCommand : collapsedCommand)
+                    .buddyText(.code)
+                    .foregroundStyle(AgentBuddyTheme.textPrimary)
+                    .textSelection(.enabled)
+                    .lineLimit(expanded ? nil : 1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.vertical, expanded ? BuddySpacing.xs : 0)
 
             if let durationText = timelineFormatDuration(data.durationMs), !durationText.isEmpty {
-                Text(durationText)
-                    .agentBuddyFont(.caption2)
-                    .foregroundColor(statusColor)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 2)
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill(statusColor.opacity(0.10))
-                    )
-                    .overlay(
-                        Capsule(style: .continuous)
-                            .stroke(statusColor.opacity(0.22), lineWidth: 0.5)
-                    )
+                TimelineDurationText(text: durationText)
                     .accessibilityLabel(durationAccessibilityLabel(durationText))
             }
 
-            Image(systemName: expanded ? "chevron.up" : "chevron.down")
-                .agentBuddyFont(size: 11, weight: .medium)
-                .foregroundColor(AgentBuddyTheme.textMuted)
+            TimelineDisclosureChevron(expanded: expanded)
         }
+        .frame(minHeight: BuddySize.minHitTarget)
         .contentShape(Rectangle())
+        .accessibilityAddTraits(.isButton)
         .onTapGesture {
             withAnimation(.easeInOut(duration: 0.2)) {
                 expanded.toggle()
@@ -111,8 +101,6 @@ struct ConversationCommandExecutionRow: View {
         return collapsed.isEmpty ? "command" : collapsed
     }
 
-    private var statusColor: Color { data.status.toolCallStatus.themeColor }
-
     private func durationAccessibilityLabel(_ duration: String) -> String {
         switch data.status.toolCallStatus {
         case .completed:
@@ -132,34 +120,38 @@ private struct ConversationCommandOutputViewport: View {
     let status: ToolCallStatus
     let durationText: String?
     @Environment(\.textScale) private var textScale
+    @ScaledMetric(relativeTo: .callout) private var codeLineHeight: CGFloat = BuddyTextStyle.code.lineHeight
     @State private var expandedLongOutput = false
 
     private let bottomAnchorId = "command-output-bottom"
     private let maxVisibleTextCharacters = 2_000
+    /// Top + bottom text padding inside the viewport.
+    private let verticalTextPadding: CGFloat = BuddySpacing.xs * 2
 
-    private var lineFontSize: CGFloat {
-        11 * textScale
+    private var lineHeight: CGFloat {
+        codeLineHeight * textScale
     }
 
     private var maxViewportHeight: CGFloat {
-        (AgentBuddyFont.uiMonoFont(size: lineFontSize).lineHeight * 3) + 16
+        (lineHeight * 3) + verticalTextPadding
     }
 
     private var viewportHeight: CGFloat {
-        let lh = AgentBuddyFont.uiMonoFont(size: lineFontSize).lineHeight
         let lines = max(1, visibleOutput.split(separator: "\n", omittingEmptySubsequences: false).count)
-        let natural = (lh * CGFloat(min(lines, 3))) + 16
+        let natural = (lineHeight * CGFloat(min(lines, 3))) + verticalTextPadding
         return min(natural, maxViewportHeight)
     }
 
+    private var codeFill: Color { TimelineCodeStyle.fill(nested: true) }
+
     var body: some View {
         ScrollViewReader { proxy in
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 0) {
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 0) {
                         Text(verbatim: visibleOutput)
-                            .agentBuddyMonoFont(size: 12)
-                            .foregroundColor(AgentBuddyTheme.textSecondary)
+                            .buddyText(.code)
+                            .foregroundStyle(AgentBuddyTheme.textPrimary)
                             .textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -167,44 +159,36 @@ private struct ConversationCommandOutputViewport: View {
                             .frame(height: 1)
                             .id(bottomAnchorId)
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.top, 8)
-                    .padding(.bottom, 12)
+                    .padding(.horizontal, BuddySpacing.sm)
+                    .padding(.vertical, BuddySpacing.xs)
                 }
                 .frame(height: viewportHeight)
-                .background(AgentBuddyTheme.codeBackground.opacity(0.78))
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .timelineCodeSurface()
                 .overlay(alignment: .top) {
                     LinearGradient(
-                        colors: [AgentBuddyTheme.codeBackground.opacity(0.96), AgentBuddyTheme.codeBackground.opacity(0)],
+                        colors: [codeFill, codeFill.opacity(0)],
                         startPoint: .top,
                         endPoint: .bottom
                     )
-                    .frame(height: 18)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .frame(height: BuddySpacing.md)
+                    .clipShape(RoundedRectangle(cornerRadius: BuddyRadius.control, style: .continuous))
                     .allowsHitTesting(false)
                 }
                 .overlay(alignment: .bottomTrailing) {
                     if let durationText, !durationText.isEmpty {
-                        Text(durationText)
-                            .foregroundColor(statusColor)
+                        TimelineDurationText(text: durationText)
                             .accessibilityLabel(durationAccessibilityLabel(durationText))
-                            .agentBuddyFont(.caption2)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
+                            .padding(.horizontal, BuddySpacing.sm)
+                            .padding(.vertical, BuddySpacing.xs)
                             .background(alignment: .bottom) {
                                 LinearGradient(
-                                    colors: [.clear, AgentBuddyTheme.codeBackground.opacity(0.94)],
+                                    colors: [codeFill.opacity(0), codeFill],
                                     startPoint: .top,
                                     endPoint: .bottom
                                 )
                             }
                         }
                     }
-                .overlay {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(AgentBuddyTheme.border.opacity(0.35), lineWidth: 1)
-                }
                 .onAppear {
                     scrollToBottom(proxy)
                 }
@@ -223,8 +207,7 @@ private struct ConversationCommandOutputViewport: View {
                         }
                     } label: {
                         Text(expandedLongOutput ? "Show less" : "Show more")
-                            .agentBuddyFont(.caption2, weight: .semibold)
-                            .foregroundColor(AgentBuddyTheme.accent)
+                            .timelineLinkAction()
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(expandedLongOutput ? "Show less command output" : "Show more command output")
@@ -255,8 +238,6 @@ private struct ConversationCommandOutputViewport: View {
             return false
         }
     }
-
-    private var statusColor: Color { status.themeColor }
 
     private func durationAccessibilityLabel(_ duration: String) -> String {
         switch status {

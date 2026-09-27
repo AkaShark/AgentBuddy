@@ -56,7 +56,7 @@ extension ConversationTimelineItemRow {
             attributed.append(verbText)
 
             var fileText = AttributedString(filename)
-            fileText.foregroundColor = AgentBuddyTheme.accent
+            fileText.foregroundColor = AgentBuddyTheme.link
             attributed.append(fileText)
 
             var additionsText = AttributedString(" +\(additions)")
@@ -71,12 +71,13 @@ extension ConversationTimelineItemRow {
         }
 
         guard hasCountSummary else {
-            return ("Changed \(data.changes.count) files", nil)
+            return (String(localized: "Changed \(data.changes.count) files"), nil)
         }
 
-        let plainText = "Changed \(data.changes.count) files +\(additions) -\(deletions)"
-        var attributed = AttributedString("Changed \(data.changes.count) files")
-        attributed.foregroundColor = AgentBuddyTheme.textSystem
+        let changedFiles = String(localized: "Changed \(data.changes.count) files")
+        let plainText = "\(changedFiles) +\(additions) -\(deletions)"
+        var attributed = AttributedString(changedFiles)
+        attributed.foregroundColor = AgentBuddyTheme.textPrimary
 
         var additionsText = AttributedString(" +\(additions)")
         additionsText.foregroundColor = AgentBuddyTheme.success

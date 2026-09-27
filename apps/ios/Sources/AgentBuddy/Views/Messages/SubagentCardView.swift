@@ -8,6 +8,7 @@ struct SubagentCardView: View {
     @State private var expanded: Bool
     @State private var sheetThreadKey: ThreadKey?
     @State private var sheetAgentLabel: String?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(
         data: ConversationMultiAgentActionData,
@@ -31,17 +32,18 @@ struct SubagentCardView: View {
                 }
 
             if expanded {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: BuddySpacing.xxs) {
                     ForEach(Array(agentRows.enumerated()), id: \.offset) { _, row in
                         agentRowView(row)
                     }
                 }
-                .padding(.top, 6)
+                .padding(.bottom, BuddySpacing.xs)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.horizontal, BuddySpacing.md)
+        .padding(.vertical, BuddySpacing.xxs)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .timelineDetailCard()
         .sheet(item: $sheetThreadKey) { key in
             let resolvedKey = appModel.snapshot?.resolvedThreadKey(for: key.threadId, serverId: key.serverId) ?? key
             SubagentDetailSheet(threadKey: resolvedKey, agentLabel: sheetAgentLabel)
@@ -52,34 +54,36 @@ struct SubagentCardView: View {
     // MARK: - Header
 
     private var headerRow: some View {
-        HStack(spacing: 8) {
-            Text(actionLabel)
-                .agentBuddyFont(.caption)
-                .foregroundColor(AgentBuddyTheme.textSystem)
+        HStack(spacing: BuddySpacing.sm) {
+            TimelineStatusGlyph(status: data.status.toolCallStatus, fallbackSystemImage: "person.2")
+
+            Text(verbatim: actionLabel)
+                .buddyText(.label)
+                .foregroundStyle(AgentBuddyTheme.textPrimary)
                 .lineLimit(1)
 
-            Image(systemName: expanded ? "chevron.up" : "chevron.down")
-                .agentBuddyFont(size: 11, weight: .medium)
-                .foregroundColor(AgentBuddyTheme.textMuted)
+            Spacer(minLength: BuddySpacing.xs)
 
-            Spacer()
+            TimelineDisclosureChevron(expanded: expanded)
         }
+        .frame(minHeight: BuddySize.minHitTarget)
+        .accessibilityAddTraits(.isButton)
     }
 
     private var actionLabel: String {
         let agentCount = max(data.targets.count, data.agentStates.count)
-        let suffix = agentCount == 1 ? "1 agent" : "\(agentCount) agents"
+        let suffix = agentCount == 1 ? String(localized: "1 agent") : String(localized: "\(agentCount) agents")
         switch data.tool.lowercased() {
         case "spawnagent", "spawn_agent":
-            return "Spawning \(suffix)"
+            return String(localized: "Spawning \(suffix)")
         case "sendinput", "send_input":
-            return "Sending input to \(suffix)"
+            return String(localized: "Sending input to \(suffix)")
         case "resumeagent", "resume_agent":
-            return "Resuming \(suffix)"
+            return String(localized: "Resuming \(suffix)")
         case "wait":
-            return "Waiting for \(suffix)"
+            return String(localized: "Waiting for \(suffix)")
         case "closeagent", "close_agent":
-            return "Closing \(suffix)"
+            return String(localized: "Closing \(suffix)")
         default:
             return "\(data.tool) \(suffix)"
         }
@@ -179,16 +183,17 @@ struct SubagentCardView: View {
 
                 (
                     Text(parts.nickname)
-                        .foregroundColor(nicknameColor(for: parts.nickname))
+                        .fontWeight(.semibold)
+                        .foregroundColor(AgentBuddyTheme.textPrimary)
                     + Text(parts.roleSuffix)
-                        .foregroundColor(AgentBuddyTheme.textSystem)
+                        .foregroundColor(AgentBuddyTheme.textSecondary)
                     + Text(" \(statusStr)")
                         .foregroundColor(AgentBuddyTheme.textSecondary)
                 )
-                .agentBuddyFont(.caption)
+                .buddyText(.label, weight: .regular)
                 .lineLimit(1)
                 .truncationMode(.tail)
-                .modifier(ShimmerText(active: isActive))
+                .modifier(ShimmerText(active: isActive && !reduceMotion))
 
                 Spacer(minLength: 8)
 
@@ -202,8 +207,10 @@ struct SubagentCardView: View {
                         }
                     } label: {
                         Text("Open")
-                            .agentBuddyFont(.caption)
-                            .foregroundColor(resolvedKey != nil ? AgentBuddyTheme.textSecondary : AgentBuddyTheme.textMuted)
+                            .buddyText(.label, weight: .semibold)
+                            .foregroundStyle(resolvedKey != nil ? AgentBuddyTheme.link : AgentBuddyTheme.textSecondary)
+                            .frame(minWidth: BuddySize.minHitTarget, minHeight: BuddySize.minHitTarget)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }
@@ -212,19 +219,19 @@ struct SubagentCardView: View {
             // Line 2: Per-agent prompt if available, else shared prompt
             if let prompt = row.prompt, !prompt.isEmpty {
                 Text(prompt)
-                    .agentBuddyFont(.caption2)
-                    .foregroundColor(AgentBuddyTheme.textMuted)
+                    .buddyText(.caption)
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
                     .lineLimit(2)
                     .truncationMode(.tail)
             } else if let prompt = data.prompt, !prompt.isEmpty {
                 Text(prompt)
-                    .agentBuddyFont(.caption2)
-                    .foregroundColor(AgentBuddyTheme.textMuted)
+                    .buddyText(.caption)
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
                     .lineLimit(2)
                     .truncationMode(.tail)
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, BuddySpacing.xxs)
     }
 
     private func readableStatus(_ status: AppSubagentStatus?) -> String {
@@ -251,24 +258,6 @@ struct SubagentCardView: View {
         return (nickname, " (\(role))")
     }
 
-    private static let nicknameColors: [Color] = [
-        Color(red: 0.90, green: 0.30, blue: 0.30), // red
-        Color(red: 0.30, green: 0.75, blue: 0.55), // green
-        Color(red: 0.40, green: 0.55, blue: 0.95), // blue
-        Color(red: 0.85, green: 0.60, blue: 0.25), // orange
-        Color(red: 0.70, green: 0.45, blue: 0.85), // purple
-        Color(red: 0.25, green: 0.78, blue: 0.82), // teal
-        Color(red: 0.90, green: 0.50, blue: 0.60), // pink
-        Color(red: 0.65, green: 0.75, blue: 0.30), // lime
-    ]
-
-    private func nicknameColor(for name: String) -> Color {
-        var hash: UInt64 = 5381
-        for byte in name.utf8 {
-            hash = ((hash &<< 5) &+ hash) &+ UInt64(byte)
-        }
-        return Self.nicknameColors[Int(hash % UInt64(Self.nicknameColors.count))]
-    }
 }
 
 // MARK: - Shimmer
@@ -288,9 +277,9 @@ private struct ShimmerText: ViewModifier {
                             let w = geo.size.width
                             LinearGradient(
                                 stops: [
-                                    .init(color: .white.opacity(0), location: max(0, phase - 0.2)),
-                                    .init(color: .white.opacity(0.35), location: phase),
-                                    .init(color: .white.opacity(0), location: min(1, phase + 0.2))
+                                    .init(color: AgentBuddyTheme.textPrimary.opacity(0), location: max(0, phase - 0.2)),
+                                    .init(color: AgentBuddyTheme.textPrimary.opacity(0.35), location: phase),
+                                    .init(color: AgentBuddyTheme.textPrimary.opacity(0), location: min(1, phase + 0.2))
                                 ],
                                 startPoint: .leading,
                                 endPoint: .trailing
@@ -322,7 +311,7 @@ private struct AgentRowData {
 #if DEBUG
 #Preview("Subagent Card") {
     ZStack {
-        AgentBuddyTheme.backgroundGradient.ignoresSafeArea()
+        AgentBuddyTheme.background.ignoresSafeArea()
         VStack(spacing: 20) {
             SubagentCardView(
                 data: ConversationMultiAgentActionData(

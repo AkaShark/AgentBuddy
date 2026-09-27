@@ -11,7 +11,7 @@ struct ConversationCodeReviewRow: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: BuddySpacing.sm) {
             ForEach(visibleFindings, id: \.index) { entry in
                 ConversationCodeReviewFindingCard(
                     finding: entry.finding,
@@ -43,6 +43,17 @@ private struct ConversationCodeReviewFindingCard: View {
         }
     }
 
+    private var prioritySurface: Color {
+        switch finding.priority {
+        case 0?, 1?:
+            return AgentBuddyTheme.dangerSurface
+        case 2?:
+            return AgentBuddyTheme.warningSurface
+        default:
+            return AgentBuddyTheme.surfaceSoft
+        }
+    }
+
     private var locationText: String? {
         guard let location = finding.codeLocation else { return nil }
         guard let lineRange = location.lineRange else { return location.absoluteFilePath }
@@ -53,43 +64,40 @@ private struct ConversationCodeReviewFindingCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center, spacing: 10) {
+        VStack(alignment: .leading, spacing: BuddySpacing.sm) {
+            HStack(alignment: .center, spacing: BuddySpacing.sm) {
                 if let priorityLabel {
-                    Text(priorityLabel)
-                        .agentBuddyFont(.caption2, weight: .bold)
-                        .foregroundColor(priorityTint)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(priorityTint.opacity(0.12), in: Capsule())
+                    Text(verbatim: priorityLabel)
+                        .buddyText(.caption, weight: .semibold)
+                        .foregroundStyle(priorityTint)
+                        .padding(.horizontal, BuddySpacing.xs)
+                        .padding(.vertical, 3)
+                        .background(prioritySurface, in: Capsule())
                 }
 
                 Text(finding.title)
-                    .agentBuddyFont(.headline, weight: .semibold)
-                    .foregroundColor(AgentBuddyTheme.textPrimary)
+                    .buddyText(.heading)
+                    .foregroundStyle(AgentBuddyTheme.textPrimary)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
 
-                Button("Dismiss", action: onDismiss)
-                    .buttonStyle(.plain)
-                    .agentBuddyFont(.callout, weight: .medium)
-                    .foregroundColor(AgentBuddyTheme.textSecondary)
+                Button(action: onDismiss) {
+                    Text("Dismiss")
+                        .timelineLinkAction()
+                }
+                .buttonStyle(.plain)
             }
 
             AgentBuddyMarkdownView(markdown: finding.body, style: .content, selectionEnabled: true)
 
             if let locationText, !locationText.isEmpty {
                 Text(locationText)
-                    .agentBuddyFont(.footnote)
-                    .foregroundColor(AgentBuddyTheme.textSecondary)
+                    .buddyText(.code)
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(20)
-        .background(AgentBuddyTheme.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 22))
-        .overlay(
-            RoundedRectangle(cornerRadius: 22)
-                .stroke(AgentBuddyTheme.border.opacity(0.7), lineWidth: 1)
-        )
+        .buddyCard(.surface, radius: BuddyRadius.card, padding: BuddySpacing.lg)
     }
 }

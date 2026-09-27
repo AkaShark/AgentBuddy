@@ -21,7 +21,7 @@ struct MessageBubbleView: View {
     let onWidgetPrompt: ((String) -> Void)?
     let onEditUserMessage: ((ChatMessage) -> Void)?
     let onForkFromUserMessage: ((ChatMessage) -> Void)?
-    private let contentFontSize = AgentBuddyFont.conversationBodyPointSize
+    private let contentFontSize = AgentBuddyFont.mintBodyPointSize
 
     init(
         message: ChatMessage,
@@ -159,9 +159,8 @@ struct MessageBubbleView: View {
     private var reasoningContent: some View {
         let (_, body) = extractSystemTitleAndBody(message.text)
         return Text(normalizedReasoningText(body))
-            .agentBuddyFont(size: contentFontSize)
-            .italic()
-            .foregroundColor(AgentBuddyTheme.textSecondary)
+            .buddyText(.label, weight: .regular)
+            .foregroundStyle(AgentBuddyTheme.textSecondary)
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contextMenu {
@@ -212,16 +211,18 @@ struct MessageBubbleView: View {
     private var genericSystemBubble: some View {
         let (title, body) = extractSystemTitleAndBody(message.text)
         let markdown = title == nil ? message.text : body
-        let displayTitle = title ?? "System"
+        let displayTitle = title ?? String(localized: "System")
 
         return VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 6) {
-                Image(systemName: "info.circle.fill")
-                    .agentBuddyFont(size: 11, weight: .semibold)
-                    .foregroundColor(AgentBuddyTheme.accent)
-                Text(displayTitle.uppercased())
-                    .agentBuddyFont(.caption2, weight: .bold)
-                    .foregroundColor(AgentBuddyTheme.accent)
+            HStack(alignment: .firstTextBaseline, spacing: BuddySpacing.xs) {
+                Image(systemName: "info.circle")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
+                    .accessibilityHidden(true)
+                Text(verbatim: displayTitle)
+                    .buddyText(.label, weight: .semibold)
+                    .foregroundStyle(AgentBuddyTheme.textPrimary)
+                    .accessibilityAddTraits(.isHeader)
                 Spacer()
             }
 
@@ -230,21 +231,13 @@ struct MessageBubbleView: View {
                     markdown: markdown,
                     style: .system,
                     bodySize: contentFontSize,
-                    codeSize: contentFontSize
+                    codeSize: AgentBuddyFont.mintCodePointSize
                 )
-                    .padding(.top, 8)
+                    .padding(.top, BuddySpacing.xs)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .modifier(GlassRectModifier(cornerRadius: 12))
-        .overlay(alignment: .leading) {
-            RoundedRectangle(cornerRadius: 1)
-                .fill(AgentBuddyTheme.accent.opacity(0.9))
-                .frame(width: 3)
-                .padding(.vertical, 6)
-        }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .buddyCard(.soft, radius: BuddyRadius.detailCard, padding: BuddySpacing.md)
         .contextMenu {
             if canCopyMessageText {
                 Button("Copy Message") {

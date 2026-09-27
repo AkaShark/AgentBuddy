@@ -4,35 +4,36 @@ struct ConversationUserInputResponseRow: View {
     let data: ConversationUserInputResponseData
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: BuddySpacing.xs) {
             ForEach(Array(data.questions.enumerated()), id: \.element.id) { _, question in
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: BuddySpacing.xs) {
                     Image(systemName: "checkmark.circle.fill")
-                        .agentBuddyFont(size: 10, weight: .semibold)
-                        .foregroundColor(AgentBuddyTheme.accent)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(AgentBuddyTheme.success)
+                        .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(question.header ?? question.question)
-                            .agentBuddyFont(.caption, weight: .semibold)
-                            .foregroundColor(AgentBuddyTheme.textSecondary)
+                            .buddyText(.caption, weight: .medium)
+                            .foregroundStyle(AgentBuddyTheme.textSecondary)
                         Text(question.answer)
-                            .agentBuddyFont(.caption)
-                            .foregroundColor(AgentBuddyTheme.textPrimary)
+                            .buddyText(.label, weight: .regular)
+                            .foregroundStyle(AgentBuddyTheme.textPrimary)
                             .textSelection(.enabled)
                     }
                 }
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .padding(.vertical, BuddySpacing.xxs)
     }
 }
 
 struct ConversationDividerRow: View {
     let kind: ConversationDividerKind
     let isLiveTurn: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: BuddySpacing.sm) {
             Capsule()
                 .fill(AgentBuddyTheme.border)
                 .frame(minWidth: 16, maxHeight: 1)
@@ -42,7 +43,7 @@ struct ConversationDividerRow: View {
                 .fill(AgentBuddyTheme.border)
                 .frame(minWidth: 16, maxHeight: 1)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, BuddySpacing.xs)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(title)
     }
@@ -51,28 +52,32 @@ struct ConversationDividerRow: View {
     private var dividerContent: some View {
         switch kind {
         case .contextCompaction:
-            HStack(spacing: 6) {
+            HStack(spacing: BuddySpacing.xs) {
                 if effectiveContextCompactionComplete {
                     Image(systemName: "checkmark.circle.fill")
-                        .agentBuddyFont(size: 10, weight: .semibold)
-                        .foregroundColor(AgentBuddyTheme.success)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(AgentBuddyTheme.success)
+                } else if reduceMotion {
+                    Image(systemName: "circle.dotted")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(AgentBuddyTheme.warning)
                 } else {
                     ProgressView()
                         .controlSize(.mini)
                         .tint(AgentBuddyTheme.warning)
                 }
 
-                Text(title)
-                    .agentBuddyFont(.caption2, weight: .semibold)
-                    .foregroundColor(
-                        effectiveContextCompactionComplete ? AgentBuddyTheme.textMuted : AgentBuddyTheme.warning
+                Text(verbatim: title)
+                    .buddyText(.caption, weight: .medium)
+                    .foregroundStyle(
+                        effectiveContextCompactionComplete ? AgentBuddyTheme.textSecondary : AgentBuddyTheme.warning
                     )
                     .lineLimit(1)
             }
         default:
-            Text(title)
-                .agentBuddyFont(.caption2, weight: .semibold)
-                .foregroundColor(AgentBuddyTheme.textMuted)
+            Text(verbatim: title)
+                .buddyText(.caption, weight: .medium)
+                .foregroundStyle(AgentBuddyTheme.textSecondary)
                 .lineLimit(1)
         }
     }
@@ -80,17 +85,19 @@ struct ConversationDividerRow: View {
     private var title: String {
         switch kind {
         case .contextCompaction:
-            return effectiveContextCompactionComplete ? "Context compacted" : "Compacting context"
+            return effectiveContextCompactionComplete
+                ? String(localized: "Context compacted")
+                : String(localized: "Compacting context")
         case .modelRerouted(let fromModel, let toModel, let reason):
-            let base = fromModel.map { "\($0) -> \(toModel)" } ?? "Routed to \(toModel)"
+            let base = fromModel.map { "\($0) -> \(toModel)" } ?? String(localized: "Routed to \(toModel)")
             if let reason, !reason.isEmpty {
                 return "\(base) · \(reason)"
             }
             return base
         case .reviewEntered(let review):
-            return review.isEmpty ? "Entered review" : "Entered review: \(review)"
+            return review.isEmpty ? String(localized: "Entered review") : String(localized: "Entered review: \(review)")
         case .reviewExited(let review):
-            return review.isEmpty ? "Exited review" : "Exited review: \(review)"
+            return review.isEmpty ? String(localized: "Exited review") : String(localized: "Exited review: \(review)")
         case .workedFor(let duration):
             return duration
         case .generic(let title, let detail):
@@ -114,14 +121,16 @@ struct ConversationSystemCardRow: View {
     let iconName: String
 
     var bodyView: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: BuddySpacing.xs) {
+            HStack(alignment: .firstTextBaseline, spacing: BuddySpacing.xs) {
                 Image(systemName: iconName)
-                    .agentBuddyFont(size: 11, weight: .semibold)
-                    .foregroundColor(accent)
-                Text(title.uppercased())
-                    .agentBuddyFont(.caption2, weight: .bold)
-                    .foregroundColor(accent)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(accent)
+                    .accessibilityHidden(true)
+                Text(verbatim: title)
+                    .buddyText(.label, weight: .semibold)
+                    .foregroundStyle(AgentBuddyTheme.textPrimary)
+                    .accessibilityAddTraits(.isHeader)
             }
             if !content.isEmpty {
                 AgentBuddyMarkdownView(
@@ -130,9 +139,8 @@ struct ConversationSystemCardRow: View {
                 )
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .buddyCard(.soft, radius: BuddyRadius.detailCard, padding: BuddySpacing.md)
     }
 
     var body: some View { bodyView }

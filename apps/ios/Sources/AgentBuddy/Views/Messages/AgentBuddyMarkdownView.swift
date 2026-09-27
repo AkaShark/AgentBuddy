@@ -12,8 +12,8 @@ enum AgentBuddyMarkdownStyleVariant {
 struct AgentBuddyMarkdownView: View {
     let markdown: String
     var style: AgentBuddyMarkdownStyleVariant = .content
-    var bodySize: CGFloat = AgentBuddyFont.conversationBodyPointSize
-    var codeSize: CGFloat = AgentBuddyFont.conversationBodyPointSize
+    var bodySize: CGFloat = AgentBuddyFont.mintBodyPointSize
+    var codeSize: CGFloat = AgentBuddyFont.mintCodePointSize
     var selectionEnabled = true
 
     @State private var debugSettings = DebugSettings.shared
@@ -22,7 +22,7 @@ struct AgentBuddyMarkdownView: View {
         if debugSettings.enabled && debugSettings.disableMarkdown {
             Text(markdown)
                 .font(.system(size: bodySize, design: .monospaced))
-                .foregroundColor(style == .system ? AgentBuddyTheme.textSecondary : AgentBuddyTheme.textPrimary)
+                .foregroundStyle(style == .system ? AgentBuddyTheme.textSecondary : AgentBuddyTheme.textPrimary)
                 .textSelection(.enabled)
         } else {
             renderedMarkdown(selectionEnabled: selectionEnabled)
@@ -50,8 +50,8 @@ struct AgentBuddyMarkdownView: View {
 struct InlineSelectableMarkdownMessage<Content: View>: View {
     let markdown: String
     var style: AgentBuddyMarkdownStyleVariant = .content
-    var bodySize: CGFloat = AgentBuddyFont.conversationBodyPointSize
-    var codeSize: CGFloat = AgentBuddyFont.conversationBodyPointSize
+    var bodySize: CGFloat = AgentBuddyFont.mintBodyPointSize
+    var codeSize: CGFloat = AgentBuddyFont.mintCodePointSize
     @ViewBuilder let content: () -> Content
 
     var body: some View {

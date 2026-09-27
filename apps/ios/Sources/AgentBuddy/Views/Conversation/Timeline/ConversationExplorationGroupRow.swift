@@ -3,6 +3,7 @@ import UIKit
 
 struct ConversationExplorationGroupRow: View {
     @Environment(\.textScale) private var textScale
+    @ScaledMetric(relativeTo: .subheadline) private var labelLineHeight: CGFloat = BuddyTextStyle.label.lineHeight
 
     let id: String
     let items: [ConversationItem]
@@ -14,53 +15,54 @@ struct ConversationExplorationGroupRow: View {
     var body: some View {
         let entries = explorationEntries
 
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 0) {
             Button(action: toggleExpanded) {
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .agentBuddyFont(size: 12, weight: .semibold)
-                        .foregroundColor(isActive ? AgentBuddyTheme.warning : AgentBuddyTheme.textSecondary)
+                HStack(spacing: BuddySpacing.sm) {
+                    TimelineStatusGlyph(status: isActive ? .inProgress : .completed)
                     Text(verbatim: summaryText)
-                        .agentBuddyFont(.caption)
-                        .foregroundColor(AgentBuddyTheme.textSystem)
+                        .buddyText(.label)
+                        .foregroundStyle(AgentBuddyTheme.textPrimary)
                         .lineLimit(1)
                         .truncationMode(.tail)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    Image(systemName: expanded ? "chevron.up" : "chevron.down")
-                        .agentBuddyFont(size: 11, weight: .medium)
-                        .foregroundColor(AgentBuddyTheme.textMuted)
+                    TimelineDisclosureChevron(expanded: expanded)
                 }
+                .frame(minHeight: BuddySize.minHitTarget)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
 
             if expanded {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: BuddySpacing.xs) {
                     ForEach(entries) { entry in
-                        HStack(alignment: .top, spacing: 8) {
+                        HStack(alignment: .top, spacing: BuddySpacing.xs) {
                             Circle()
-                                .fill(entry.isInProgress ? AgentBuddyTheme.warning : AgentBuddyTheme.textMuted)
+                                .fill(entry.isInProgress ? AgentBuddyTheme.warning : AgentBuddyTheme.textSecondary)
                                 .frame(width: explorationBulletSize, height: explorationBulletSize)
                                 .padding(.top, explorationBulletTopPadding)
+                                .accessibilityHidden(true)
                             Text(verbatim: entry.label)
-                                .agentBuddyFont(.caption)
-                                .foregroundColor(AgentBuddyTheme.textSecondary)
+                                .buddyText(.label, weight: .regular)
+                                .foregroundStyle(AgentBuddyTheme.textSecondary)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
                 }
+                .padding(.bottom, BuddySpacing.sm)
             } else if showsCollapsedPreview && !entries.isEmpty {
                 ScrollViewReader { proxy in
                     ScrollView(.vertical, showsIndicators: false) {
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: BuddySpacing.xxs) {
                             ForEach(entries) { entry in
-                                HStack(alignment: .top, spacing: 8) {
+                                HStack(alignment: .top, spacing: BuddySpacing.xs) {
                                     Circle()
-                                        .fill(entry.isInProgress ? AgentBuddyTheme.warning : AgentBuddyTheme.textMuted)
+                                        .fill(entry.isInProgress ? AgentBuddyTheme.warning : AgentBuddyTheme.textSecondary)
                                         .frame(width: explorationBulletSize, height: explorationBulletSize)
                                         .padding(.top, explorationBulletTopPadding)
+                                        .accessibilityHidden(true)
                                     Text(verbatim: displayedCollapsedLabel(for: entry))
-                                        .agentBuddyFont(.caption)
-                                        .foregroundColor(AgentBuddyTheme.textSecondary)
+                                        .buddyText(.label, weight: .regular)
+                                        .foregroundStyle(AgentBuddyTheme.textSecondary)
                                         .lineLimit(1)
                                         .truncationMode(.tail)
                                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -71,22 +73,22 @@ struct ConversationExplorationGroupRow: View {
                                 .frame(height: 1)
                                 .id(bottomAnchorId)
                         }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 6)
+                        .padding(.horizontal, BuddySpacing.sm)
+                        .padding(.vertical, BuddySpacing.xs)
                     }
                     .frame(maxHeight: collapsedPreviewHeight)
-                    .background(AgentBuddyTheme.surface.opacity(0.6))
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .timelineCodeSurface()
                     .overlay(alignment: .top) {
                         LinearGradient(
-                            colors: [AgentBuddyTheme.surface.opacity(0.92), AgentBuddyTheme.surface.opacity(0)],
+                            colors: [TimelineCodeStyle.fill(nested: true), TimelineCodeStyle.fill(nested: true).opacity(0)],
                             startPoint: .top,
                             endPoint: .bottom
                         )
-                        .frame(height: 16)
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .frame(height: BuddySpacing.md)
+                        .clipShape(RoundedRectangle(cornerRadius: BuddyRadius.control, style: .continuous))
                         .allowsHitTesting(false)
                     }
+                    .padding(.bottom, BuddySpacing.sm)
                     .onAppear {
                         scrollToBottom(proxy)
                     }
@@ -96,8 +98,9 @@ struct ConversationExplorationGroupRow: View {
                 }
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .padding(.horizontal, BuddySpacing.md)
+        .padding(.vertical, BuddySpacing.xxs)
+        .timelineDetailCard()
         .opacity(displayMode.rendersRows ? 1 : 0)
         .frame(height: displayMode.rendersRows ? nil : 0)
         .clipped()
@@ -108,8 +111,7 @@ struct ConversationExplorationGroupRow: View {
     }
 
     private var summaryText: String {
-        let prefix = isActive ? "Exploring" : "Explored"
-        return explorationSummaryText(prefix: prefix)
+        explorationSummaryText(isActive: isActive)
     }
 
     private var explorationBulletSize: CGFloat {
@@ -117,11 +119,11 @@ struct ConversationExplorationGroupRow: View {
     }
 
     private var explorationBulletTopPadding: CGFloat {
-        5 * textScale
+        6 * textScale
     }
 
     private var collapsedPreviewHeight: CGFloat {
-        (AgentBuddyFont.uiMonoFont(size: 12 * textScale).lineHeight * 3) + 18
+        (labelLineHeight * textScale * 3) + 18
     }
 
     private var bottomAnchorId: String {
@@ -178,7 +180,7 @@ struct ConversationExplorationGroupRow: View {
         }
     }
 
-    private func explorationSummaryText(prefix: String) -> String {
+    private func explorationSummaryText(isActive: Bool) -> String {
         var readCount = 0
         var searchCount = 0
         var listingCount = 0
@@ -206,39 +208,40 @@ struct ConversationExplorationGroupRow: View {
 
         var parts: [String] = []
         if readCount > 0 {
-            parts.append("\(readCount) \(readCount == 1 ? "file" : "files")")
+            parts.append(readCount == 1 ? String(localized: "1 file") : String(localized: "\(readCount) files"))
         }
         if searchCount > 0 {
-            parts.append("\(searchCount) \(searchCount == 1 ? "search" : "searches")")
+            parts.append(searchCount == 1 ? String(localized: "1 search") : String(localized: "\(searchCount) searches"))
         }
         if listingCount > 0 {
-            parts.append("\(listingCount) \(listingCount == 1 ? "listing" : "listings")")
+            parts.append(listingCount == 1 ? String(localized: "1 listing") : String(localized: "\(listingCount) listings"))
         }
         if fallbackCount > 0 {
-            parts.append("\(fallbackCount) \(fallbackCount == 1 ? "step" : "steps")")
+            parts.append(fallbackCount == 1 ? String(localized: "1 step") : String(localized: "\(fallbackCount) steps"))
         }
         if parts.isEmpty {
             let count = explorationEntries.count
-            return count == 1 ? "\(prefix) 1 exploration step" : "\(prefix) \(count) exploration steps"
+            parts.append(count == 1 ? String(localized: "1 step") : String(localized: "\(count) steps"))
         }
-        return "\(prefix) \(parts.joined(separator: ", "))"
+        let joined = parts.joined(separator: " · ")
+        return isActive ? String(localized: "Exploring \(joined)") : String(localized: "Explored \(joined)")
     }
 
     private func explorationLabel(for action: ConversationCommandAction, fallback: String) -> String {
         let suffix = explorationCommandSuffix(for: action)
         switch action.kind {
         case .read:
-            return action.path.map { "Read \(workspaceTitle(for: $0))\(suffix)" } ?? fallback
+            return action.path.map { String(localized: "Read \(workspaceTitle(for: $0))") + suffix } ?? fallback
         case .search:
             if let query = action.query, let path = action.path {
-                return "Searched for \(query) in \(workspaceTitle(for: path))\(suffix)"
+                return String(localized: "Searched for \(query) in \(workspaceTitle(for: path))") + suffix
             }
             if let query = action.query {
-                return "Searched for \(query)\(suffix)"
+                return String(localized: "Searched for \(query)") + suffix
             }
             return fallback
         case .listFiles:
-            return action.path.map { "Listed files in \(workspaceTitle(for: $0))\(suffix)" } ?? fallback
+            return action.path.map { String(localized: "Listed files in \(workspaceTitle(for: $0))") + suffix } ?? fallback
         case .unknown:
             return fallback
         }

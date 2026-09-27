@@ -54,17 +54,17 @@ private struct DiffLine: Identifiable {
             switch self {
             case .addition: AgentBuddyTheme.success
             case .deletion: AgentBuddyTheme.danger
-            case .hunk: AgentBuddyTheme.accentStrong
-            case .context: AgentBuddyTheme.textBody
+            case .hunk: AgentBuddyTheme.link
+            case .context: AgentBuddyTheme.textPrimary
             }
         }
 
         var backgroundColor: Color {
             switch self {
-            case .addition: AgentBuddyTheme.success.opacity(0.12)
-            case .deletion: AgentBuddyTheme.danger.opacity(0.12)
-            case .hunk: AgentBuddyTheme.accentStrong.opacity(0.12)
-            case .context: AgentBuddyTheme.codeBackground.opacity(0.72)
+            case .addition: AgentBuddyTheme.successSurface
+            case .deletion: AgentBuddyTheme.dangerSurface
+            case .hunk: AgentBuddyTheme.surfaceSoft
+            case .context: AgentBuddyTheme.codeBackground
             }
         }
     }

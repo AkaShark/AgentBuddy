@@ -8,14 +8,10 @@ struct ToolCallCardView: View {
     private let onExpandedChange: ((Bool) -> Void)?
     @State private var expanded: Bool
     @State var collapsedDiffSections: Set<String> = []
-    /// Header row (icon + summary). A half-step smaller than body so tool
-    /// calls read as secondary to assistant messages.
-    private let summaryFontSize: CGFloat = 13
-    /// Expanded content size — matches the bash/command output size
-    /// (`ConversationCommandOutputViewport` renders at 12pt) so tool-call
-    /// details, diffs, and command output share a typographic baseline.
-    let contentFontSize: CGFloat = 12
-    let terminalFontSize: CGFloat = 12
+    /// Expanded content size — the Mint code size (14) shared with command
+    /// output, so tool-call details, diffs, and output share a baseline.
+    let contentFontSize: CGFloat = BuddyTextStyle.code.size
+    let terminalFontSize: CGFloat = BuddyTextStyle.code.size
     let maxVisibleTextCharacters = 2_000
     @State var expandedLongTextIDs: Set<String> = []
 
@@ -34,46 +30,32 @@ struct ToolCallCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 8) {
-                Image(systemName: model.kind.iconName)
-                    .agentBuddyFont(size: 12, weight: .semibold)
-                    .foregroundColor(kindAccent)
+            HStack(spacing: BuddySpacing.sm) {
+                TimelineStatusGlyph(status: model.status, fallbackSystemImage: model.kind.iconName)
 
                 if let attributedSummary = model.attributedSummary {
                     Text(attributedSummary)
-                        .agentBuddyFont(size: summaryFontSize)
+                        .buddyText(.label)
                         .lineLimit(1)
                 } else {
                     Text(model.summary)
-                        .agentBuddyFont(size: summaryFontSize)
-                        .foregroundColor(AgentBuddyTheme.textSystem)
+                        .buddyText(.label)
+                        .foregroundStyle(AgentBuddyTheme.textPrimary)
                         .lineLimit(1)
                 }
 
-                Spacer()
+                Spacer(minLength: BuddySpacing.xs)
 
                 if let duration = model.duration, !duration.isEmpty {
-                    Text(duration)
-                        .agentBuddyFont(.caption2)
-                        .foregroundColor(durationStatusColor)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 2)
-                        .background(
-                            Capsule(style: .continuous)
-                                .fill(durationStatusColor.opacity(0.10))
-                        )
-                        .overlay(
-                            Capsule(style: .continuous)
-                                .stroke(durationStatusColor.opacity(0.22), lineWidth: 0.5)
-                        )
+                    TimelineDurationText(text: duration)
                         .accessibilityLabel(durationAccessibilityLabel(duration))
                 }
 
-                Image(systemName: resolvedExpanded ? "chevron.up" : "chevron.down")
-                    .agentBuddyFont(size: 11, weight: .medium)
-                    .foregroundColor(AgentBuddyTheme.textMuted)
+                TimelineDisclosureChevron(expanded: resolvedExpanded)
             }
+            .frame(minHeight: BuddySize.minHitTarget)
             .contentShape(Rectangle())
+            .accessibilityAddTraits(.isButton)
             .onTapGesture {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     setExpanded(!resolvedExpanded)
@@ -81,7 +63,7 @@ struct ToolCallCardView: View {
             }
 
             if resolvedExpanded {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: BuddySpacing.sm) {
                     if let imageDescriptor {
                         ToolCallImagePreview(
                             descriptor: imageDescriptor,
@@ -92,18 +74,14 @@ struct ToolCallCardView: View {
                         sectionView(section)
                     }
                 }
-                .padding(.top, 6)
+                .padding(.top, BuddySpacing.xxs)
+                .padding(.bottom, BuddySpacing.sm)
                 .transition(.toolCallDetailReveal)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
-        .background(AgentBuddyTheme.surface)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(AgentBuddyTheme.border, lineWidth: 0.5)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(.horizontal, BuddySpacing.md)
+        .padding(.vertical, BuddySpacing.xxs)
+        .timelineDetailCard()
         .animation(.spring(duration: 0.32, bounce: 0.12), value: resolvedExpanded)
         .onChange(of: model.status) { _, newStatus in
             if newStatus == .failed {
@@ -134,19 +112,6 @@ struct ToolCallCardView: View {
 
     private var resolvedExpanded: Bool { expanded }
 
-    private var durationStatusColor: Color {
-        switch model.status {
-        case .completed:
-            return AgentBuddyTheme.success
-        case .inProgress:
-            return AgentBuddyTheme.warning
-        case .failed:
-            return AgentBuddyTheme.danger
-        case .unknown:
-            return AgentBuddyTheme.textSecondary
-        }
-    }
-
     private func durationAccessibilityLabel(_ duration: String) -> String {
         switch model.status {
         case .completed:
@@ -163,11 +128,9 @@ struct ToolCallCardView: View {
     var kindAccent: Color {
         switch model.kind {
         case .commandExecution, .commandOutput:
-            return AgentBuddyTheme.warning
-        case .fileChange, .fileDiff, .webSearch:
-            return AgentBuddyTheme.accent
-        case .mcpToolCall, .widget:
-            return AgentBuddyTheme.accentStrong
+            return AgentBuddyTheme.textSecondary
+        case .fileChange, .fileDiff, .webSearch, .mcpToolCall, .widget:
+            return AgentBuddyTheme.link
         case .mcpToolProgress, .imageView:
             return AgentBuddyTheme.warning
         case .collaboration:
@@ -183,7 +146,7 @@ private extension AnyTransition {
 #if DEBUG
 #Preview("Tool Call Card") {
     ZStack {
-        AgentBuddyTheme.backgroundGradient.ignoresSafeArea()
+        AgentBuddyTheme.background.ignoresSafeArea()
         ToolCallCardView(model: AgentBuddyPreviewData.sampleToolCallModel)
             .padding(20)
     }

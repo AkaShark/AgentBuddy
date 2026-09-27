@@ -8,13 +8,15 @@ struct ConversationTurnDiffRow: View {
         Button {
             presented = PresentedDiff(
                 id: "turn-diff",
-                title: "Turn Diff",
+                title: String(localized: "Turn Diff"),
                 diff: data.diff,
                 stats: DiffStats(additions: data.additions, deletions: data.deletions),
                 sections: presentedDiffSections(from: data.diff)
             )
         } label: {
             DiffIndicatorLabel(additions: data.additions, deletions: data.deletions)
+                .frame(minHeight: BuddySize.minHitTarget)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .sheet(item: $presented) { sheet in
@@ -39,29 +41,34 @@ struct DiffIndicatorLabel: View {
     }
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: BuddySpacing.xs) {
             Image(systemName: "arrow.left.arrow.right")
-                .agentBuddyFont(size: 11, weight: .semibold)
-                .foregroundColor(AgentBuddyTheme.accent)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(AgentBuddyTheme.textSecondary)
 
             if stats.hasChanges {
                 HStack(spacing: 6) {
-                    Text("+\(stats.additions)")
-                        .agentBuddyFont(.caption2, weight: .semibold)
-                        .foregroundColor(AgentBuddyTheme.success)
-                    Text("-\(stats.deletions)")
-                        .agentBuddyFont(.caption2, weight: .semibold)
-                        .foregroundColor(AgentBuddyTheme.danger)
+                    Text(verbatim: "+\(stats.additions)")
+                        .buddyText(.caption, weight: .semibold)
+                        .monospacedDigit()
+                        .foregroundStyle(AgentBuddyTheme.success)
+                    Text(verbatim: "−\(stats.deletions)")
+                        .buddyText(.caption, weight: .semibold)
+                        .monospacedDigit()
+                        .foregroundStyle(AgentBuddyTheme.danger)
                 }
             } else {
                 Text("Diff")
-                    .agentBuddyFont(.caption2, weight: .semibold)
-                    .foregroundColor(AgentBuddyTheme.textSecondary)
+                    .buddyText(.caption, weight: .semibold)
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(AgentBuddyTheme.surface.opacity(0.72), in: Capsule())
+        .padding(.horizontal, BuddySpacing.sm)
+        .frame(minHeight: BuddySize.compactPill)
+        .background(AgentBuddyTheme.surface, in: Capsule())
+        .overlay {
+            Capsule().strokeBorder(AgentBuddyTheme.border, lineWidth: 1)
+        }
         .fixedSize(horizontal: true, vertical: false)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel)

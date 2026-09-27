@@ -134,7 +134,7 @@ struct ConversationTimelineItemRow: View, Equatable {
         case .error(let data):
             return AnyView(
                 ConversationSystemCardRow(
-                    title: data.title.isEmpty ? "Error" : data.title,
+                    title: data.title.isEmpty ? String(localized: "Error") : data.title,
                     content: [data.message, data.details].compactMap { $0 }.joined(separator: "\n\n"),
                     accent: AgentBuddyTheme.danger,
                     iconName: "exclamationmark.triangle.fill",
@@ -145,7 +145,7 @@ struct ConversationTimelineItemRow: View, Equatable {
                 ConversationSystemCardRow(
                     title: data.title,
                     content: data.body,
-                    accent: AgentBuddyTheme.accent,
+                    accent: AgentBuddyTheme.textSecondary,
                     iconName: "info.circle.fill"
                 )
             )

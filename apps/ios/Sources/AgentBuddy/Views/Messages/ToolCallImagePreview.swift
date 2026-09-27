@@ -28,20 +28,18 @@ struct ToolCallImagePreview: View {
     private static let imageCache = NSCache<NSString, UIImage>()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("IMAGE")
-                .agentBuddyFont(.caption2, weight: .bold)
-                .foregroundColor(AgentBuddyTheme.textSecondary)
+        VStack(alignment: .leading, spacing: BuddySpacing.xs) {
+            TimelineSectionLabel("Image")
 
             ZStack {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(AgentBuddyTheme.codeBackground.opacity(0.82))
+                RoundedRectangle(cornerRadius: BuddyRadius.control, style: .continuous)
+                    .fill(TimelineCodeStyle.fill(nested: true))
 
                 if let renderedImage {
                     Image(uiImage: renderedImage)
                         .resizable()
                         .scaledToFit()
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: BuddyRadius.control, style: .continuous))
                         .draggable(Image(uiImage: renderedImage)) {
                             Image(uiImage: renderedImage)
                                 .resizable()
@@ -50,19 +48,24 @@ struct ToolCallImagePreview: View {
                         }
                 } else if isLoading {
                     ProgressView()
-                        .tint(AgentBuddyTheme.accent)
+                        .tint(AgentBuddyTheme.textSecondary)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 32)
+                        .padding(.vertical, BuddySpacing.xxl)
                 } else {
-                    Text(loadError ?? "Image unavailable")
-                        .agentBuddyFont(.caption)
-                        .foregroundColor(loadError == nil ? AgentBuddyTheme.textSecondary : AgentBuddyTheme.danger)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 24)
+                    Label {
+                        Text(loadError ?? "Image unavailable")
+                    } icon: {
+                        Image(systemName: loadError == nil ? "photo" : "exclamationmark.triangle")
+                            .accessibilityHidden(true)
+                    }
+                    .buddyText(.label, weight: .regular)
+                    .foregroundStyle(loadError == nil ? AgentBuddyTheme.textSecondary : AgentBuddyTheme.danger)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.horizontal, BuddySpacing.sm)
+                    .padding(.vertical, BuddySpacing.xl)
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: BuddyRadius.control, style: .continuous))
         }
         .task(id: taskKey) {
             await loadImage()

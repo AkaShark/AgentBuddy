@@ -12,6 +12,8 @@ struct ConversationTurnRow: View, Equatable {
     let originThreadId: String?
     let agentDirectoryVersion: UInt64
     @Environment(\.textScale) private var textScale
+    @ScaledMetric(relativeTo: .body) private var bodyLineHeight: CGFloat = BuddyTextStyle.body.lineHeight
+    @ScaledMetric(relativeTo: .caption) private var captionLineHeight: CGFloat = BuddyTextStyle.caption.lineHeight
     let messageActionsDisabled: Bool
     let onToggleExpansion: () -> Void
     let onStreamingSnapshotRendered: (() -> Void)?
@@ -46,7 +48,7 @@ struct ConversationTurnRow: View, Equatable {
     }
 
     private var expandedContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: BuddySpacing.sm) {
             ConversationTurnTimeline(
                 items: turn.items,
                 isLive: turn.isLive,
@@ -69,10 +71,11 @@ struct ConversationTurnRow: View, Equatable {
 
             if canCollapse {
                 Button("Show Less", systemImage: "chevron.up", action: onToggleExpansion)
-                    .agentBuddyFont(.caption, weight: .semibold)
-                    .foregroundColor(AgentBuddyTheme.textSecondary)
+                    .buddyText(.label, weight: .semibold)
+                    .foregroundStyle(AgentBuddyTheme.link)
+                    .frame(minHeight: BuddySize.minHitTarget)
+                    .contentShape(Rectangle())
                     .buttonStyle(.plain)
-                    .padding(.top, 2)
             }
         }
     }
@@ -81,18 +84,18 @@ struct ConversationTurnRow: View, Equatable {
         Button(action: onToggleExpansion) {
             previewTextBlock
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 14)
-                .padding(.top, 10)
+                .padding(.horizontal, BuddySpacing.md)
+                .padding(.top, BuddySpacing.sm)
                 .padding(.bottom, collapsedFooterReservedInset)
-                .modifier(GlassRectModifier(cornerRadius: 16, tint: AgentBuddyTheme.surface.opacity(0.34)))
+                .timelineDetailCard()
                 .overlay(alignment: .bottomLeading) {
                     footerRow
-                        .padding(.horizontal, 14)
-                        .padding(.bottom, 10)
+                        .padding(.horizontal, BuddySpacing.md)
+                        .padding(.bottom, BuddySpacing.sm)
                 }
         }
         .buttonStyle(.plain)
-        .contentShape(RoundedRectangle(cornerRadius: 16))
+        .contentShape(RoundedRectangle(cornerRadius: BuddyRadius.detailCard, style: .continuous))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilitySummary)
     }
@@ -100,18 +103,17 @@ struct ConversationTurnRow: View, Equatable {
     private var previewTextBlock: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(verbatim: turn.preview.primaryText)
-                .agentBuddyFont(.body, weight: .semibold)
-                .foregroundColor(AgentBuddyTheme.textPrimary)
+                .buddyText(.body, weight: .semibold)
+                .foregroundStyle(AgentBuddyTheme.textPrimary)
                 .lineLimit(1)
                 .truncationMode(.tail)
-                .minimumScaleFactor(0.82)
                 .allowsTightening(true)
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             Text(verbatim: responsePreviewText)
-                .agentBuddyFont(.body)
-                .foregroundColor(AgentBuddyTheme.textSecondary.opacity(0.82))
+                .buddyText(.body)
+                .foregroundStyle(AgentBuddyTheme.textSecondary)
                 .lineLimit(2)
                 .truncationMode(.tail)
                 .multilineTextAlignment(.leading)
@@ -136,10 +138,8 @@ struct ConversationTurnRow: View, Equatable {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            Spacer(minLength: 8)
-            Image(systemName: "chevron.down")
-                .agentBuddyFont(size: 11, weight: .semibold)
-                .foregroundColor(AgentBuddyTheme.textMuted)
+            Spacer(minLength: BuddySpacing.xs)
+            TimelineDisclosureChevron(expanded: false)
         }
         .padding(.horizontal, 2)
         .padding(.bottom, 2)
@@ -147,15 +147,15 @@ struct ConversationTurnRow: View, Equatable {
 
     private var collapsedPreviewHeight: CGFloat { collapsedPrimaryLineHeight + collapsedResponseHeight + 4 }
     private var collapsedFooterReservedInset: CGFloat { collapsedFooterHeight + 10 }
-    private var collapsedFooterHeight: CGFloat { max(UIFont.preferredFont(forTextStyle: .caption1).lineHeight * textScale, 14) }
+    private var collapsedFooterHeight: CGFloat { max(captionLineHeight * textScale, 14) }
 
     private var responsePreviewMask: some View {
         LinearGradient(
             stops: [
-                .init(color: .white, location: 0),
-                .init(color: .white, location: 0.55),
-                .init(color: .white.opacity(0.58), location: 0.82),
-                .init(color: .white.opacity(0.24), location: 1),
+                .init(color: Color.primary, location: 0),
+                .init(color: Color.primary, location: 0.55),
+                .init(color: Color.primary.opacity(0.58), location: 0.82),
+                .init(color: Color.primary.opacity(0.24), location: 1),
             ],
             startPoint: .top,
             endPoint: .bottom
@@ -164,7 +164,7 @@ struct ConversationTurnRow: View, Equatable {
 
     private var collapsedPrimaryLineHeight: CGFloat { collapsedPreviewLineHeight }
     private var collapsedResponseHeight: CGFloat { (collapsedPreviewLineHeight * 2) + 2 }
-    private var collapsedPreviewLineHeight: CGFloat { UIFont.preferredFont(forTextStyle: .body).lineHeight * textScale }
+    private var collapsedPreviewLineHeight: CGFloat { bodyLineHeight * textScale }
 
     private var footerMetadataItems: [CollapsedTurnMeta] {
         var items: [CollapsedTurnMeta] = []
@@ -216,13 +216,14 @@ private struct CollapsedTurnMetaItem: View {
     let text: String
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: BuddySpacing.xxs) {
             Image(systemName: systemImage)
-                .agentBuddyFont(size: 9, weight: .medium)
-                .foregroundColor(AgentBuddyTheme.textMuted)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(AgentBuddyTheme.textSecondary)
             Text(verbatim: text)
-                .agentBuddyMonoFont(size: 10)
-                .foregroundColor(AgentBuddyTheme.textSecondary)
+                .buddyText(.caption)
+                .monospacedDigit()
+                .foregroundStyle(AgentBuddyTheme.textSecondary)
                 .lineLimit(1)
         }
     }

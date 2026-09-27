@@ -39,13 +39,13 @@ struct SubagentDetailSheet: View {
                     let items = threadSnapshot.hydratedConversationItems.map(\.conversationItem)
                     ScrollView {
                         if items.isEmpty {
-                            VStack(spacing: 12) {
+                            VStack(spacing: BuddySpacing.sm) {
                                 Spacer().frame(height: 40)
                                 ProgressView()
-                                    .tint(AgentBuddyTheme.accent)
+                                    .tint(AgentBuddyTheme.textSecondary)
                                 Text(isLoading ? "Loading thread..." : "Waiting for agent output...")
-                                    .agentBuddyFont(.caption)
-                                    .foregroundColor(AgentBuddyTheme.textMuted)
+                                    .buddyText(.label, weight: .regular)
+                                    .foregroundStyle(AgentBuddyTheme.textSecondary)
                                 Spacer()
                             }
                             .frame(maxWidth: .infinity)
@@ -64,48 +64,51 @@ struct SubagentDetailSheet: View {
                                 onEditUserItem: { _ in },
                                 onForkFromUserItem: { _ in }
                             )
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
+                            .padding(.horizontal, BuddySpacing.md)
+                            .padding(.vertical, BuddySpacing.sm)
                         }
                     }
                 } else {
-                    VStack(spacing: 12) {
+                    VStack(spacing: BuddySpacing.sm) {
                         Spacer()
-                        Image(systemName: "person.fill.questionmark")
-                            .agentBuddyFont(size: 32)
-                            .foregroundColor(AgentBuddyTheme.textMuted)
+                        BuddyIconTile(content: .symbol("person.fill.questionmark"), size: 48)
                         Text("Thread not available yet")
-                            .agentBuddyFont(.footnote)
-                            .foregroundColor(AgentBuddyTheme.textSecondary)
+                            .buddyText(.heading)
+                            .foregroundStyle(AgentBuddyTheme.textPrimary)
+                            .multilineTextAlignment(.center)
                         Text("The agent may still be initializing.")
-                            .agentBuddyFont(.caption)
-                            .foregroundColor(AgentBuddyTheme.textMuted)
+                            .buddyText(.body)
+                            .foregroundStyle(AgentBuddyTheme.textSecondary)
+                            .multilineTextAlignment(.center)
                         Spacer()
                     }
+                    .padding(.horizontal, BuddySpacing.xl)
                     .frame(maxWidth: .infinity)
                 }
             }
-            .background(AgentBuddyTheme.backgroundGradient.ignoresSafeArea())
+            .buddyPageBackground()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     let parts = parseLabel(title)
                     (
                         Text(parts.nickname)
-                            .foregroundColor(titleColor(for: parts.nickname))
+                            .foregroundColor(AgentBuddyTheme.textPrimary)
                         + Text(parts.roleSuffix)
                             .foregroundColor(AgentBuddyTheme.textSecondary)
                     )
-                    .agentBuddyFont(.callout, weight: .semibold)
+                    .buddyText(.heading)
+                    .lineLimit(1)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
-                        .foregroundColor(AgentBuddyTheme.accent)
+                        .foregroundStyle(AgentBuddyTheme.link)
                 }
             }
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+        .buddySheetStyle()
         .task(id: threadKey.id) {
             await loadThreadIfNeeded()
         }
@@ -118,23 +121,6 @@ struct SubagentDetailSheet: View {
         let nickname = String(label[..<openBracket]).trimmingCharacters(in: .whitespacesAndNewlines)
         let role = String(label[label.index(after: openBracket)..<label.index(before: label.endIndex)])
         return (nickname, " (\(role))")
-    }
-
-    private static let colors: [Color] = [
-        Color(red: 0.90, green: 0.30, blue: 0.30),
-        Color(red: 0.30, green: 0.75, blue: 0.55),
-        Color(red: 0.40, green: 0.55, blue: 0.95),
-        Color(red: 0.85, green: 0.60, blue: 0.25),
-        Color(red: 0.70, green: 0.45, blue: 0.85),
-        Color(red: 0.25, green: 0.78, blue: 0.82),
-        Color(red: 0.90, green: 0.50, blue: 0.60),
-        Color(red: 0.65, green: 0.75, blue: 0.30),
-    ]
-
-    private func titleColor(for name: String) -> Color {
-        var hash: UInt64 = 5381
-        for byte in name.utf8 { hash = ((hash &<< 5) &+ hash) &+ UInt64(byte) }
-        return Self.colors[Int(hash % UInt64(Self.colors.count))]
     }
 
     private func loadThreadIfNeeded() async {
