@@ -14,20 +14,22 @@ struct MountedFoldersView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                AgentBuddyTheme.backgroundGradient.ignoresSafeArea()
+            Group {
                 if store.mounts.isEmpty {
                     emptyState
                 } else {
                     list
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .buddyPageBackground()
             .navigationTitle("Mounted folders")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Done") { dismiss() }
-                        .foregroundColor(AgentBuddyTheme.accent)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(AgentBuddyTheme.link)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -35,10 +37,12 @@ struct MountedFoldersView: View {
                     } label: {
                         Image(systemName: "plus")
                     }
-                    .foregroundColor(AgentBuddyTheme.accent)
+                    .foregroundStyle(AgentBuddyTheme.link)
+                    .accessibilityLabel(Text("Add folder"))
                 }
             }
         }
+        .buddySheetStyle()
         .fileImporter(
             isPresented: Binding(
                 get: { pickerMode != nil },
@@ -71,32 +75,32 @@ struct MountedFoldersView: View {
 
     private var list: some View {
         ScrollView {
-            VStack(spacing: 10) {
+            VStack(spacing: BuddySpacing.sm) {
                 ForEach(store.mounts) { mount in
                     row(for: mount)
                 }
                 footerExplainer
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 24)
+            .padding(.horizontal, BuddySpacing.xl)
+            .padding(.top, BuddySpacing.sm)
+            .padding(.bottom, BuddySpacing.xl)
         }
     }
 
     private func row(for mount: UserMount) -> some View {
         let status = store.statuses[mount.id]
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 10) {
+        return VStack(alignment: .leading, spacing: BuddySpacing.xs) {
+            HStack(spacing: BuddySpacing.sm) {
                 statusIcon(for: status)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(mount.name)
-                        .agentBuddyFont(.subheadline)
-                        .foregroundColor(AgentBuddyTheme.textPrimary)
-                    Text("/mnt/\(mount.name)")
-                        .agentBuddyMonoFont(size: 11)
-                        .foregroundColor(AgentBuddyTheme.textMuted)
+                    Text(verbatim: mount.name)
+                        .buddyText(.heading)
+                        .foregroundStyle(AgentBuddyTheme.textPrimary)
+                    Text(verbatim: "/mnt/\(mount.name)")
+                        .buddyText(.code)
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
                 }
-                Spacer()
+                Spacer(minLength: BuddySpacing.xs)
                 Menu {
                     if needsReconnect(status) {
                         Button {
@@ -111,70 +115,61 @@ struct MountedFoldersView: View {
                         Label("Remove", systemImage: "trash")
                     }
                 } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .foregroundColor(AgentBuddyTheme.textSecondary)
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
+                        .frame(width: BuddySize.minHitTarget, height: BuddySize.minHitTarget)
+                        .contentShape(Rectangle())
                 }
+                .accessibilityLabel(Text("More actions"))
             }
-            Text(mount.displayPath)
-                .agentBuddyFont(.caption)
-                .foregroundColor(AgentBuddyTheme.textSecondary)
+            Text(verbatim: mount.displayPath)
+                .buddyText(.code)
+                .foregroundStyle(AgentBuddyTheme.textSecondary)
                 .lineLimit(2)
                 .truncationMode(.middle)
             if let detail = statusDetail(for: status) {
-                Text(detail)
-                    .agentBuddyFont(.caption)
-                    .foregroundColor(AgentBuddyTheme.danger)
+                HStack(alignment: .firstTextBaseline, spacing: BuddySpacing.xs) {
+                    Image(systemName: "exclamationmark.circle")
+                        .accessibilityHidden(true)
+                    Text(verbatim: detail)
+                        .buddyText(.label, weight: .regular)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .foregroundStyle(AgentBuddyTheme.danger)
             }
         }
-        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(AgentBuddyTheme.surface.opacity(0.6))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(AgentBuddyTheme.textMuted.opacity(0.18), lineWidth: 0.6)
-        )
+        .buddyCard(.surface, radius: BuddyRadius.card, padding: BuddySpacing.md)
     }
 
     private var footerExplainer: some View {
         Text("Mounts persist across launches. Removing only detaches the mount inside iSH; files in the source folder are not deleted.")
-            .agentBuddyFont(.caption)
-            .foregroundColor(AgentBuddyTheme.textMuted)
-            .padding(.horizontal, 4)
-            .padding(.top, 8)
+            .buddyText(.caption)
+            .foregroundStyle(AgentBuddyTheme.textSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, BuddySpacing.xxs)
+            .padding(.top, BuddySpacing.xs)
     }
 
     // MARK: - Empty state
 
     private var emptyState: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "externaldrive.badge.icloud")
-                .font(.system(size: 44, weight: .light))
-                .foregroundColor(AgentBuddyTheme.accent)
-            Text("No folders mounted")
-                .agentBuddyFont(.headline)
-                .foregroundColor(AgentBuddyTheme.textPrimary)
-            Text("Pick a folder from Files (iCloud Drive, On My iPhone, or a third-party provider) to make it available inside iSH at /mnt/<name>.")
-                .agentBuddyFont(.caption)
-                .foregroundColor(AgentBuddyTheme.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
-            Button {
+        VStack {
+            BuddyEmptyState(
+                systemImage: "externaldrive.badge.icloud",
+                title: "No folders mounted",
+                message: "Pick a folder from Files (iCloud Drive, On My iPhone, or a third-party provider) to make it available inside iSH at /mnt/<name>.",
+                actionTitle: "Add folder",
+                actionSystemImage: "plus"
+            ) {
                 pickerMode = .add
-            } label: {
-                Text("Add folder")
-                    .agentBuddyFont(.subheadline)
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 10)
             }
-            .background(
-                Capsule().fill(AgentBuddyTheme.accent)
-            )
-            .foregroundColor(AgentBuddyTheme.textOnAccent)
+            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 24)
+        .padding(.horizontal, BuddySpacing.xl)
+        .padding(.top, BuddySpacing.md)
     }
 
     // MARK: - Helpers
@@ -200,16 +195,18 @@ struct MountedFoldersView: View {
         let (symbol, tint): (String, Color) = {
             switch status {
             case .mounted:
-                return ("checkmark.circle.fill", AgentBuddyTheme.accent)
+                return ("checkmark.circle.fill", AgentBuddyTheme.success)
             case .resolutionFailed, .mountFailed:
                 return ("exclamationmark.triangle.fill", AgentBuddyTheme.danger)
             case nil:
-                return ("circle.dotted", AgentBuddyTheme.textMuted)
+                return ("circle.dotted", AgentBuddyTheme.textSecondary)
             }
         }()
         return Image(systemName: symbol)
-            .foregroundColor(tint)
-            .frame(width: 18)
+            .font(.system(size: 20, weight: .medium))
+            .foregroundStyle(tint)
+            .frame(width: 24)
+            .accessibilityHidden(true)
     }
 
     private func statusDetail(for status: MountStatus?) -> String? {

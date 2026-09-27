@@ -18,81 +18,99 @@ struct QuickReplySheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(thread.sessionTitle)
-                    .agentBuddyFont(.subheadline, weight: .semibold)
-                    .foregroundStyle(AgentBuddyTheme.textPrimary)
-                    .lineLimit(2)
+            VStack(alignment: .leading, spacing: BuddySpacing.md) {
+                VStack(alignment: .leading, spacing: BuddySpacing.xxs) {
+                    Text(thread.sessionTitle)
+                        .buddyText(.heading)
+                        .foregroundStyle(AgentBuddyTheme.textPrimary)
+                        .lineLimit(2)
 
-                Text(thread.serverDisplayName + " · " + (HomeDashboardSupport.workspaceLabel(for: thread.cwd) ?? PathDisplay.display(thread.cwd, isLocal: thread.isLocal)))
-                    .agentBuddyFont(.caption)
-                    .foregroundStyle(AgentBuddyTheme.textMuted)
-                    .lineLimit(1)
-
-                Divider().background(AgentBuddyTheme.separator)
-
-                TextField(
-                    "Reply…",
-                    text: $text,
-                    axis: .vertical
-                )
-                .focused($isFocused)
-                .lineLimit(1...8)
-                .submitLabel(.send)
-                .agentBuddyFont(.body)
-                .foregroundStyle(AgentBuddyTheme.textPrimary)
-                .padding(10)
-                .background(AgentBuddyTheme.surface, in: RoundedRectangle(cornerRadius: 10))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(AgentBuddyTheme.border, lineWidth: 0.5)
-                )
-
-                if let errorMessage {
-                    Text(errorMessage)
-                        .agentBuddyFont(.caption)
-                        .foregroundStyle(AgentBuddyTheme.danger)
+                    Text(thread.serverDisplayName + " · " + (HomeDashboardSupport.workspaceLabel(for: thread.cwd) ?? PathDisplay.display(thread.cwd, isLocal: thread.isLocal)))
+                        .buddyText(.caption)
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
                 }
 
-                HStack {
-                    Spacer()
-                    Button {
-                        Task { await submit() }
-                    } label: {
-                        HStack(spacing: 6) {
-                            if isSending {
-                                ProgressView().controlSize(.small).tint(.black)
-                            }
-                            Image(systemName: "arrow.up.circle.fill")
-                                .font(.system(size: 18, weight: .semibold))
-                            Text("Send")
-                                .agentBuddyFont(.subheadline, weight: .semibold)
-                        }
-                        .foregroundStyle(canSend ? Color.black : AgentBuddyTheme.textMuted)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(canSend ? AgentBuddyTheme.accent : AgentBuddyTheme.surfaceLight, in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(!canSend)
+                composer
+
+                if let errorMessage {
+                    BuddyBanner(tone: .danger, message: Text(errorMessage))
                 }
 
                 Spacer()
             }
-            .padding(16)
-            .background(AgentBuddyTheme.backgroundGradient.ignoresSafeArea())
+            .padding(.horizontal, BuddySpacing.xl)
+            .padding(.top, BuddySpacing.sm)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .buddyPageBackground()
             .navigationTitle("Reply")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Cancel") { dismiss() }
-                        .tint(AgentBuddyTheme.textSecondary)
+                        .foregroundStyle(AgentBuddyTheme.link)
                 }
             }
             .task {
                 // Pop the keyboard once the sheet has settled.
                 try? await Task.sleep(nanoseconds: 150_000_000)
                 isFocused = true
+            }
+        }
+    }
+
+    /// Mint composer card: surface, radius 24, one primary send action.
+    private var composer: some View {
+        let shape = RoundedRectangle(cornerRadius: BuddyRadius.composer, style: .continuous)
+        return VStack(alignment: .trailing, spacing: BuddySpacing.xs) {
+            TextField(
+                "Reply…",
+                text: $text,
+                axis: .vertical
+            )
+            .focused($isFocused)
+            .lineLimit(1...8)
+            .submitLabel(.send)
+            .buddyText(.body)
+            .foregroundStyle(AgentBuddyTheme.textPrimary)
+            .tint(AgentBuddyTheme.focus)
+            .padding(.horizontal, BuddySpacing.xxs)
+            .padding(.top, BuddySpacing.xs)
+            .frame(maxWidth: .infinity, minHeight: BuddySize.composerMinHeight, alignment: .topLeading)
+
+            sendButton
+        }
+        .padding(.horizontal, BuddySpacing.sm)
+        .padding(.vertical, BuddySpacing.xs)
+        .background(AgentBuddyTheme.surface, in: shape)
+        .overlay {
+            shape.strokeBorder(isFocused ? AgentBuddyTheme.borderControl : AgentBuddyTheme.border, lineWidth: 1)
+        }
+        .shadow(color: AgentBuddyTheme.floatingShadow, radius: 12, y: 8)
+    }
+
+    @ViewBuilder
+    private var sendButton: some View {
+        if isSending {
+            ZStack {
+                Circle().fill(AgentBuddyTheme.action)
+                ProgressView().tint(AgentBuddyTheme.onAction)
+            }
+            .frame(width: 38, height: 38)
+            .frame(minWidth: BuddySize.minHitTarget, minHeight: BuddySize.minHitTarget)
+            .accessibilityElement()
+            .accessibilityLabel(Text("Sending"))
+        } else {
+            BuddyIconButton(
+                systemImage: "arrow.up",
+                accessibilityLabel: "Send",
+                tone: .action,
+                diameter: 38,
+                iconSize: 17,
+                isEnabled: canSend
+            ) {
+                Task { await submit() }
             }
         }
     }

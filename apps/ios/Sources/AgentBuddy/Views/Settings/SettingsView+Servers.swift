@@ -7,59 +7,85 @@ extension SettingsView {
         Section {
             if connectedServers.isEmpty {
                 Text("No servers connected")
-                    .agentBuddyFont(.footnote)
-                    .foregroundColor(AgentBuddyTheme.textMuted)
-                    .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+                    .buddyText(.label, weight: .regular)
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
+                    .padding(.vertical, BuddySpacing.xxs)
+                    .settingsMintRow()
             } else {
                 ForEach(connectedServers, id: \.id) { conn in
-                    HStack {
+                    HStack(spacing: BuddySpacing.sm) {
                         Button {
                             activeServerSheet = .edit(conn)
                         } label: {
-                            HStack {
+                            HStack(spacing: BuddySpacing.sm) {
                                 Image(systemName: conn.isLocal ? "iphone" : "server.rack")
-                                    .foregroundColor(AgentBuddyTheme.accent)
-                                    .frame(width: 20)
+                                    .font(.system(size: 17, weight: .medium))
+                                    .foregroundStyle(AgentBuddyTheme.textSecondary)
+                                    .frame(width: 24)
+                                    .accessibilityHidden(true)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(LocalizedStringKey(conn.displayName))
-                                        .agentBuddyFont(.footnote)
-                                        .foregroundColor(AgentBuddyTheme.textPrimary)
-                                    Text(conn.health.displayLabel)
-                                        .agentBuddyFont(.caption)
-                                        .foregroundColor(conn.health.accentColor)
+                                        .buddyText(.body)
+                                        .foregroundStyle(AgentBuddyTheme.textPrimary)
+                                        .lineLimit(2)
+                                    BuddyConnectionPill(
+                                        state: settingsConnectionState(conn.health),
+                                        title: Text(LocalizedStringKey(conn.health.displayLabel)),
+                                        filled: false
+                                    )
                                 }
-                                Spacer()
+                                Spacer(minLength: BuddySpacing.xs)
                             }
+                            .padding(.vertical, BuddySpacing.xxs)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        Button("Remove") {
+                        .accessibilityHint(Text("Edit Server"))
+
+                        Button {
                             removeServer(conn)
+                        } label: {
+                            Text("Remove")
+                                .buddyText(.label, weight: .medium)
+                                .foregroundStyle(AgentBuddyTheme.danger)
+                                .frame(minWidth: BuddySize.minHitTarget, minHeight: BuddySize.minHitTarget)
+                                .contentShape(Rectangle())
                         }
-                        .agentBuddyFont(.caption)
-                        .foregroundColor(AgentBuddyTheme.danger)
                         .buttonStyle(.borderless)
                     }
-                    .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+                    .settingsMintRow()
                 }
             }
 
             Button {
                 activeServerSheet = .add
             } label: {
-                HStack {
+                HStack(spacing: BuddySpacing.sm) {
                     Image(systemName: "plus.circle.fill")
-                        .foregroundColor(AgentBuddyTheme.accent)
-                        .frame(width: 20)
+                        .font(.system(size: 17, weight: .medium))
+                        .frame(width: 24)
+                        .accessibilityHidden(true)
                     Text("Add Server")
-                        .agentBuddyFont(.footnote)
-                        .foregroundColor(AgentBuddyTheme.accent)
+                        .buddyText(.body, weight: .medium)
                     Spacer()
                 }
+                .foregroundStyle(AgentBuddyTheme.link)
+                .frame(minHeight: BuddySize.minHitTarget)
+                .contentShape(Rectangle())
             }
-            .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+            .settingsMintRow()
         } header: {
             Text("Servers")
-                .foregroundColor(AgentBuddyTheme.textSecondary)
+                .settingsMintHeader()
+        }
+    }
+
+    private func settingsConnectionState(_ health: AppServerHealth) -> BuddyConnectionState {
+        switch health {
+        case .connected: return .connected
+        case .connecting: return .connecting
+        case .unresponsive: return .failed
+        case .disconnected, .unknown: return .disconnected
         }
     }
 

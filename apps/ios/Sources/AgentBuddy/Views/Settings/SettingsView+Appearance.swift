@@ -8,33 +8,19 @@ extension SettingsView {
             NavigationLink {
                 AppearanceSettingsView()
             } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "paintbrush")
-                        .foregroundColor(AgentBuddyTheme.accent)
-                        .frame(width: 20)
-                    Text("Appearance")
-                        .agentBuddyFont(.subheadline)
-                        .foregroundColor(AgentBuddyTheme.textPrimary)
-                }
+                SettingsMintRowLabel("Appearance", systemImage: "paintbrush")
             }
-            .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+            .settingsMintRow()
 
             NavigationLink {
                 LanguageSettingsView()
             } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "globe")
-                        .foregroundColor(AgentBuddyTheme.accent)
-                        .frame(width: 20)
-                    Text("Language")
-                        .agentBuddyFont(.subheadline)
-                        .foregroundColor(AgentBuddyTheme.textPrimary)
-                }
+                SettingsMintRowLabel("Language", systemImage: "globe")
             }
-            .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+            .settingsMintRow()
         } header: {
             Text("Theme")
-                .foregroundColor(AgentBuddyTheme.textSecondary)
+                .settingsMintHeader()
         }
     }
 
@@ -43,32 +29,35 @@ extension SettingsView {
     var fontSection: some View {
         Section {
             ForEach(FontFamilyOption.allCases) { option in
+                let isSelected = fontFamily == option.rawValue
                 Button {
                     fontFamily = option.rawValue
                     ThemeManager.shared.syncFontPreference()
                 } label: {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: BuddySpacing.sm) {
+                        VStack(alignment: .leading, spacing: 2) {
                             Text(option.displayName)
-                                .agentBuddyFont(.subheadline)
-                                .foregroundColor(AgentBuddyTheme.textPrimary)
+                                .buddyText(.body, weight: isSelected ? .semibold : .regular)
+                                .foregroundStyle(AgentBuddyTheme.textPrimary)
+                            // Sample rendered in the option's own font on purpose.
                             Text("The quick brown fox")
                                 .font(AgentBuddyFont.sampleFont(family: option, size: 14))
-                                .foregroundColor(AgentBuddyTheme.textSecondary)
+                                .foregroundStyle(AgentBuddyTheme.textSecondary)
                         }
-                        Spacer()
-                        if fontFamily == option.rawValue {
-                            Image(systemName: "checkmark")
-                                .agentBuddyFont(.subheadline, weight: .semibold)
-                                .foregroundColor(AgentBuddyTheme.accentStrong)
+                        Spacer(minLength: BuddySpacing.xs)
+                        if isSelected {
+                            SettingsMintCheckmark()
                         }
                     }
+                    .padding(.vertical, BuddySpacing.xxs)
+                    .contentShape(Rectangle())
                 }
-                .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+                .settingsMintSelected(isSelected)
+                .settingsMintRow()
             }
         } header: {
             Text("Font")
-                .foregroundColor(AgentBuddyTheme.textSecondary)
+                .settingsMintHeader()
         }
     }
 }

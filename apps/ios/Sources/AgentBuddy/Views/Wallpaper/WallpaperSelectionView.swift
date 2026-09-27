@@ -71,20 +71,13 @@ struct WallpaperSelectionView: View {
             // Close button (top-left)
             VStack {
                 HStack {
-                    Button {
+                    WallpaperFloatingPillButton(title: "Close") {
                         onClose?()
-                    } label: {
-                        Text("Close")
-                            .agentBuddyFont(size: 15, weight: .medium)
-                            .foregroundStyle(AgentBuddyTheme.textPrimary)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .modifier(GlassRectModifier(cornerRadius: 10))
                     }
                     Spacer()
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
+                .padding(.horizontal, BuddySpacing.md)
+                .padding(.top, BuddySpacing.xs)
                 Spacer()
             }
         }
@@ -156,30 +149,23 @@ struct WallpaperSelectionView: View {
     // MARK: - Sample Bubbles
 
     private var sampleBubbles: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: BuddySpacing.sm) {
             Spacer()
             // User bubble
             HStack {
-                Spacer()
-                Text("Fix the login bug on the profile page")
-                    .agentBuddyFont(size: 14)
-                    .foregroundStyle(AgentBuddyTheme.textPrimary)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .modifier(GlassRectModifier(cornerRadius: 14, tint: AgentBuddyTheme.accent.opacity(0.3)))
+                Spacer(minLength: BuddySpacing.xxxl)
+                WallpaperSampleUserBubble(text: "Fix the login bug on the profile page")
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, BuddySpacing.md)
 
-            // Streaming assistant bubble
+            // Streaming assistant reply
             HStack {
                 StreamingEffectPreview(config: typingEffectConfig)
                     .id(typingEffectConfig)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .modifier(GlassRectModifier(cornerRadius: 14))
-                Spacer()
+                    .wallpaperSampleAssistantCard()
+                Spacer(minLength: 0)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, BuddySpacing.md)
 
             Spacer()
         }
@@ -190,11 +176,9 @@ struct WallpaperSelectionView: View {
     private var bottomCard: some View {
         VStack(spacing: 0) {
             // Handle
-            RoundedRectangle(cornerRadius: 2)
-                .fill(AgentBuddyTheme.textMuted.opacity(0.4))
-                .frame(width: 36, height: 4)
-                .padding(.top, 12)
-                .padding(.bottom, 8)
+            WallpaperPanelGrabber()
+                .padding(.top, BuddySpacing.sm)
+                .padding(.bottom, BuddySpacing.sm)
 
             // Tab picker
             Picker("", selection: $activeTab) {
@@ -203,8 +187,8 @@ struct WallpaperSelectionView: View {
                 }
             }
             .pickerStyle(.segmented)
-            .padding(.horizontal, 16)
-            .padding(.bottom, 12)
+            .padding(.horizontal, BuddySpacing.md)
+            .padding(.bottom, BuddySpacing.sm)
 
             // Tab content
             switch activeTab {
@@ -214,10 +198,7 @@ struct WallpaperSelectionView: View {
                 typingEffectTabContent
             }
         }
-        .background(
-            UnevenRoundedRectangle(topLeadingRadius: 20, topTrailingRadius: 20)
-                .fill(AgentBuddyTheme.surface.opacity(0.95))
-        )
+        .wallpaperBottomPanel()
     }
 }
 
