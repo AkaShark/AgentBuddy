@@ -4,22 +4,22 @@ import android.util.Base64
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,16 +30,22 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.akashark.agentbuddy.android.ui.LocalAppModel
-import com.akashark.agentbuddy.android.ui.AgentBuddyTextStyle
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
-import com.akashark.agentbuddy.android.ui.scaled
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyBrandMark
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyShapes
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySpacing
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyTextStyle
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyTextStyle
 import uniffi.codex_mobile_client.AppMessageRenderBlock
 import kotlinx.coroutines.delay
 
@@ -58,9 +64,10 @@ internal fun UserMessageRow(
     var showMenu by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
-    // Right-aligned user bubble matching iOS `UserBubble`: accent-tinted
-    // rounded rect that hugs content width, with a 60dp minimum gutter on
-    // the left so long messages wrap before reaching that edge.
+    // Right-aligned Mint user bubble matching iOS `UserBubble`: surfaceSoft
+    // fill with the 19/19/5/19 corners pointing at the sender. It hugs the
+    // content width, keeps a 48dp start gutter so long messages wrap before
+    // that edge, and caps its width on wide screens.
     //
     // Long-press opens an action menu (Edit / Fork / Copy). Text selection is
     // disabled on user bubbles because Compose's SelectionContainer would
@@ -69,23 +76,23 @@ internal fun UserMessageRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 10.dp, bottom = 14.dp),
+            .padding(top = BuddySpacing.xs, bottom = BuddySpacing.sm),
         horizontalArrangement = Arrangement.End,
     ) {
-        Box {
+        Box(modifier = Modifier.padding(start = 48.dp)) {
             Column(
                 horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(BuddySpacing.xs),
                 modifier = Modifier
-                    .padding(start = 60.dp)
-                    .background(
-                        AgentBuddyTheme.accent.copy(alpha = 0.3f),
-                        RoundedCornerShape(18.dp),
-                    )
+                    .widthIn(max = UserBubbleMaxWidth)
+                    .clip(BuddyShapes.userBubble)
+                    .background(AgentBuddyTheme.surfaceSoft, BuddyShapes.userBubble)
                     .combinedClickable(
+                        onLongClickLabel = "消息操作",
                         onClick = {},
                         onLongClick = { showMenu = true },
                     )
-                    .padding(horizontal = 18.dp, vertical = 14.dp),
+                    .padding(horizontal = BuddySpacing.md, vertical = BuddySpacing.sm),
             ) {
                 LimitedUserMessageText(data.text)
                 // Inline images from data URIs
@@ -104,9 +111,8 @@ internal fun UserMessageRow(
                                 .build(),
                             contentDescription = "附带的图片",
                             modifier = Modifier
-                                .padding(top = 4.dp)
                                 .heightIn(max = 200.dp)
-                                .clip(RoundedCornerShape(8.dp)),
+                                .clip(TimelineImageShape),
                         )
                     }
                 }
@@ -149,21 +155,19 @@ private fun LimitedUserMessageText(text: String) {
         if (isLong && !expanded) text.take(UserMessageTextPreviewLimit) else text
     }
 
-    com.akashark.agentbuddy.android.ui.common.FormattedText(
-        text = display,
-        color = AgentBuddyTheme.textPrimary,
-        fontSize = AgentBuddyTextStyle.callout.scaled,
-    )
+    val bodyStyle = buddyTextStyle(BuddyTextStyle.BODY)
+    ProvideTextStyle(bodyStyle) {
+        com.akashark.agentbuddy.android.ui.common.FormattedText(
+            text = display,
+            color = AgentBuddyTheme.textPrimary,
+            fontSize = bodyStyle.fontSize,
+        )
+    }
 
     if (isLong) {
-        Text(
+        TimelineLinkButton(
             text = if (expanded) "收起" else "展开",
-            color = AgentBuddyTheme.accent,
-            fontSize = AgentBuddyTextStyle.caption2.scaled,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier
-                .padding(top = 4.dp)
-                .clickable { expanded = !expanded },
+            onClick = { expanded = !expanded },
         )
     }
 }
@@ -232,29 +236,10 @@ internal fun AssistantMessageRow(
         onStreamingSnapshotRendered?.invoke()
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
+    AssistantMessageLayout(
+        agentNickname = data.agentNickname,
+        agentRole = data.agentRole,
     ) {
-        // Agent badge
-        if (data.agentNickname != null || data.agentRole != null) {
-            val label = buildString {
-                data.agentNickname?.let { append(it) }
-                data.agentRole?.let {
-                    if (isNotEmpty()) append(" ")
-                    append("[$it]")
-                }
-            }
-            Text(
-                text = label,
-                color = AgentBuddyTheme.accent,
-                fontSize = AgentBuddyTextStyle.caption2.scaled,
-                fontWeight = FontWeight.Medium,
-            )
-            Spacer(Modifier.height(2.dp))
-        }
-
         if (isStreamingMessage) {
             StreamingMarkdownView(
                 text = renderedText,
@@ -270,8 +255,78 @@ internal fun AssistantMessageRow(
     }
 }
 
+/**
+ * Assistant reply on the page (no bubble): an optional agent label for
+ * subagent replies, then the Markdown body.
+ */
 @Composable
-private fun AssistantRenderBlocks(
+internal fun AssistantMessageLayout(
+    agentNickname: String?,
+    agentRole: String?,
+    body: @Composable () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = BuddySpacing.xxs),
+        verticalArrangement = Arrangement.spacedBy(BuddySpacing.xxs),
+    ) {
+        // Agent badge
+        if (agentNickname != null || agentRole != null) {
+            val label = buildString {
+                agentNickname?.let { append(it) }
+                agentRole?.let {
+                    if (isNotEmpty()) append(" ")
+                    append("[$it]")
+                }
+            }
+            Text(
+                text = label,
+                style = buddyTextStyle(BuddyTextStyle.CAPTION, FontWeight.Medium),
+                color = AgentBuddyTheme.textSecondary,
+            )
+        }
+        body()
+    }
+}
+
+/**
+ * "搭子 · Codex" line that opens each assistant reply (iOS
+ * `AssistantSpeakerHeader`), so a turn reads as a conversation with a named
+ * partner instead of an anonymous log.
+ */
+@Composable
+internal fun AssistantSpeakerHeader(
+    partnerLabel: String?,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .padding(top = BuddySpacing.xxs)
+            .semantics(mergeDescendants = true) { heading() },
+        horizontalArrangement = Arrangement.spacedBy(BuddySpacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        BuddyBrandMark(size = 26.dp)
+        Text(
+            text = "搭子",
+            style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.SemiBold),
+            color = AgentBuddyTheme.textPrimary,
+        )
+        partnerLabel?.takeIf { it.isNotBlank() }?.let { partner ->
+            Text(
+                text = "· $partner",
+                style = buddyTextStyle(BuddyTextStyle.CAPTION),
+                color = AgentBuddyTheme.textSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+internal fun AssistantRenderBlocks(
     blocks: List<AppMessageRenderBlock>,
     fallbackText: String,
 ) {
@@ -281,7 +336,7 @@ private fun AssistantRenderBlocks(
     }
 
     val context = LocalContext.current
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(BuddySpacing.sm)) {
         blocks.forEachIndexed { index, block ->
             when (block) {
                 is AppMessageRenderBlock.Markdown -> MarkdownText(text = block.markdown)
@@ -305,7 +360,7 @@ private fun AssistantRenderBlocks(
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(max = 300.dp)
-                            .clip(RoundedCornerShape(10.dp)),
+                            .clip(TimelineImageShape),
                     )
                 }
             }
@@ -327,18 +382,44 @@ internal fun ReasoningRow(
 
     if (reasoningText.isBlank()) return
 
-    SelectableConversationText(
+    // Secondary tone with a quiet leading rule instead of an italic mono wall.
+    val ruleColor = AgentBuddyTheme.border
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = BuddySpacing.xxs),
+        verticalArrangement = Arrangement.spacedBy(BuddySpacing.xxs),
     ) {
-        Text(
-            text = reasoningText,
-            color = AgentBuddyTheme.textSecondary,
-            fontSize = AgentBuddyTextStyle.body.scaled,
-            fontFamily = AgentBuddyTheme.monoFont,
-            fontStyle = FontStyle.Italic,
-        )
+        Row(
+            modifier = Modifier.semantics(mergeDescendants = true) { heading() },
+            horizontalArrangement = Arrangement.spacedBy(BuddySpacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Psychology,
+                contentDescription = null,
+                tint = AgentBuddyTheme.textSecondary,
+                modifier = Modifier.size(16.dp),
+            )
+            Text(
+                text = "思考过程",
+                style = buddyTextStyle(BuddyTextStyle.CAPTION, FontWeight.Medium),
+                color = AgentBuddyTheme.textSecondary,
+            )
+        }
+        SelectableConversationText(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = reasoningText,
+                style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.Normal),
+                color = AgentBuddyTheme.textSecondary,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .drawBehind {
+                        drawRect(color = ruleColor, size = Size(2.dp.toPx(), size.height))
+                    }
+                    .padding(start = BuddySpacing.sm),
+            )
+        }
     }
 }
 
@@ -353,9 +434,8 @@ internal fun MarkdownText(
         SelectableConversationText(modifier = modifier.fillMaxWidth()) {
             Text(
                 text = text,
+                style = buddyTextStyle(BuddyTextStyle.BODY).copy(fontFamily = FontFamily.Monospace),
                 color = AgentBuddyTheme.textBody,
-                fontFamily = FontFamily.Monospace,
-                fontSize = AgentBuddyTextStyle.body.scaled,
             )
         }
         return
@@ -364,47 +444,13 @@ internal fun MarkdownText(
     SelectableMarkdownText(
         text = text,
         modifier = modifier.fillMaxWidth(),
+        bodySize = BuddyTextStyle.BODY.size,
+        lineHeightRatio = MintBodyLineHeightRatio,
     )
 }
 
-@Composable
-private fun CodeBlockSegment(
-    language: String?,
-    code: String,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        language?.takeIf { it.isNotBlank() }?.let {
-            Text(
-                text = it.uppercase(),
-                color = AgentBuddyTheme.textSecondary,
-                fontSize = AgentBuddyTextStyle.caption2.scaled,
-                fontWeight = FontWeight.Bold,
-            )
-        }
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(AgentBuddyTheme.codeBackground, RoundedCornerShape(8.dp))
-                .padding(10.dp),
-        ) {
-            if (isDiffLanguage(language)) {
-                SyntaxHighlightedDiffBlock(
-                    diff = code,
-                    titleHint = language,
-                    fontSize = AgentBuddyTextStyle.caption.sp,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            } else {
-                SelectableConversationText {
-                    Text(
-                        text = code,
-                        color = AgentBuddyTheme.textBody,
-                        fontFamily = AgentBuddyTheme.monoFont,
-                        fontSize = AgentBuddyTextStyle.body.scaled,
-                        modifier = Modifier.horizontalScroll(rememberScrollState()),
-                    )
-                }
-            }
-        }
-    }
-}
+
+/** BODY 16 / 26 for Markdown rendered by the platform TextView. */
+internal const val MintBodyLineHeightRatio = 26f / 16f
+
+private val UserBubbleMaxWidth = 560.dp

@@ -6,6 +6,7 @@ import android.view.ActionMode
 import android.view.Menu
 import android.view.MenuItem
 import android.widget.TextView
+import androidx.core.widget.TextViewCompat
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -28,6 +29,7 @@ import io.noties.prism4j.Prism4j
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 @Composable
 internal fun SelectableConversationText(
@@ -39,18 +41,39 @@ internal fun SelectableConversationText(
     }
 }
 
+/**
+ * Markdown through Markwon in a selectable TextView. [lineHeightRatio] sets
+ * the line height relative to the text size (Mint BODY is 26 / 16); null
+ * keeps the font's natural line height.
+ */
 @Composable
 internal fun SelectableMarkdownText(
     text: String,
     modifier: Modifier = Modifier,
     bodySize: Float = AgentBuddyTextStyle.body,
     usePhysicalDpTextSize: Boolean = false,
+    lineHeightRatio: Float? = null,
     onTextViewReady: ((TextView) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val textScale = LocalTextScale.current
     val resolvedTextSize = bodySize * textScale
     val textColor = AgentBuddyTheme.textBody.toArgb()
+    val palette = MarkdownPalette(
+        link = AgentBuddyTheme.link.toArgb(),
+        secondary = AgentBuddyTheme.textSecondary.toArgb(),
+        codeText = AgentBuddyTheme.textPrimary.toArgb(),
+        codeBackground = AgentBuddyTheme.codeBackground.toArgb(),
+        rule = AgentBuddyTheme.border.toArgb(),
+    )
+    val codeTypeface = remember(context) {
+        runCatching {
+            androidx.core.content.res.ResourcesCompat.getFont(
+                context,
+                com.akashark.agentbuddy.android.R.font.berkeley_mono_regular,
+            )
+        }.getOrNull() ?: android.graphics.Typeface.MONOSPACE
+    }
     val useMono = AgentBuddyThemeManager.monoFontEnabled
     val typeface = remember(context, useMono) {
         if (useMono) {
@@ -69,9 +92,10 @@ internal fun SelectableMarkdownText(
     }
     val markwon = rememberConversationMarkwon(
         context = context,
-        typeface = typeface,
+        codeTypeface = codeTypeface,
         markdownTextSizePx = markdownTextSizePx,
         textColor = textColor,
+        palette = palette,
     )
     val markdown = remember(text) { normalizeMathMarkdown(text) }
 
@@ -81,10 +105,11 @@ internal fun SelectableMarkdownText(
                 configureSelectableMarkdownTextView(
                     textView = this,
                     textColor = textColor,
-                    linkColor = AgentBuddyTheme.accent.toArgb(),
+                    linkColor = palette.link,
                     textSize = resolvedTextSize,
                     typeface = typeface,
                     usePhysicalDpTextSize = usePhysicalDpTextSize,
+                    lineHeightPx = lineHeightRatio?.let { markdownTextSizePx * it },
                 )
                 onTextViewReady?.invoke(this)
             }
@@ -93,10 +118,11 @@ internal fun SelectableMarkdownText(
             configureSelectableMarkdownTextView(
                 textView = tv,
                 textColor = textColor,
-                linkColor = AgentBuddyTheme.accent.toArgb(),
+                linkColor = palette.link,
                 textSize = resolvedTextSize,
                 typeface = typeface,
                 usePhysicalDpTextSize = usePhysicalDpTextSize,
+                lineHeightPx = lineHeightRatio?.let { markdownTextSizePx * it },
             )
             markwon.setMarkdown(tv, markdown)
         },
@@ -111,6 +137,7 @@ internal fun configureSelectableMarkdownTextView(
     textSize: Float,
     typeface: android.graphics.Typeface? = null,
     usePhysicalDpTextSize: Boolean = false,
+    lineHeightPx: Float? = null,
 ) {
     textView.setTextColor(textColor)
     textView.typeface = typeface
@@ -120,6 +147,7 @@ internal fun configureSelectableMarkdownTextView(
     } else {
         textView.textSize = textSize
     }
+    lineHeightPx?.let { TextViewCompat.setLineHeight(textView, it.roundToInt()) }
     textView.linksClickable = true
     textView.movementMethod = LinkMovementMethod.getInstance()
     textView.setLinkTextColor(linkColor)
@@ -185,21 +213,26 @@ private class RunInTerminalSelectionMenu(
     }
 }
 
+/** Mint colours applied to the Markwon theme (ARGB ints so they key `remember`). */
+private data class MarkdownPalette(
+    val link: Int,
+    val secondary: Int,
+    val codeText: Int,
+    val codeBackground: Int,
+    val rule: Int,
+)
+
 @Composable
 private fun rememberConversationMarkwon(
     context: android.content.Context,
-    typeface: android.graphics.Typeface?,
+    codeTypeface: android.graphics.Typeface,
     markdownTextSizePx: Float,
     textColor: Int,
-): Markwon = remember(context, typeface, markdownTextSizePx, textColor) {
+    palette: MarkdownPalette,
+): Markwon = remember(context, codeTypeface, markdownTextSizePx, textColor, palette) {
     try {
         val prism4j = Prism4j(com.akashark.agentbuddy.android.ui.Prism4jGrammarLocator())
         Markwon.builder(context)
-            .usePlugin(object : AbstractMarkwonPlugin() {
-                override fun configureTheme(builder: MarkwonTheme.Builder) {
-                    typeface?.let { builder.codeTypeface(it) }
-                }
-            })
             .usePlugin(
                 SyntaxHighlightPlugin.create(
                     prism4j,
@@ -214,9 +247,50 @@ private fun rememberConversationMarkwon(
                     builder.theme().textColor(textColor)
                 },
             )
+            // Registered last so the Mint theme wins over the syntax plugin's
+            // code-block colours.
+            .usePlugin(MintMarkdownThemePlugin(context, codeTypeface, markdownTextSizePx, palette))
             .build()
     } catch (_: Exception) {
         Markwon.create(context)
+    }
+}
+
+/**
+ * Mint Markdown typography: link colour, Berkeley Mono code on the code
+ * background (CODE 14 relative to BODY 16), quiet quote bar and rules, and
+ * heading sizes stepped close to the body instead of Markwon's 2x H1.
+ */
+private class MintMarkdownThemePlugin(
+    private val context: android.content.Context,
+    private val codeTypeface: android.graphics.Typeface,
+    private val bodyTextSizePx: Float,
+    private val palette: MarkdownPalette,
+) : AbstractMarkwonPlugin() {
+    override fun configureTheme(builder: MarkwonTheme.Builder) {
+        val density = context.resources.displayMetrics.density
+        val codeTextSizePx = (bodyTextSizePx * CODE_TO_BODY_RATIO).roundToInt()
+        builder
+            .linkColor(palette.link)
+            .codeTypeface(codeTypeface)
+            .codeBlockTypeface(codeTypeface)
+            .codeTextSize(codeTextSizePx)
+            .codeBlockTextSize(codeTextSizePx)
+            .codeTextColor(palette.codeText)
+            .codeBlockTextColor(palette.codeText)
+            .codeBackgroundColor(palette.codeBackground)
+            .codeBlockBackgroundColor(palette.codeBackground)
+            .codeBlockMargin((12 * density).roundToInt())
+            .blockQuoteColor(palette.rule)
+            .blockQuoteWidth((3 * density).roundToInt())
+            .listItemColor(palette.secondary)
+            .thematicBreakColor(palette.rule)
+            .headingBreakHeight(0)
+            .headingTextSizeMultipliers(floatArrayOf(1.375f, 1.25f, 1.125f, 1.0625f, 1f, 1f))
+    }
+
+    private companion object {
+        const val CODE_TO_BODY_RATIO = 14f / 16f
     }
 }
 

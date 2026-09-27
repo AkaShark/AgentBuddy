@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import com.akashark.agentbuddy.android.state.AppModel
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
 import com.akashark.agentbuddy.android.ui.AgentBuddyTextStyle
+import com.akashark.agentbuddy.android.ui.common.runtimeLabel
 import com.akashark.agentbuddy.android.ui.scaled
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -70,6 +71,7 @@ internal fun ConversationTranscriptList(
 ) {
     // Use transparent gradient when wallpaper is set
     val fadeColor = if (hasWallpaper) Color.Transparent else AgentBuddyTheme.background
+    val partnerLabel = thread.agentRuntimeKind.runtimeLabel
 
     LazyColumn(
         state = listState,
@@ -176,8 +178,17 @@ internal fun ConversationTranscriptList(
                         }
                     }
                 }
+                // "搭子 · Codex" opens the first reply row of each turn (iOS parity).
+                val firstReplyIndex = remember(timelineEntries) {
+                    timelineEntries.indexOfFirst { entry ->
+                        !(entry is TimelineEntry.Single && entry.item.content is HydratedConversationItemContent.User)
+                    }
+                }
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     timelineEntries.forEachIndexed { index, entry ->
+                        if (index == firstReplyIndex) {
+                            AssistantSpeakerHeader(partnerLabel = partnerLabel)
+                        }
                         when (entry) {
                             is TimelineEntry.Single -> {
                                 ConversationTimelineItem(
