@@ -1,6 +1,5 @@
 package com.akashark.agentbuddy.android.state
 
-import android.content.Context
 import com.akashark.agentbuddy.android.voice.RealtimeWebRtcSession
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -10,22 +9,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import uniffi.codex_mobile_client.AppAskForApproval
 import uniffi.codex_mobile_client.AppDynamicToolSpec
 import uniffi.codex_mobile_client.AppRealtimeStartTransport
-import uniffi.codex_mobile_client.AppSandboxMode
-import uniffi.codex_mobile_client.AppSandboxPolicy
 import uniffi.codex_mobile_client.AppStoreUpdateRecord
 import uniffi.codex_mobile_client.HandoffManager
-import uniffi.codex_mobile_client.PinnedThreadKey
-import uniffi.codex_mobile_client.ReasoningEffort
-import uniffi.codex_mobile_client.ServiceTier
 import uniffi.codex_mobile_client.ThreadKey
-import uniffi.codex_mobile_client.AppFinalizeRealtimeHandoffRequest
-import uniffi.codex_mobile_client.AppResolveRealtimeHandoffRequest
 import uniffi.codex_mobile_client.AppStartRealtimeSessionRequest
 import uniffi.codex_mobile_client.AppStopRealtimeSessionRequest
-import uniffi.codex_mobile_client.generativeUiDynamicToolSpecs
 import java.util.UUID
 
 /**
@@ -38,9 +28,7 @@ class VoiceRuntimeController {
 
     companion object {
         val shared: VoiceRuntimeController by lazy { VoiceRuntimeController() }
-        private const val LOCAL_SERVER_ID = "local"
-        private const val VOICE_PREFS_NAME = "agentbuddy.voice"
-        private const val PERSISTED_LOCAL_VOICE_THREAD_ID_KEY = "agentbuddy.voice.local.thread_id"
+        internal const val LOCAL_SERVER_ID = "local"
     }
 
     // ── State ────────────────────────────────────────────────────────────────
@@ -56,7 +44,7 @@ class VoiceRuntimeController {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var sessionJob: Job? = null
-    private var handoffManager: HandoffManager? = null
+    internal var handoffManager: HandoffManager? = null
     private var webRtcSession: RealtimeWebRtcSession? = null
     private var stopRequestedThreadKey: ThreadKey? = null
     private var speakerEnabled = true
@@ -238,74 +226,6 @@ class VoiceRuntimeController {
         }
     }
 
-    private suspend fun ensurePinnedLocalVoiceThread(
-        appModel: AppModel,
-        cwd: String,
-        model: String? = null,
-    ): ThreadKey? {
-        val serverId = ensureLocalServerConnected(appModel) ?: return null
-        val launchConfig = appModel.launchState.launchConfig(modelOverride = model)
-
-        persistedLocalVoiceThreadId(appModel)?.let { storedThreadId ->
-            val key = ThreadKey(serverId = serverId, threadId = storedThreadId)
-            val knownThread = appModel.snapshot.value?.let { snapshot ->
-                snapshot.threads.any { it.key == key } || snapshot.sessionSummaries.any { it.key == key }
-            } == true
-
-            if (knownThread) {
-                appModel.store.setActiveThread(key)
-                return key
-            }
-
-            val loadedKey = appModel.ensureThreadLoaded(key)
-            if (loadedKey != null) {
-                appModel.store.setActiveThread(loadedKey)
-                setPersistedLocalVoiceThreadId(appModel, loadedKey.threadId)
-                appModel.refreshSnapshot()
-                return loadedKey
-            }
-
-            setPersistedLocalVoiceThreadId(appModel, null)
-        }
-
-        return try {
-            val key = appModel.startThread(
-                serverId,
-                launchConfig.toAppStartThreadRequest(
-                    preferredVoiceThreadCwd(appModel, key = null, fallback = cwd),
-                ),
-            )
-            SavedThreadsStore.add(
-                appModel.appContext,
-                PinnedThreadKey(serverId = key.serverId, threadId = key.threadId),
-            )
-            appModel.store.setActiveThread(key)
-            setPersistedLocalVoiceThreadId(appModel, key.threadId)
-            appModel.refreshSnapshot()
-            key
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    private suspend fun ensureLocalServerConnected(appModel: AppModel): String? {
-        appModel.snapshot.value?.servers?.firstOrNull { it.isLocal && it.isConnected }?.let { server ->
-            return server.serverId
-        }
-
-        val currentLocal = appModel.snapshot.value?.servers?.firstOrNull { it.isLocal }
-        val serverId = currentLocal?.serverId ?: LOCAL_SERVER_ID
-        val displayName = currentLocal?.displayName ?: "本地"
-        return try {
-            appModel.serverBridge.connectLocalServer(serverId, displayName, "127.0.0.1", 0u)
-            appModel.restoreStoredLocalAuthState(serverId)
-            appModel.refreshSnapshot()
-            serverId
-        } catch (_: Exception) {
-            null
-        }
-    }
-
     private suspend fun cleanupKnownRealtimeVoiceSessions(
         appModel: AppModel,
         keepThreadKey: ThreadKey? = null,
@@ -399,102 +319,6 @@ class VoiceRuntimeController {
         }
     }
 
-    // ── Handoff action dispatch ──────────────────────────────────────────────
-
-    private suspend fun processHandoffActions(appModel: AppModel) {
-        val hm = handoffManager ?: return
-        val actions = hm.uniffiDrainActions()
-        for (action in actions) {
-            dispatchHandoffAction(appModel, action)
-        }
-    }
-
-    private suspend fun dispatchHandoffAction(appModel: AppModel, action: uniffi.codex_mobile_client.HandoffAction) {
-        when (action) {
-            is uniffi.codex_mobile_client.HandoffAction.StartThread -> {
-                try {
-                    val serverIsLocal = appModel.snapshot.value
-                        ?.servers
-                        ?.firstOrNull { it.serverId == action.targetServerId }
-                        ?.isLocal == true
-                    val key = appModel.startThread(
-                        action.targetServerId,
-                        AppThreadLaunchConfig(
-                            model = null,
-                            approvalPolicy = AppAskForApproval.Never,
-                            sandboxMode = AppSandboxMode.DANGER_FULL_ACCESS,
-                            developerInstructions = null,
-                            persistHistory = true,
-                        ).toAppStartThreadRequest(
-                            cwd = action.cwd,
-                            dynamicTools = if (serverIsLocal) generativeUiDynamicToolSpecs() else null,
-                        ),
-                    )
-                    SavedThreadsStore.add(
-                        appModel.appContext,
-                        PinnedThreadKey(serverId = key.serverId, threadId = key.threadId),
-                    )
-                    handoffManager?.uniffiReportThreadCreated(action.handoffId, action.targetServerId, key.threadId)
-                } catch (e: Exception) {
-                    handoffManager?.uniffiReportThreadFailed(action.handoffId, e.message ?: "Thread creation failed")
-                }
-            }
-
-            is uniffi.codex_mobile_client.HandoffAction.SendTurn -> {
-                try {
-                    val payload = AppComposerPayload(
-                        text = action.transcript,
-                        approvalPolicy = AppAskForApproval.Never,
-                        sandboxPolicy = AppSandboxPolicy.DangerFullAccess,
-                        model = action.config.model,
-                        reasoningEffort = reasoningEffortFromWireValue(action.config.effort),
-                        serviceTier = if (action.config.fastMode) ServiceTier.FAST else null,
-                    )
-                    appModel.startTurn(
-                        ThreadKey(serverId = action.targetServerId, threadId = action.threadId),
-                        payload,
-                    )
-                    handoffManager?.uniffiReportTurnSent(action.handoffId, 0u)
-                    val handoffKey = ThreadKey(serverId = action.targetServerId, threadId = action.threadId)
-                    appModel.store.setVoiceHandoffThread(key = handoffKey)
-                } catch (e: Exception) {
-                    handoffManager?.uniffiReportTurnFailed(action.handoffId, e.message ?: "Turn failed")
-                }
-            }
-
-            is uniffi.codex_mobile_client.HandoffAction.ResolveHandoff -> {
-                try {
-                    appModel.client.resolveRealtimeHandoff(
-                        action.voiceThreadKey.serverId,
-                        AppResolveRealtimeHandoffRequest(
-                            threadId = action.voiceThreadKey.threadId,
-                            toolCallOutput = action.text,
-                        ),
-                    )
-                } catch (_: Exception) {}
-            }
-
-            is uniffi.codex_mobile_client.HandoffAction.FinalizeHandoff -> {
-                try {
-                    appModel.client.finalizeRealtimeHandoff(
-                        action.voiceThreadKey.serverId,
-                        AppFinalizeRealtimeHandoffRequest(
-                            threadId = action.voiceThreadKey.threadId,
-                        ),
-                    )
-                } catch (_: Exception) {}
-                handoffManager?.uniffiReportFinalized(action.handoffId)
-                appModel.store.setVoiceHandoffThread(key = null)
-            }
-
-            is uniffi.codex_mobile_client.HandoffAction.Error -> {
-                android.util.Log.e("VoiceRuntime", "Handoff error: ${action.message}")
-            }
-
-            else -> {}
-        }
-    }
-
     private fun realtimePrompt(appModel: AppModel): String {
         val remoteServers = appModel.snapshot.value?.servers
             ?.filter { !it.isLocal && it.isConnected }
@@ -518,18 +342,6 @@ class VoiceRuntimeController {
         """.trimIndent()
     }
 
-    private fun reasoningEffortFromWireValue(value: String?): ReasoningEffort? =
-        when (value?.trim()?.lowercase()) {
-            "none" -> ReasoningEffort.NONE
-            "minimal" -> ReasoningEffort.MINIMAL
-            "low" -> ReasoningEffort.LOW
-            "medium" -> ReasoningEffort.MEDIUM
-            "high" -> ReasoningEffort.HIGH
-            "xhigh", "x-high" -> ReasoningEffort.X_HIGH
-            "max" -> ReasoningEffort.MAX
-            else -> null
-        }
-
     internal fun buildDynamicToolSpecs(): List<AppDynamicToolSpec> = listOf(
         AppDynamicToolSpec(
             name = "list_servers",
@@ -544,55 +356,6 @@ class VoiceRuntimeController {
             deferLoading = false,
         ),
     )
-
-    private fun persistedLocalVoiceThreadId(appModel: AppModel): String? {
-        val stored = voicePrefs(appModel)
-            .getString(PERSISTED_LOCAL_VOICE_THREAD_ID_KEY, null)
-            ?.trim()
-            .orEmpty()
-        return stored.ifEmpty { null }
-    }
-
-    private fun setPersistedLocalVoiceThreadId(appModel: AppModel, threadId: String?) {
-        val trimmed = threadId?.trim().orEmpty()
-        val editor = voicePrefs(appModel).edit()
-        if (trimmed.isEmpty()) {
-            editor.remove(PERSISTED_LOCAL_VOICE_THREAD_ID_KEY)
-        } else {
-            editor.putString(PERSISTED_LOCAL_VOICE_THREAD_ID_KEY, trimmed)
-        }
-        editor.apply()
-    }
-
-    private fun voicePrefs(appModel: AppModel) =
-        appModel.appContext.getSharedPreferences(VOICE_PREFS_NAME, Context.MODE_PRIVATE)
-
-    private fun preferredVoiceThreadCwd(
-        appModel: AppModel,
-        key: ThreadKey?,
-        fallback: String,
-    ): String {
-        val existingCwd = key
-            ?.let { threadKey ->
-                appModel.snapshot.value
-                    ?.threads
-                    ?.firstOrNull { it.key == threadKey }
-                    ?.info
-                    ?.cwd
-                    ?.trim()
-            }
-            .orEmpty()
-        if (existingCwd.isNotEmpty()) {
-            return existingCwd
-        }
-
-        val trimmedFallback = fallback.trim()
-        if (trimmedFallback.isNotEmpty()) {
-            return trimmedFallback
-        }
-
-        return appModel.launchState.snapshot.value.currentCwd.trim().ifEmpty { "/" }
-    }
 
     // ── Cleanup ──────────────────────────────────────────────────────────────
 
