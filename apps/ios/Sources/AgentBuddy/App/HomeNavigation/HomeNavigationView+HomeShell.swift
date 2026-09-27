@@ -42,7 +42,10 @@ extension HomeNavigationView {
             selectServer: handleSelectServer,
             clearServerScope: { homeDashboardModel.clearScope() },
             addServer: { appState.showServerPicker = true },
-            pairWithQRCode: { appState.showServerPicker = true },
+            pairWithQRCode: {
+                appState.serverPickerEntryPoint = .pairWithQRCode
+                appState.showServerPicker = true
+            },
             reconnectServer: reconnectServer,
             restartAppServer: restartAppServer,
             renameServer: { serverId, name in renameServer(serverId, newName: name) },

@@ -15,33 +15,23 @@ struct AlleycatQRScannerScreen: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
             QRCaptureSheet(
                 onScan: onScan,
                 onCancel: onCancel,
                 onPermissionDenied: onPermissionDenied
             )
             .ignoresSafeArea()
+            .accessibilityHidden(true)
 
-            LinearGradient(
-                colors: [Color.black.opacity(0.55), Color.black.opacity(0.0)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 320)
-            .frame(maxHeight: .infinity, alignment: .top)
-            .ignoresSafeArea()
-            .allowsHitTesting(false)
-
-            VStack(spacing: 16) {
+            VStack(spacing: BuddySpacing.md) {
                 topBar
                 instructionsCard
                 Spacer()
                 framingHint
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
-            .padding(.bottom, 24)
+            .padding(.horizontal, BuddySpacing.md)
+            .padding(.top, BuddySpacing.xs)
+            .padding(.bottom, BuddySpacing.xl)
         }
     }
 
@@ -50,88 +40,109 @@ struct AlleycatQRScannerScreen: View {
             Spacer()
             Button(action: onCancel) {
                 Text("Cancel")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(.black.opacity(0.45), in: Capsule())
+                    .buddyText(.label, weight: .semibold)
+                    .foregroundStyle(AgentBuddyTheme.textPrimary)
+                    .padding(.horizontal, BuddySpacing.md)
+                    .frame(minHeight: BuddySize.minHitTarget)
+                    .background(AgentBuddyTheme.surface, in: Capsule())
+                    .shadow(color: AgentBuddyTheme.floatingShadow, radius: 12, y: 4)
+                    .contentShape(Capsule())
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("alleycat.scanner.cancelButton")
         }
     }
 
+    /// Explains where the code comes from. Only the public setup command is
+    /// shown here; pairing details stay inside the QR code.
     private var instructionsCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Pair with AgentBuddy")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(.white)
+        VStack(alignment: .leading, spacing: BuddySpacing.md) {
+            VStack(alignment: .leading, spacing: BuddySpacing.xxs) {
+                Text("Scan the pairing code")
+                    .buddyText(.heading)
+                    .foregroundStyle(AgentBuddyTheme.textPrimary)
+                    .accessibilityAddTraits(.isHeader)
+                Text("The code comes from AgentBuddy on your computer.")
+                    .buddyText(.label, weight: .regular)
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
-            stepRow(number: "1", title: "On the host you want to connect to, run:")
-            commandRow
-            stepRow(number: "2", title: "Point this camera at the QR code it prints.")
+            stepRow(number: "1", title: "Open AgentBuddy on the computer and go to Pairing.")
+            stepRow(number: "2", title: "Point this camera at the QR code it shows.")
+
+            BuddyDivider()
+
+            VStack(alignment: .leading, spacing: BuddySpacing.xs) {
+                Text("No desktop app? On the host you want to connect to, run:")
+                    .buddyText(.caption)
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                commandRow
+            }
         }
-        .padding(14)
+        .padding(BuddySpacing.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.black.opacity(0.55))
+            AgentBuddyTheme.surface,
+            in: RoundedRectangle(cornerRadius: BuddyRadius.card, style: .continuous)
         )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(.white.opacity(0.12), lineWidth: 0.8)
-        )
+        .shadow(color: AgentBuddyTheme.floatingShadow, radius: 24, y: 8)
     }
 
-    private func stepRow(number: String, title: String) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Text(number)
-                .font(.system(size: 12, weight: .bold))
-                .foregroundColor(.black)
-                .frame(width: 20, height: 20)
-                .background(AgentBuddyTheme.accent, in: Circle())
+    private func stepRow(number: String, title: LocalizedStringKey) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: BuddySpacing.sm) {
+            Text(verbatim: number)
+                .buddyText(.caption, weight: .semibold)
+                .foregroundStyle(AgentBuddyTheme.onBrand)
+                .frame(width: 24, height: 24)
+                .background(AgentBuddyTheme.brand, in: Circle())
+                .accessibilityHidden(true)
             Text(title)
-                .font(.system(size: 13))
-                .foregroundColor(.white.opacity(0.92))
+                .buddyText(.body)
+                .foregroundStyle(AgentBuddyTheme.textPrimary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
 
     private var commandRow: some View {
-        HStack(spacing: 10) {
-            Text(Self.pairCommand)
-                .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                .foregroundColor(.white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 9)
+        HStack(spacing: BuddySpacing.xs) {
+            Text(verbatim: Self.pairCommand)
+                .buddyText(.code)
+                .foregroundStyle(AgentBuddyTheme.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, BuddySpacing.sm)
+                .padding(.vertical, BuddySpacing.xs)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(.white.opacity(0.12))
+                    AgentBuddyTheme.surfaceSoft,
+                    in: RoundedRectangle(cornerRadius: BuddyRadius.control, style: .continuous)
                 )
+                .textSelection(.enabled)
             Button(action: copyCommand) {
                 Image(systemName: copied ? "checkmark" : "doc.on.doc")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white)
-                    .frame(width: 36, height: 36)
-                    .background(.white.opacity(0.14), in: Circle())
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(copied ? AgentBuddyTheme.success : AgentBuddyTheme.textPrimary)
+                    .frame(width: BuddySize.minHitTarget, height: BuddySize.minHitTarget)
+                    .background(AgentBuddyTheme.surfaceSoft, in: Circle())
+                    .contentShape(Circle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(copied ? Text("Copied") : Text("Copy command"))
             .accessibilityIdentifier("alleycat.scanner.copyCommandButton")
         }
-        .padding(.leading, 30)
     }
 
     private var framingHint: some View {
         Text("Hold steady — the QR code is detected automatically.")
-            .font(.system(size: 12))
-            .foregroundColor(.white.opacity(0.75))
+            .buddyText(.label, weight: .regular)
+            .foregroundStyle(AgentBuddyTheme.textPrimary)
             .multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .background(.black.opacity(0.4), in: Capsule())
+            .padding(.horizontal, BuddySpacing.md)
+            .padding(.vertical, BuddySpacing.xs)
+            .background(AgentBuddyTheme.surface, in: Capsule())
+            .shadow(color: AgentBuddyTheme.floatingShadow, radius: 12, y: 4)
     }
 
     private func copyCommand() {

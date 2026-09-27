@@ -42,147 +42,83 @@ struct SSHLoginSheet: View {
         return "\(server.hostname):\(sshPort)"
     }
 
+    private var canConnect: Bool {
+        !(isConnecting || username.isEmpty || (!useKey && password.isEmpty) || (useKey && privateKey.isEmpty))
+    }
+
     var body: some View {
         NavigationStack {
-            ZStack {
-                AgentBuddyTheme.backgroundGradient.ignoresSafeArea()
-                Form {
-                    Section {
-                        HStack(spacing: 12) {
-                            Image(systemName: "terminal")
-                                .foregroundColor(AgentBuddyTheme.accent)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(server.name)
-                                    .agentBuddyFont(.subheadline)
-                                    .foregroundColor(AgentBuddyTheme.textPrimary)
-                                Text(hostDisplay)
-                                    .agentBuddyFont(.caption)
-                                    .foregroundColor(AgentBuddyTheme.textSecondary)
-                            }
-                        }
-                    }
-                    .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+            ScrollView {
+                VStack(alignment: .leading, spacing: BuddySpacing.xl) {
+                    DiscoveryHostSummary(systemImage: "terminal", name: server.name, address: hostDisplay)
 
-                    Section {
+                    DiscoveryFormSection("Username") {
                         TextField("username", text: $username)
-                            .agentBuddyFont(.footnote)
-                            .foregroundColor(AgentBuddyTheme.textPrimary)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled(true)
-                    } header: {
-                        Text("Username")
-                            .foregroundColor(AgentBuddyTheme.textSecondary)
+                            .discoveryFieldStyle()
                     }
-                    .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
 
-                    Section {
-                        Picker("Method", selection: $useKey) {
-                            Text("Password").tag(false)
-                            Text("SSH Key").tag(true)
-                        }
-                        .pickerStyle(.segmented)
-                        .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+                    DiscoveryFormSection("Authentication") {
+                        VStack(alignment: .leading, spacing: BuddySpacing.sm) {
+                            DiscoverySegmentedPicker(
+                                options: [(false, "Password"), (true, "SSH Key")],
+                                selection: $useKey
+                            )
 
-                        if useKey {
-                            TextEditor(text: $privateKey)
-                                .agentBuddyFont(.caption)
-                                .foregroundColor(AgentBuddyTheme.textPrimary)
-                                .scrollContentBackground(.hidden)
-                                .frame(minHeight: 100)
-                                .overlay(alignment: .topLeading) {
-                                    if privateKey.isEmpty {
-                                        Text("Paste private key here...")
-                                            .agentBuddyFont(.caption)
-                                            .foregroundColor(AgentBuddyTheme.textMuted)
-                                            .padding(.top, 8)
-                                            .padding(.leading, 4)
-                                            .allowsHitTesting(false)
-                                    }
-                                }
-                            SecureField("passphrase (optional)", text: $passphrase)
-                                .agentBuddyFont(.footnote)
-                                .foregroundColor(AgentBuddyTheme.textPrimary)
-                        } else {
-                            passwordInput
-
-                            VStack(alignment: .leading, spacing: 4) {
-                                Toggle(isOn: $unlockMacosKeychain) {
-                                    Text("Unlock keychain (macOS)")
-                                        .agentBuddyFont(.footnote)
-                                        .foregroundColor(AgentBuddyTheme.textPrimary)
-                                }
-                                .tint(AgentBuddyTheme.accent)
-
-                                Text("Uses your SSH/login password during headless bootstrap. Required for tools like gh CLI auth.")
-                                    .agentBuddyFont(.caption)
-                                    .foregroundColor(AgentBuddyTheme.textSecondary)
+                            if useKey {
+                                DiscoveryPasteEditor(text: $privateKey, placeholder: String(localized: "Paste private key here..."))
+                                SecureField("passphrase (optional)", text: $passphrase)
+                                    .discoveryFieldStyle()
+                            } else {
+                                passwordInput
+                                DiscoveryToggleRow(
+                                    title: "Unlock keychain (macOS)",
+                                    detail: "Uses your SSH/login password during headless bootstrap. Required for tools like gh CLI auth.",
+                                    isOn: $unlockMacosKeychain
+                                )
                             }
                         }
-                    } header: {
-                        Text("Authentication")
-                            .foregroundColor(AgentBuddyTheme.textSecondary)
                     }
-                    .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
 
-                    Section {
-                        Toggle(isOn: $rememberCredentials) {
-                            Text("Remember credentials on this device")
-                                .agentBuddyFont(.footnote)
-                                .foregroundColor(AgentBuddyTheme.textPrimary)
-                        }
-                        .tint(AgentBuddyTheme.accent)
-
+                    DiscoveryFormSection("Saved Credentials") {
+                        DiscoveryToggleRow(title: "Remember credentials on this device", isOn: $rememberCredentials)
                         if hasSavedCredentials {
-                            Button(role: .destructive) {
+                            BuddyButton("Forget saved credentials", systemImage: "trash", kind: .destructive) {
                                 forgetSavedCredentials()
-                            } label: {
-                                Text("Forget saved credentials")
-                                    .agentBuddyFont(.footnote)
                             }
                         }
-                    } header: {
-                        Text("Saved Credentials")
-                            .foregroundColor(AgentBuddyTheme.textSecondary)
                     }
-                    .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
-
-                    Section {
-                        Button {
-                            connect()
-                        } label: {
-                            HStack {
-                                if isConnecting {
-                                    ProgressView().tint(AgentBuddyTheme.accent)
-                                }
-                                Text("Connect")
-                                    .foregroundColor(AgentBuddyTheme.accent)
-                                    .agentBuddyFont(.subheadline)
-                            }
-                        }
-                        .disabled(isConnecting || username.isEmpty || (!useKey && password.isEmpty) || (useKey && privateKey.isEmpty))
-                    }
-                    .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
 
                     if let err = errorMessage {
-                        Section {
-                            Text(err)
-                                .foregroundColor(.red)
-                                .agentBuddyFont(.caption)
-                        }
-                        .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+                        BuddyBanner(tone: .danger, message: Text(err))
                     }
                 }
-                .scrollContentBackground(.hidden)
+                .padding(.horizontal, BuddySpacing.xl)
+                .padding(.top, BuddySpacing.md)
+                .padding(.bottom, BuddySpacing.xl)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .buddyPageBackground()
+            .safeAreaInset(edge: .bottom) {
+                BuddyButton("Connect", isLoading: isConnecting) {
+                    connect()
+                }
+                .disabled(!canConnect)
+                .padding(.horizontal, BuddySpacing.xl)
+                .padding(.vertical, BuddySpacing.sm)
+                .background(AgentBuddyTheme.background)
             }
             .navigationTitle("SSH Login")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
-                        .foregroundColor(AgentBuddyTheme.accent)
+                        .foregroundStyle(AgentBuddyTheme.link)
                 }
             }
         }
+        .buddySheetStyle()
         .task {
             guard autoLoadSavedCredentials else { return }
             loadSavedCredentialsIfNeeded()
@@ -196,7 +132,7 @@ struct SSHLoginSheet: View {
     }
 
     private var passwordInput: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 0) {
             Group {
                 if isPasswordVisible {
                     TextField("password", text: $password)
@@ -206,8 +142,6 @@ struct SSHLoginSheet: View {
                         .textContentType(.password)
                 }
             }
-            .agentBuddyFont(.footnote)
-            .foregroundColor(AgentBuddyTheme.textPrimary)
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled(true)
 
@@ -215,11 +149,16 @@ struct SSHLoginSheet: View {
                 isPasswordVisible.toggle()
             } label: {
                 Image(systemName: isPasswordVisible ? "eye.slash" : "eye")
-                    .foregroundColor(AgentBuddyTheme.textSecondary)
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
+                    .frame(width: BuddySize.minHitTarget, height: BuddySize.minHitTarget)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(isPasswordVisible ? "Hide password" : "Show password")
         }
+        .padding(.trailing, -BuddySpacing.sm)
+        .discoveryFieldStyle()
     }
 
     private func connect() {
