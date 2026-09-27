@@ -27,7 +27,9 @@ struct TerminalScreen: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
 
-    let accent = Color(red: 0, green: 1, blue: 0.612)
+    /// The terminal is always a dark console, so its accent comes from the
+    /// dark palette's brand colour regardless of the app appearance.
+    var accent: Color { Color(hex: ThemeStore.shared.dark.brand) }
     let alleycatServerIdPrefix = "alleycat:"
 
     var body: some View {
@@ -101,14 +103,13 @@ struct TerminalScreen: View {
                     dismiss()
                 } label: {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 24, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(width: 54, height: 54)
-                        .background(Color.white.opacity(0.09))
-                        .clipShape(Circle())
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: BuddySize.minHitTarget, height: BuddySize.minHitTarget)
+                        .background(Color.white.opacity(0.09), in: Circle())
                         .overlay {
                             Circle()
-                                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                                .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
                         }
                 }
                 .buttonStyle(.plain)
@@ -118,12 +119,12 @@ struct TerminalScreen: View {
             }
 
             Text("Terminal")
-                .font(.system(size: 22, weight: .bold))
-                .foregroundColor(.white)
+                .buddyText(.heading)
+                .foregroundStyle(.white)
         }
-        .padding(.horizontal, 14)
-        .padding(.top, topInset + 8)
-        .frame(height: topInset + 86)
+        .padding(.horizontal, BuddySpacing.md)
+        .padding(.top, topInset + BuddySpacing.xs)
+        .frame(height: topInset + 64)
         .background(Color.black)
     }
 
@@ -148,7 +149,7 @@ struct TerminalScreen: View {
     }
 
     private var backendBar: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: BuddySpacing.xs) {
             Menu {
                 ForEach(backendOptions) { option in
                     Button {
@@ -170,17 +171,19 @@ struct TerminalScreen: View {
                     Image(systemName: "chevron.down")
                         .font(.system(size: 10, weight: .bold))
                 }
-                .font(.custom("SFMono-Regular", size: 12))
-                .foregroundColor(accent)
-                .padding(.horizontal, 10)
-                .frame(height: 34)
-                .background(Color.white.opacity(0.08))
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .buddyText(.label)
+                .foregroundStyle(accent)
+                .padding(.horizontal, BuddySpacing.sm)
+                .frame(height: BuddySize.compactPill)
+                .background(Color.white.opacity(0.08), in: Capsule())
+                .frame(minHeight: BuddySize.minHitTarget)
+                .contentShape(Rectangle())
             }
+            .accessibilityLabel(Text("Terminal server"))
 
             Text(selectedBackend?.subtitle ?? "Add a remote server")
-                .font(.custom("SFMono-Regular", size: 11))
-                .foregroundColor(.white.opacity(0.48))
+                .buddyText(.caption)
+                .foregroundStyle(.white.opacity(0.6))
                 .lineLimit(1)
 
             Spacer(minLength: 0)
@@ -190,17 +193,19 @@ struct TerminalScreen: View {
             Button {
                 showConfigSheet = true
             } label: {
-                Text("Aa")
-                    .font(.custom("SFMono-Regular", size: 13))
-                    .foregroundColor(accent)
-                    .frame(width: 34, height: 30)
-                    .background(Color.white.opacity(0.08))
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                Text(verbatim: "Aa")
+                    .buddyText(.label, weight: .semibold)
+                    .foregroundStyle(accent)
+                    .frame(width: BuddySize.compactPill + 6, height: BuddySize.compactPill)
+                    .background(Color.white.opacity(0.08), in: Capsule())
+                    .frame(width: BuddySize.minHitTarget, height: BuddySize.minHitTarget)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
             .accessibilityLabel("Theme and font")
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, BuddySpacing.sm)
+        .padding(.vertical, BuddySpacing.xxs)
         .frame(maxWidth: .infinity)
         .background(Color.black)
         .overlay(alignment: .bottom) {
@@ -222,22 +227,23 @@ struct TerminalScreen: View {
                     )
                 }
             )
+            .buddySheetStyle()
         }
     }
 
     private var phaseChip: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: BuddySpacing.xxs) {
             Image(systemName: phaseIcon)
-                .font(.system(size: 10, weight: .semibold))
-            Text(phaseLabel)
-                .font(.custom("SFMono-Regular", size: 11))
+                .font(.system(size: 12, weight: .semibold))
+                .accessibilityHidden(true)
+            Text(verbatim: phaseLabel)
+                .buddyText(.caption, weight: .medium)
                 .lineLimit(1)
         }
-        .foregroundColor(phaseColor)
-        .padding(.horizontal, 8)
-        .frame(height: 22)
-        .background(phaseColor.opacity(0.12))
-        .clipShape(Capsule())
+        .foregroundStyle(phaseColor)
+        .padding(.horizontal, BuddySpacing.xs)
+        .frame(height: 26)
+        .background(phaseColor.opacity(0.14), in: Capsule())
     }
 
     private var phaseIcon: String {
@@ -251,10 +257,10 @@ struct TerminalScreen: View {
 
     var phaseColor: Color {
         switch controller.phase {
-        case .idle, .connecting: return .white.opacity(0.45)
+        case .idle, .connecting: return .white.opacity(0.6)
         case .running: return accent
-        case .exited: return .white.opacity(0.5)
-        case .failed: return .red
+        case .exited: return .white.opacity(0.6)
+        case .failed: return Color(hex: ThemeStore.shared.dark.danger)
         }
     }
 

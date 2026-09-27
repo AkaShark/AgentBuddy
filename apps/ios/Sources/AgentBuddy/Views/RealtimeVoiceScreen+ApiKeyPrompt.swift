@@ -2,47 +2,50 @@ import SwiftUI
 
 extension RealtimeVoiceScreen {
     var realtimeApiKeyPrompt: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: BuddySpacing.sm) {
             Text("Realtime needs an API key")
-                .font(AgentBuddyFont.styled(.headline, weight: .semibold))
-                .foregroundColor(primaryTextColor)
+                .buddyText(.heading)
+                .foregroundStyle(primaryTextColor)
 
             Text("Enter your OpenAI API key for this device. AgentBuddy will store it in the local Codex environment as OPENAI_API_KEY.")
-                .font(AgentBuddyFont.styled(.caption))
-                .foregroundColor(secondaryTextColor)
+                .buddyText(.label, weight: .regular)
+                .foregroundStyle(secondaryTextColor)
                 .fixedSize(horizontal: false, vertical: true)
 
             SecureField("sk-...", text: $apiKey)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
-                .font(AgentBuddyFont.monospaced(.body))
-                .foregroundColor(primaryTextColor)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-                .background(controlFillColor)
+                .buddyText(.code)
+                .foregroundStyle(primaryTextColor)
+                .tint(AgentBuddyTheme.focus)
+                .padding(.horizontal, BuddySpacing.md)
+                .frame(minHeight: BuddySize.control)
+                .background(AgentBuddyTheme.background, in: RoundedRectangle(cornerRadius: BuddyRadius.button, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(promptStrokeColor.opacity(1.75), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: BuddyRadius.button, style: .continuous)
+                        .strokeBorder(AgentBuddyTheme.borderControl, lineWidth: 1)
                 )
-                .clipShape(RoundedRectangle(cornerRadius: 14))
 
             if let apiKeyError, !apiKeyError.isEmpty {
-                Text(apiKeyError)
-                    .font(AgentBuddyFont.styled(.caption))
-                    .foregroundColor(AgentBuddyTheme.danger)
-                    .fixedSize(horizontal: false, vertical: true)
+                BuddyBanner(tone: .danger, message: Text(verbatim: apiKeyError))
             }
 
-            apiKeySaveButton
+            BuddyButton(
+                isSavingApiKey ? "Saving…" : "Save API Key",
+                kind: .primary,
+                isLoading: isSavingApiKey
+            ) {
+                saveApiKeyAndRetry()
+            }
+            .disabled(trimmedApiKey.isEmpty || isSavingApiKey)
         }
-        .padding(18)
+        .padding(BuddySpacing.lg)
         .frame(maxWidth: 420)
-        .background(promptFillColor)
+        .background(AgentBuddyTheme.surface, in: RoundedRectangle(cornerRadius: BuddyRadius.card, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 24)
-                .stroke(promptStrokeColor, lineWidth: 1)
+            RoundedRectangle(cornerRadius: BuddyRadius.card, style: .continuous)
+                .strokeBorder(AgentBuddyTheme.border, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 24))
     }
 
     private func saveApiKeyAndRetry() {
@@ -108,40 +111,5 @@ extension RealtimeVoiceScreen {
                 }
             }
         }
-    }
-
-    @ViewBuilder
-    private var apiKeySaveButton: some View {
-        Button {
-            saveApiKeyAndRetry()
-        } label: {
-            apiKeySaveButtonLabel
-                .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(controlFillColor)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(promptStrokeColor, lineWidth: 1)
-                )
-        }
-        .buttonStyle(.plain)
-        .disabled(trimmedApiKey.isEmpty || isSavingApiKey)
-        .opacity(trimmedApiKey.isEmpty || isSavingApiKey ? 0.55 : 1)
-    }
-
-    private var apiKeySaveButtonLabel: some View {
-        HStack(spacing: 10) {
-            if isSavingApiKey {
-                ProgressView()
-                    .tint(primaryTextColor)
-                    .scaleEffect(0.85)
-            }
-            Text(isSavingApiKey ? "Saving…" : "Save API Key")
-                .font(AgentBuddyFont.styled(.subheadline, weight: .semibold))
-        }
-        .foregroundColor(primaryTextColor)
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
     }
 }

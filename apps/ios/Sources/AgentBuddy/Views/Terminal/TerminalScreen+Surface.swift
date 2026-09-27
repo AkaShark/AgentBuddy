@@ -65,14 +65,13 @@ extension TerminalScreen {
                                     Task { await controller.trustUnknownSshHostAndRetry() }
                                 } label: {
                                     Label("Trust \(challenge.fingerprint)", systemImage: "key.fill")
-                                        .font(.custom("SFMono-Regular", size: 12))
-                                        .foregroundColor(.black)
+                                        .buddyText(.code)
+                                        .foregroundStyle(Color(hex: ThemeStore.shared.dark.onBrand))
                                         .lineLimit(1)
                                         .truncationMode(.middle)
-                                        .padding(.horizontal, 10)
-                                        .frame(height: 32)
-                                        .background(accent)
-                                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                        .padding(.horizontal, BuddySpacing.sm)
+                                        .frame(minHeight: BuddySize.minHitTarget)
+                                        .background(accent, in: RoundedRectangle(cornerRadius: BuddyRadius.control, style: .continuous))
                                 }
                                 .buttonStyle(.plain)
                             }

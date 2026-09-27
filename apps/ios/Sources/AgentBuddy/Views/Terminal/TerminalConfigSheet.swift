@@ -29,15 +29,17 @@ struct TerminalConfigSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Font") {
+                Section {
                     Stepper(value: $draftFontSize, in: 10...24, step: 1) {
                         HStack {
                             Text("Size")
-                                .font(.custom("SFMono-Regular", size: 13))
+                                .buddyText(.body)
+                                .foregroundStyle(AgentBuddyTheme.textPrimary)
                             Spacer()
                             Text("\(Int(draftFontSize)) pt")
-                                .font(.custom("SFMono-Regular", size: 13))
-                                .foregroundColor(.secondary)
+                                .buddyText(.body)
+                                .monospacedDigit()
+                                .foregroundStyle(AgentBuddyTheme.textSecondary)
                         }
                     }
                     Slider(
@@ -47,24 +49,46 @@ struct TerminalConfigSheet: View {
                     ) {
                         Text("Size")
                     }
+                    .tint(AgentBuddyTheme.action)
+                } header: {
+                    sectionHeader("Font")
                 }
+                .listRowBackground(AgentBuddyTheme.surface)
                 .onChange(of: draftFontSize) { _, _ in
                     applyDraft()
                 }
-                Section("Theme") {
+                Section {
                     Picker("Theme", selection: $draftThemeId) {
                         ForEach(TerminalThemeChoice.allCases) { choice in
-                            Text(choice.title).tag(choice.id)
+                            Text(choice.title)
+                                .buddyText(.body)
+                                .foregroundStyle(AgentBuddyTheme.textPrimary)
+                                .tag(choice.id)
                         }
                     }
                     .pickerStyle(.inline)
+                    .labelsHidden()
+                    .tint(AgentBuddyTheme.action)
                     .onChange(of: draftThemeId) { _, _ in applyDraft() }
+                } header: {
+                    sectionHeader("Theme")
                 }
-                Section("Cursor") {
-                    Toggle("Blink", isOn: $draftCursorBlink)
-                        .onChange(of: draftCursorBlink) { _, _ in applyDraft() }
+                .listRowBackground(AgentBuddyTheme.surface)
+                Section {
+                    Toggle(isOn: $draftCursorBlink) {
+                        Text("Blink")
+                            .buddyText(.body)
+                            .foregroundStyle(AgentBuddyTheme.textPrimary)
+                    }
+                    .tint(AgentBuddyTheme.action)
+                    .onChange(of: draftCursorBlink) { _, _ in applyDraft() }
+                } header: {
+                    sectionHeader("Cursor")
                 }
+                .listRowBackground(AgentBuddyTheme.surface)
             }
+            .scrollContentBackground(.hidden)
+            .buddyPageBackground()
             .navigationTitle("Terminal")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -74,6 +98,7 @@ struct TerminalConfigSheet: View {
                         appliedForDismiss = true
                         dismiss()
                     }
+                    .foregroundStyle(AgentBuddyTheme.link)
                 }
             }
             .onDisappear {
@@ -82,6 +107,12 @@ struct TerminalConfigSheet: View {
                 }
             }
         }
+    }
+
+    private func sectionHeader(_ title: LocalizedStringKey) -> some View {
+        Text(title)
+            .buddyText(.caption, weight: .medium)
+            .foregroundStyle(AgentBuddyTheme.textSecondary)
     }
 
     private func applyDraft() {

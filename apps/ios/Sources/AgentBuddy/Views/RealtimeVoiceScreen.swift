@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RealtimeVoiceScreen: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(AppModel.self) var appModel
     @Environment(VoiceRuntimeController.self) var voiceRuntime
     let threadKey: ThreadKey
@@ -36,7 +37,7 @@ struct RealtimeVoiceScreen: View {
     }
 
     var controlFillColor: Color {
-        AgentBuddyTheme.surfaceLight.opacity(colorScheme == .dark ? 0.72 : 0.88)
+        AgentBuddyTheme.surface.opacity(colorScheme == .dark ? 0.82 : 0.92)
     }
     private var session: VoiceSessionState? {
         guard let session = voiceRuntime.activeVoiceSession,
@@ -204,24 +205,27 @@ struct RealtimeVoiceScreen: View {
     @ViewBuilder
     private var transcriptContent: some View {
         VStack(spacing: 16) {
-            HStack(spacing: 8) {
+            HStack(spacing: BuddySpacing.xs) {
                 VoiceScreenPulsingDot(
                     color: phaseColor,
-                    isActive: phase == .listening || phase == .speaking
+                    isActive: (phase == .listening || phase == .speaking) && !reduceMotion
                 )
 
-                Text(phase.displayTitle.uppercased())
-                    .font(AgentBuddyFont.monospaced(.caption, weight: .bold))
-                    .foregroundColor(phaseColor)
-                    .tracking(2)
+                Text(verbatim: phase.displayTitle)
+                    .buddyText(.label, weight: .semibold)
+                    .foregroundStyle(primaryTextColor)
             }
+            .padding(.horizontal, BuddySpacing.sm)
+            .frame(minHeight: BuddySize.compactPill)
+            .background(promptFillColor, in: Capsule())
+            .accessibilityElement(children: .combine)
 
             if phase == .error,
                let error = session?.lastError?.trimmingCharacters(in: .whitespacesAndNewlines),
                !error.isEmpty {
-                Text(error)
-                    .font(AgentBuddyFont.styled(.caption))
-                    .foregroundColor(secondaryTextColor)
+                Text(verbatim: error)
+                    .buddyText(.label, weight: .regular)
+                    .foregroundStyle(secondaryTextColor)
                     .multilineTextAlignment(.center)
                     .lineLimit(3)
                     .padding(.horizontal, 16)
@@ -253,7 +257,7 @@ struct RealtimeVoiceScreen: View {
                         }
                         .onChange(of: transcriptScrollSignature) { _, _ in
                             guard let next = visibleTranscriptEntries.last?.id else { return }
-                            withAnimation(.easeOut(duration: 0.18)) {
+                            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.18)) {
                                 proxy.scrollTo(next, anchor: .bottom)
                             }
                         }
@@ -281,12 +285,12 @@ struct RealtimeVoiceScreen: View {
         default:
             0.34
         }
-        let textStyle: Font.TextStyle = isUser || isSystem ? .body : .title2
+        let textStyle: BuddyTextStyle = isUser || isSystem ? .body : .title
         let fontWeight: Font.Weight = isSystem ? .regular : (isUser ? .regular : .medium)
 
-        return Text(entry.text)
-            .font(AgentBuddyFont.styled(textStyle, weight: fontWeight))
-            .foregroundColor(primaryTextColor.opacity(opacity))
+        return Text(verbatim: entry.text)
+            .buddyText(textStyle, weight: fontWeight)
+            .foregroundStyle((isUser || isSystem ? secondaryTextColor : primaryTextColor).opacity(opacity))
             .multilineTextAlignment(.center)
             .lineSpacing(isUser ? 4 : 6)
             .fixedSize(horizontal: false, vertical: true)
@@ -294,21 +298,21 @@ struct RealtimeVoiceScreen: View {
     }
 
     private var bottomControls: some View {
-        HStack(spacing: 40) {
+        HStack(alignment: .top, spacing: BuddySpacing.xxl) {
             if let session {
                 Button(action: onToggleSpeaker) {
-                    VStack(spacing: 6) {
+                    VStack(spacing: BuddySpacing.xs) {
                         Image(systemName: session.route.iconName)
-                            .font(.system(size: 20, weight: .medium))
-                            .frame(width: 52, height: 52)
-                            .background(controlFillColor)
-                            .clipShape(Circle())
+                            .font(.system(size: 22, weight: .medium))
+                            .frame(width: 64, height: 64)
+                            .background(controlFillColor, in: Circle())
+                            .overlay(Circle().strokeBorder(promptStrokeColor, lineWidth: 1))
 
-                        Text(session.route.label)
-                            .font(AgentBuddyFont.monospaced(.caption2, weight: .medium))
+                        Text(verbatim: session.route.label)
+                            .buddyText(.caption, weight: .medium)
                     }
-                    .foregroundColor(
-                        session.route.supportsSpeakerToggle ? primaryTextColor : secondaryTextColor.opacity(0.6)
+                    .foregroundStyle(
+                        session.route.supportsSpeakerToggle ? primaryTextColor : AgentBuddyTheme.onDisabled
                     )
                 }
                 .buttonStyle(.plain)
@@ -316,14 +320,19 @@ struct RealtimeVoiceScreen: View {
             }
 
             Button(action: onEnd) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(AgentBuddyTheme.textOnAccent)
-                    .frame(width: 64, height: 64)
-                    .background(AgentBuddyTheme.danger)
-                    .clipShape(Circle())
+                VStack(spacing: BuddySpacing.xs) {
+                    Image(systemName: "phone.down.fill")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(AgentBuddyTheme.onAction)
+                        .frame(width: 64, height: 64)
+                        .background(AgentBuddyTheme.danger, in: Circle())
+                    Text("End")
+                        .buddyText(.caption, weight: .medium)
+                        .foregroundStyle(primaryTextColor)
+                }
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(Text("End voice session"))
         }
     }
 
