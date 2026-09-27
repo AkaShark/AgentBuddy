@@ -6,11 +6,8 @@ plugins {
 fun String.asBuildFlag(): Boolean =
     equals("1") || equals("true", ignoreCase = true) || equals("yes", ignoreCase = true)
 
-val androidAbis = System.getenv("ANDROID_ABIS")
-    ?.split(",")
-    ?.map { it.trim() }
-    ?.filter { it.isNotBlank() }
-    ?: listOf("arm64-v8a", "x86_64")
+@Suppress("UNCHECKED_CAST")
+val androidAbis = rootProject.extra["androidAbis"] as List<String>
 
 val ghosttyHeader = file("src/main/cpp/include/ghostty.h")
 val ghosttyLibrariesAvailable = ghosttyHeader.isFile &&

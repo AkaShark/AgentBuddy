@@ -20,6 +20,9 @@ val uploadKeyAlias = projectPropOrEnv("LITTER_UPLOAD_KEY_ALIAS")
 val uploadKeyPassword = projectPropOrEnv("LITTER_UPLOAD_KEY_PASSWORD")
 val hasUploadSigning = listOf(uploadStoreFile, uploadStorePassword, uploadKeyAlias, uploadKeyPassword).all { !it.isNullOrBlank() }
 
+@Suppress("UNCHECKED_CAST")
+val androidAbis = rootProject.extra["androidAbis"] as List<String>
+
 android {
     namespace = "com.akashark.agentbuddy.android"
     compileSdk = 35
@@ -37,6 +40,12 @@ android {
         manifestPlaceholders["runtimeStartupMode"] = "hybrid"
         manifestPlaceholders["enableOnDeviceBridge"] = "true"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Only package ABIs our Rust libs exist for; third-party AARs (WebRTC,
+        // JNA, ML Kit) otherwise add armeabi-v7a/x86/mips copies nothing can load.
+        ndk {
+            abiFilters += androidAbis
+        }
     }
 
     if (hasUploadSigning) {

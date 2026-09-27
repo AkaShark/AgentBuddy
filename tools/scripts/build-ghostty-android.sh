@@ -51,7 +51,9 @@ mkdir -p "$INCLUDE_DIR" "$STAGING_DIR"
 cp "$GHOSTTY_DIR/include/ghostty.h" "$INCLUDE_DIR/ghostty.h"
 
 ZIG_CACHE_DIR="${GHOSTTY_ANDROID_ZIG_CACHE_DIR:-$STAGING_DIR/zig-cache}"
-rm -rf "$ZIG_CACHE_DIR"
+# Keep a pre-populated zig package cache (set GHOSTTY_KEEP_ZIG_CACHE=1), as
+# build-ghostty.sh does for iOS, so a seeded cache survives between runs.
+[ "${GHOSTTY_KEEP_ZIG_CACHE:-0}" = "1" ] || rm -rf "$ZIG_CACHE_DIR"
 mkdir -p "$ZIG_CACHE_DIR/global" "$ZIG_CACHE_DIR/local"
 
 target_for_abi() {

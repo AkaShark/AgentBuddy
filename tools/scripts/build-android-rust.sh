@@ -112,4 +112,8 @@ cargo ndk "${ABI_ARGS[@]}" -o "$OUT_DIR" build --profile "$RUST_PROFILE" -p code
 echo "==> Building codex_bridge Android shared libs..."
 cargo ndk "${ABI_ARGS[@]}" -o "$OUT_DIR" build --profile "$RUST_PROFILE" -p codex-bridge
 
+# cargo-ndk also copies cdylibs that dependencies build for themselves (e.g.
+# libiroh-<hash>.so). Nothing loads them, so keep them out of the APK.
+rm -f "$OUT_DIR"/*/lib*-????????????????.so
+
 echo "==> Done. Android JNI libs are in: $OUT_DIR"

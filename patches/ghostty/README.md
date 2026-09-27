@@ -19,6 +19,14 @@ already declares (checked with `zig fetch` on 2026-09-24). An earlier
 `error: hash mismatch`, so it was removed. If a hash mismatch comes back, check
 `zig version` first: this checkout needs 0.15.2.
 
+The "fetched package" hash `N-V-__8AAEXUywEb8JCSytwiCVUsFb2CwHjOB59jhyRhOhsj`
+is what zig computes when `test/data/artificial-jpeg/hippopotamus-bad-comment-length.jpeg`
+is missing. Endpoint security (ESET real-time protection, 2026-09-27) deletes that
+deliberately malformed JPEG as soon as it is extracted, so the tarball is fine
+but a fresh fetch fails. Do not change the declared hash; copy a complete
+package into the Ghostty zig cache (`<cache>/global/p/<declared-hash>`) and
+build with `GHOSTTY_KEEP_ZIG_CACHE=1` so zig reuses it instead of re-fetching.
+
 ## Proxy handling
 
 The iOS (including Mac Catalyst) and Android Ghostty build scripts default to
