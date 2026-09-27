@@ -5,6 +5,7 @@ struct ConversationPinnedContextStrip: View {
     @State private var todoExpanded = false
     @State private var selectedDiff: PresentedDiff?
     @State private var cachedCombinedPinnedDiff: PresentedDiff?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(items: [ConversationItem]) {
         self.items = items
@@ -14,10 +15,10 @@ struct ConversationPinnedContextStrip: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: BuddySpacing.xs) {
             if pinnedPlan != nil || cachedCombinedPinnedDiff != nil {
                 if let plan = pinnedPlan, let diff = cachedCombinedPinnedDiff {
-                    HStack(alignment: .top, spacing: 10) {
+                    HStack(alignment: .top, spacing: BuddySpacing.xs) {
                         compactTodoAccordion(for: plan)
                             .layoutPriority(1)
                         diffIndicatorButton(for: diff)
@@ -33,8 +34,8 @@ struct ConversationPinnedContextStrip: View {
                 }
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 8)
+        .padding(.horizontal, BuddySpacing.sm)
+        .padding(.top, BuddySpacing.xs)
         .sheet(item: $selectedDiff) { presentedDiff in
             ConversationDiffDetailSheet(
                 title: presentedDiff.title,
@@ -103,61 +104,62 @@ struct ConversationPinnedContextStrip: View {
         if case .todoList(let data) = item.content {
             let completed = data.completedCount
             let total = data.steps.count
-            let summary: String = {
-                if completed == 0 {
-                    return "To do list created with \(total) tasks"
-                }
-                return "\(completed) out of \(total) tasks completed"
-            }()
+            let summary: LocalizedStringKey = completed == 0
+                ? "To do list created with \(total) tasks"
+                : "\(completed) out of \(total) tasks completed"
 
             VStack(alignment: .leading, spacing: 0) {
                 Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
                         todoExpanded.toggle()
                     }
                 } label: {
-                    HStack(spacing: 8) {
+                    HStack(spacing: BuddySpacing.xs) {
                         Image(systemName: completed == total && total > 0 ? "checkmark.circle.fill" : "checklist")
-                            .agentBuddyFont(size: 11, weight: .semibold)
-                            .foregroundColor(completed == total && total > 0 ? AgentBuddyTheme.success : AgentBuddyTheme.accent)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(completed == total && total > 0 ? AgentBuddyTheme.success : AgentBuddyTheme.link)
+                            .accessibilityHidden(true)
                         Text(summary)
-                            .agentBuddyFont(.caption, weight: .semibold)
-                            .foregroundColor(AgentBuddyTheme.textPrimary)
+                            .buddyText(.label, weight: .semibold)
+                            .foregroundStyle(AgentBuddyTheme.textPrimary)
                             .lineLimit(2)
                             .frame(maxWidth: .infinity, alignment: .leading)
                         Image(systemName: "chevron.down")
-                            .agentBuddyFont(size: 11, weight: .medium)
-                            .foregroundColor(AgentBuddyTheme.textMuted)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(AgentBuddyTheme.textSecondary)
                             .rotationEffect(.degrees(todoExpanded ? 180 : 0))
+                            .accessibilityHidden(true)
                     }
+                    .padding(.horizontal, BuddySpacing.sm)
+                    .frame(minHeight: BuddySize.minHitTarget)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
+                .accessibilityHint(Text(todoExpanded ? "Collapses the task list" : "Shows every step"))
 
                 if todoExpanded {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: BuddySpacing.xs) {
                         ForEach(Array(data.steps.enumerated()), id: \.offset) { _, step in
-                            HStack(alignment: .top, spacing: 8) {
+                            HStack(alignment: .top, spacing: BuddySpacing.xs) {
                                 compactTodoStatusView(for: step.status)
                                     .padding(.top, 2)
                                 AgentBuddyMarkdownView(
                                     markdown: step.step,
                                     style: .content,
-                                    bodySize: 12,
-                                    codeSize: 11
+                                    bodySize: 14,
+                                    codeSize: 13
                                 )
-                                    .strikethrough(step.status == .completed, color: AgentBuddyTheme.textMuted)
+                                    .strikethrough(step.status == .completed, color: AgentBuddyTheme.textSecondary)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
                         }
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 10)
+                    .padding(.horizontal, BuddySpacing.sm)
+                    .padding(.bottom, BuddySpacing.sm)
                     .transition(.sectionReveal)
                 }
             }
+            .buddyCard(.surface, radius: BuddyRadius.detailCard, padding: nil)
         }
     }
 
@@ -166,17 +168,20 @@ struct ConversationPinnedContextStrip: View {
         switch status {
         case .pending:
             Image(systemName: "circle")
-                .agentBuddyFont(size: 10, weight: .semibold)
-                .foregroundColor(AgentBuddyTheme.textMuted)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(AgentBuddyTheme.textSecondary)
+                .accessibilityLabel(Text("Not started"))
         case .inProgress:
             ProgressView()
                 .controlSize(.mini)
                 .tint(AgentBuddyTheme.warning)
-                .frame(width: 10, height: 10)
+                .frame(width: 12, height: 12)
+                .accessibilityLabel(Text("In progress"))
         case .completed:
             Image(systemName: "checkmark.circle.fill")
-                .agentBuddyFont(size: 10, weight: .semibold)
-                .foregroundColor(AgentBuddyTheme.success)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(AgentBuddyTheme.success)
+                .accessibilityLabel(Text("Done"))
         }
     }
 
@@ -190,7 +195,10 @@ struct ConversationPinnedContextStrip: View {
             )
         }
         .buttonStyle(.plain)
+        .frame(minHeight: BuddySize.minHitTarget)
+        .contentShape(Rectangle())
         .fixedSize(horizontal: true, vertical: false)
+        .accessibilityLabel(Text("Session changes: \(presented.stats.additions) added, \(presented.stats.deletions) removed"))
     }
 
 }

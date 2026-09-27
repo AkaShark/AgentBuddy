@@ -56,7 +56,7 @@ struct HomeComposerView: View {
     private var attachSheetDetentHeight: CGFloat {
         let showsCamera = !AgentBuddyPlatform.isCatalyst
         let count = 2 + (showsCamera ? 1 : 0)
-        return count >= 3 ? 260 : 210
+        return count >= 3 ? 300 : 240
     }
 
     private var isActive: Bool {
@@ -169,6 +169,7 @@ struct HomeComposerView: View {
                 }
             )
             .presentationDetents([.height(attachSheetDetentHeight)])
+            .buddySheetStyle()
             .presentationDragIndicator(.visible)
         }
         .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhoto, matching: .images)

@@ -713,6 +713,7 @@
 		A30FAA773855EE3BC74FF387 /* AppsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99879379421E46F3576533B6 /* AppsListView.swift */; };
 		A31942A3D02417F864C0AEA3 /* LanguageSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7230AFF4465B1D9A983DBE89 /* LanguageSettingsView.swift */; };
 		A33064AF6AD7DEED8282D94A /* GhosttyTerminalRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F99DCA5F2162C820E0BE32A1 /* GhosttyTerminalRenderer.swift */; };
+		A339E48C4F14DEC56B43087B /* MintGalleryAccessoriesPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 940C6E307580C094608A47DD /* MintGalleryAccessoriesPage.swift */; };
 		A3B6ABFBE7A5D7525EC5FD4F /* ConnectionTarget.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC5400DB4794D588677BFEBE /* ConnectionTarget.swift */; };
 		A3D9EEA58D65B3CFAA613472 /* PiPContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 788869046B23C527612E8261 /* PiPContentView.swift */; };
 		A4992CD8028382E7F819A756 /* SessionsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86861FC5276F62D162F1FA28 /* SessionsScreen.swift */; };
@@ -1037,6 +1038,7 @@
 		EC7635DE9179007E244B03FE /* ConversationComposerPopupOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90AA1B524E4326DAFBB0D07 /* ConversationComposerPopupOverlayView.swift */; };
 		ECAC797D8B9CEE58DCB6028B /* ConversationInfoView+ServerInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C4EBB4F6D83030082301027 /* ConversationInfoView+ServerInfo.swift */; };
 		ECD6508ABC2D57D1F871D392 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = E55B9D02BA0E84390C88D89F /* AppDelegate.swift */; };
+		ECE9AD0E7F22CB124A1B0F37 /* MintGalleryAccessoriesPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 940C6E307580C094608A47DD /* MintGalleryAccessoriesPage.swift */; };
 		ECF6F8AACBB395BD247954B9 /* Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24C2709C655BAF0E797516EF /* Extensions.swift */; };
 		ED244C5E5E833405C92766A1 /* HomeNavigationView+SessionLaunch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25DDA694C23258681E4B0C9F /* HomeNavigationView+SessionLaunch.swift */; };
 		ED29A777B442E4069E00FA61 /* UWBDebugView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F63A3B293A0C81256395AA6 /* UWBDebugView.swift */; };
@@ -1573,6 +1575,7 @@
 		92C0387436224407CC37D26D /* ConversationPinnedContextStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationPinnedContextStrip.swift; sourceTree = "<group>"; };
 		9344FFA3B6117AF5DAFD4617 /* AgentBuddy.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AgentBuddy.entitlements; sourceTree = "<group>"; };
 		93965D5F72A85CEFD9086CA7 /* WatchCompanionBridgeTests+Inbound.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WatchCompanionBridgeTests+Inbound.swift"; sourceTree = "<group>"; };
+		940C6E307580C094608A47DD /* MintGalleryAccessoriesPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintGalleryAccessoriesPage.swift; sourceTree = "<group>"; };
 		94751619AD2BE7CAF1E58873 /* SettingsView+ServerConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsView+ServerConnection.swift"; sourceTree = "<group>"; };
 		9481154F60986FD8461D32A6 /* SessionCanvasLine+Goal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SessionCanvasLine+Goal.swift"; sourceTree = "<group>"; };
 		949A66BCBBFC2BB132CE3377 /* one-dark-pro-D.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "one-dark-pro-D.json"; sourceTree = "<group>"; };
@@ -2285,6 +2288,7 @@
 			children = (
 				6EAF317D3F3648E458B4C13A /* AgentBuddyPreviewData+Factories.swift */,
 				31E433142DE82121B956CA39 /* AgentBuddyPreviewScene.swift */,
+				940C6E307580C094608A47DD /* MintGalleryAccessoriesPage.swift */,
 				237BE2596DA6D6CA147A0E6F /* MintGalleryPages.swift */,
 				3E74492FC688AE785605B528 /* MintGalleryView.swift */,
 				B60B5176C9A23E0E7BC76A41 /* PreviewSupport.swift */,
@@ -3590,6 +3594,7 @@
 				6C2513DE8223F4C426A8518F /* MessageRecorder.swift in Sources */,
 				08FA6F4C07A5ECCF9C346409 /* MessageRenderCache.swift in Sources */,
 				44B4EBFDF6F47F68C631674F /* MinigameOverlayView.swift in Sources */,
+				ECE9AD0E7F22CB124A1B0F37 /* MintGalleryAccessoriesPage.swift in Sources */,
 				2EA906500F6ABC3AA4B2A8D1 /* MintGalleryPages.swift in Sources */,
 				10C61ED6988FFEC605B901E1 /* MintGalleryView.swift in Sources */,
 				1C8F80E2EAD09860943FA8CD /* MobilePreferencesDirectory.swift in Sources */,
@@ -4014,6 +4019,7 @@
 				521202A71E42AB39D8333232 /* MessageRecorder.swift in Sources */,
 				C1BE940B0C7C39A07F5A188E /* MessageRenderCache.swift in Sources */,
 				F8C882A0A96DE80184B56A52 /* MinigameOverlayView.swift in Sources */,
+				A339E48C4F14DEC56B43087B /* MintGalleryAccessoriesPage.swift in Sources */,
 				DBC712330274260D13BF77B4 /* MintGalleryPages.swift in Sources */,
 				4DD087D8A69AC667E51C1315 /* MintGalleryView.swift in Sources */,
 				5CF5A35715F7E40985374567 /* MobilePreferencesDirectory.swift in Sources */,

@@ -12,6 +12,8 @@ enum ConversationComposerPopupState {
     case skill(loading: Bool, suggestions: [SkillMetadata])
 }
 
+/// Suggestion popup above the composer for `/` commands, `@` files/plugins and
+/// `$` skills. Rows are 44pt tall; the token itself is shown in code style.
 struct ConversationComposerPopupOverlayView: View {
     let state: ConversationComposerPopupState
     let onApplySlashSuggestion: (ComposerSlashCommand) -> Void
@@ -26,32 +28,12 @@ struct ConversationComposerPopupOverlayView: View {
 
         case .slash(let suggestions):
             suggestionPopup {
-                let indexedSuggestions = Array(suggestions.enumerated())
-                ForEach(indexedSuggestions, id: \.offset) { item in
-                    let index = item.offset
-                    let command = item.element
-                    VStack(spacing: 0) {
-                        Button {
-                            onApplySlashSuggestion(command)
-                        } label: {
-                            HStack(spacing: 10) {
-                                Text("/\(command.rawValue)")
-                                    .agentBuddyFont(.body)
-                                    .foregroundColor(AgentBuddyTheme.success)
-                                Text(command.description)
-                                    .agentBuddyFont(.body)
-                                    .foregroundColor(AgentBuddyTheme.textSecondary)
-                                    .lineLimit(1)
-                                Spacer(minLength: 0)
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 9)
-                        }
-                        .buttonStyle(.plain)
-
-                        Divider()
-                            .background(AgentBuddyTheme.border)
-                            .opacity(index < suggestions.count - 1 ? 1 : 0)
+                ForEach(Array(suggestions.enumerated()), id: \.offset) { index, command in
+                    suggestionRow(showsDivider: index < suggestions.count - 1) {
+                        onApplySlashSuggestion(command)
+                    } content: {
+                        tokenText("/\(command.rawValue)")
+                        detailText(command.description)
                     }
                 }
             }
@@ -61,50 +43,33 @@ struct ConversationComposerPopupOverlayView: View {
                 let cappedPlugins = Array(plugins.prefix(6))
                 let cappedFiles = Array(suggestions.prefix(8))
                 if cappedPlugins.isEmpty && loading {
-                    popupStateText("Searching files...")
+                    popupStateText(Text("Searching files..."), showsProgress: true)
                 } else if cappedPlugins.isEmpty && cappedFiles.isEmpty {
                     if let error, !error.isEmpty {
-                        popupStateText(error, color: .red)
+                        popupStateText(Text(verbatim: error), systemImage: "exclamationmark.triangle", color: AgentBuddyTheme.danger)
                     } else {
-                        popupStateText("No matches")
+                        popupStateText(Text("No matches"))
                     }
                 } else {
                     if !cappedPlugins.isEmpty {
                         sectionHeader("Plugins")
-                        let indexedPlugins = Array(cappedPlugins.enumerated())
-                        ForEach(indexedPlugins, id: \.element.id) { item in
-                            let index = item.offset
-                            let plugin = item.element
-                            VStack(spacing: 0) {
-                                Button {
-                                    onApplyPluginSuggestion(plugin)
-                                } label: {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "puzzlepiece.extension.fill")
-                                            .agentBuddyFont(.caption)
-                                            .foregroundColor(AgentBuddyTheme.accent)
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(plugin.displayTitle)
-                                                .agentBuddyFont(.footnote)
-                                                .foregroundColor(AgentBuddyTheme.textPrimary)
-                                                .lineLimit(1)
-                                            if let subtitle = plugin.interface?.shortDescription, !subtitle.isEmpty {
-                                                Text(subtitle)
-                                                    .agentBuddyFont(.caption)
-                                                    .foregroundColor(AgentBuddyTheme.textSecondary)
-                                                    .lineLimit(1)
-                                            }
-                                        }
-                                        Spacer(minLength: 0)
+                        ForEach(Array(cappedPlugins.enumerated()), id: \.element.id) { index, plugin in
+                            suggestionRow(showsDivider: index < cappedPlugins.count - 1 || !cappedFiles.isEmpty) {
+                                onApplyPluginSuggestion(plugin)
+                            } content: {
+                                rowIcon("puzzlepiece.extension.fill", color: AgentBuddyTheme.link)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(verbatim: plugin.displayTitle)
+                                        .buddyText(.label)
+                                        .foregroundStyle(AgentBuddyTheme.textPrimary)
+                                        .lineLimit(1)
+                                    if let subtitle = plugin.interface?.shortDescription, !subtitle.isEmpty {
+                                        Text(verbatim: subtitle)
+                                            .buddyText(.caption)
+                                            .foregroundStyle(AgentBuddyTheme.textSecondary)
+                                            .lineLimit(1)
                                     }
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 9)
                                 }
-                                .buttonStyle(.plain)
-
-                                Divider()
-                                    .background(AgentBuddyTheme.border)
-                                    .opacity(index < indexedPlugins.count - 1 || !cappedFiles.isEmpty ? 1 : 0)
                             }
                         }
                     }
@@ -113,32 +78,16 @@ struct ConversationComposerPopupOverlayView: View {
                         if !cappedPlugins.isEmpty {
                             sectionHeader("Files")
                         }
-                        let indexedSuggestions = Array(cappedFiles.enumerated())
-                        ForEach(indexedSuggestions, id: \.offset) { item in
-                            let index = item.offset
-                            let suggestion = item.element
-                            VStack(spacing: 0) {
-                                Button {
-                                    onApplyFileSuggestion(suggestion)
-                                } label: {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "folder")
-                                            .agentBuddyFont(.caption)
-                                            .foregroundColor(AgentBuddyTheme.textSecondary)
-                                        Text(suggestion.path)
-                                            .agentBuddyFont(.footnote)
-                                            .foregroundColor(AgentBuddyTheme.textPrimary)
-                                            .lineLimit(1)
-                                        Spacer(minLength: 0)
-                                    }
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 9)
-                                }
-                                .buttonStyle(.plain)
-
-                                Divider()
-                                    .background(AgentBuddyTheme.border)
-                                    .opacity(index < indexedSuggestions.count - 1 ? 1 : 0)
+                        ForEach(Array(cappedFiles.enumerated()), id: \.offset) { index, suggestion in
+                            suggestionRow(showsDivider: index < cappedFiles.count - 1) {
+                                onApplyFileSuggestion(suggestion)
+                            } content: {
+                                rowIcon("doc", color: AgentBuddyTheme.textSecondary)
+                                Text(verbatim: suggestion.path)
+                                    .buddyText(.code)
+                                    .foregroundStyle(AgentBuddyTheme.textPrimary)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
                             }
                         }
                     }
@@ -148,36 +97,17 @@ struct ConversationComposerPopupOverlayView: View {
         case .skill(let loading, let suggestions):
             suggestionPopup {
                 if loading && suggestions.isEmpty {
-                    popupStateText("Loading skills...")
+                    popupStateText(Text("Loading skills..."), showsProgress: true)
                 } else if suggestions.isEmpty {
-                    popupStateText("No skills found")
+                    popupStateText(Text("No skills found"))
                 } else {
-                    let indexedSuggestions = Array(Array(suggestions.prefix(8)).enumerated())
-                    ForEach(indexedSuggestions, id: \.offset) { item in
-                        let index = item.offset
-                        let skill = item.element
-                        VStack(spacing: 0) {
-                            Button {
-                                onApplySkillSuggestion(skill)
-                            } label: {
-                                HStack(spacing: 8) {
-                                    Text("$\(skill.name)")
-                                        .agentBuddyFont(.footnote)
-                                        .foregroundColor(AgentBuddyTheme.success)
-                                    Text(skill.description)
-                                        .agentBuddyFont(.footnote)
-                                        .foregroundColor(AgentBuddyTheme.textSecondary)
-                                        .lineLimit(1)
-                                    Spacer(minLength: 0)
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 9)
-                            }
-                            .buttonStyle(.plain)
-
-                            Divider()
-                                .background(AgentBuddyTheme.border)
-                                .opacity(index < indexedSuggestions.count - 1 ? 1 : 0)
+                    let capped = Array(suggestions.prefix(8))
+                    ForEach(Array(capped.enumerated()), id: \.offset) { index, skill in
+                        suggestionRow(showsDivider: index < capped.count - 1) {
+                            onApplySkillSuggestion(skill)
+                        } content: {
+                            tokenText("$\(skill.name)")
+                            detailText(skill.description)
                         }
                     }
                 }
@@ -185,41 +115,99 @@ struct ConversationComposerPopupOverlayView: View {
         }
     }
 
-    @ViewBuilder
-    private func sectionHeader(_ title: String) -> some View {
+    // MARK: - Building blocks
+
+    private func suggestionRow<Content: View>(
+        showsDivider: Bool,
+        action: @escaping () -> Void,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(spacing: 0) {
+            Button(action: action) {
+                HStack(spacing: BuddySpacing.xs) {
+                    content()
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, BuddySpacing.sm)
+                .padding(.vertical, BuddySpacing.xxs)
+                .frame(minHeight: BuddySize.minHitTarget)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if showsDivider {
+                BuddyDivider()
+                    .padding(.leading, BuddySpacing.sm)
+            }
+        }
+    }
+
+    private func tokenText(_ token: String) -> some View {
+        Text(verbatim: token)
+            .buddyText(.code)
+            .foregroundStyle(AgentBuddyTheme.link)
+            .lineLimit(1)
+            .fixedSize()
+    }
+
+    private func detailText(_ text: String) -> some View {
+        Text(verbatim: text)
+            .buddyText(.label, weight: .regular)
+            .foregroundStyle(AgentBuddyTheme.textSecondary)
+            .lineLimit(1)
+    }
+
+    private func rowIcon(_ systemImage: String, color: Color) -> some View {
+        Image(systemName: systemImage)
+            .font(.system(size: 17, weight: .medium))
+            .foregroundStyle(color)
+            .frame(width: 24)
+            .accessibilityHidden(true)
+    }
+
+    private func sectionHeader(_ title: LocalizedStringKey) -> some View {
         Text(title)
-            .agentBuddyFont(.caption)
-            .foregroundColor(AgentBuddyTheme.textSecondary)
+            .buddyText(.caption, weight: .medium)
+            .foregroundStyle(AgentBuddyTheme.textSecondary)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 12)
-            .padding(.top, 6)
-            .padding(.bottom, 4)
+            .padding(.horizontal, BuddySpacing.sm)
+            .padding(.top, BuddySpacing.xs)
+            .padding(.bottom, BuddySpacing.xxs)
     }
 
-    @ViewBuilder
-    private func popupStateText(_ text: String, color: Color = AgentBuddyTheme.textSecondary) -> some View {
-        Text(text)
-            .agentBuddyFont(.footnote)
-            .foregroundColor(color)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
+    private func popupStateText(
+        _ text: Text,
+        systemImage: String? = nil,
+        color: Color = AgentBuddyTheme.textSecondary,
+        showsProgress: Bool = false
+    ) -> some View {
+        HStack(spacing: BuddySpacing.xs) {
+            if showsProgress {
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(AgentBuddyTheme.textSecondary)
+            } else if let systemImage {
+                Image(systemName: systemImage)
+                    .accessibilityHidden(true)
+            }
+            text
+                .buddyText(.label, weight: .regular)
+        }
+        .foregroundStyle(color)
+        .frame(maxWidth: .infinity, minHeight: BuddySize.minHitTarget, alignment: .leading)
+        .padding(.horizontal, BuddySpacing.sm)
     }
 
-    @ViewBuilder
     private func suggestionPopup<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         VStack(spacing: 0) {
             content()
         }
+        .padding(.vertical, BuddySpacing.xxs)
         .frame(maxWidth: .infinity)
-        .background(AgentBuddyTheme.surface.opacity(0.95))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(AgentBuddyTheme.border, lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .padding(.horizontal, 12)
-        .padding(.bottom, 4)
+        .buddyCard(.surface, radius: BuddyRadius.detailCard, padding: nil)
+        .shadow(color: AgentBuddyTheme.floatingShadow, radius: 16, y: 6)
+        .padding(.horizontal, BuddySpacing.sm)
+        .padding(.bottom, BuddySpacing.xxs)
         .padding(.bottom, 56)
     }
 }

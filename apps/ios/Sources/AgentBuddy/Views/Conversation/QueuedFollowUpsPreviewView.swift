@@ -1,136 +1,143 @@
 import SwiftUI
 
+/// Messages queued behind the running turn. Each row can be turned into a
+/// steer (sent into the current turn) or removed.
 struct QueuedFollowUpsPreviewView: View {
     let previews: [AppQueuedFollowUpPreview]
     let onSteer: (AppQueuedFollowUpPreview) -> Void
     let onDelete: (AppQueuedFollowUpPreview) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: BuddySpacing.xs) {
+            HStack(spacing: BuddySpacing.xs) {
                 Image(systemName: "clock.arrow.circlepath")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(AgentBuddyTheme.accent)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(AgentBuddyTheme.link)
+                    .accessibilityHidden(true)
                 Text("Queued Next")
-                    .agentBuddyFont(.caption, weight: .semibold)
-                    .foregroundColor(AgentBuddyTheme.textPrimary)
+                    .buddyText(.label, weight: .semibold)
+                    .foregroundStyle(AgentBuddyTheme.textPrimary)
                 Spacer()
-                Text("\(previews.count)")
-                    .agentBuddyFont(.caption2, weight: .semibold)
-                    .foregroundColor(AgentBuddyTheme.textSecondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(AgentBuddyTheme.surface.opacity(0.9))
-                    .clipShape(Capsule())
+                Text(verbatim: "\(previews.count)")
+                    .buddyText(.caption, weight: .semibold)
+                    .monospacedDigit()
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
+                    .padding(.horizontal, BuddySpacing.xs)
+                    .padding(.vertical, 2)
+                    .background(AgentBuddyTheme.surfaceSoft, in: Capsule())
+                    .accessibilityLabel(Text("\(previews.count) queued"))
             }
+            .padding(.top, BuddySpacing.xs)
 
             ForEach(previews, id: \.id) { preview in
-                let style = QueuedFollowUpPreviewStyle.forKind(preview.kind)
-
-                HStack(alignment: .center, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 6) {
-                            Image(systemName: style.symbol)
-                                .font(.system(size: 11, weight: .semibold))
-                            Text(style.title)
-                                .agentBuddyFont(.caption2, weight: .semibold)
-                        }
-                        .foregroundColor(style.tint)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .background(style.tint.opacity(0.14))
-                        .clipShape(Capsule())
-
-                        Text(preview.text)
-                            .agentBuddyFont(.caption)
-                            .foregroundColor(AgentBuddyTheme.textSecondary)
-                            .lineLimit(4)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    if preview.kind == .message || preview.kind == .pendingSteer {
-                        Button(action: { onSteer(preview) }) {
-                            HStack(spacing: 6) {
-                                if preview.kind == .pendingSteer {
-                                    Image(systemName: "checkmark")
-                                        .font(.system(size: 12, weight: .semibold))
-                                    Text("Steering")
-                                        .agentBuddyFont(.caption, weight: .semibold)
-                                } else {
-                                    Image(systemName: "arrow.turn.down.right")
-                                        .font(.system(size: 12, weight: .semibold))
-                                    Text("Steer")
-                                        .agentBuddyFont(.caption, weight: .semibold)
-                                }
-                            }
-                            .foregroundColor(preview.kind == .pendingSteer ? AgentBuddyTheme.accent : AgentBuddyTheme.textPrimary)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(AgentBuddyTheme.surface.opacity(0.96))
-                            .clipShape(Capsule())
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(preview.kind == .pendingSteer)
-                    }
-
-                    Button(action: { onDelete(preview) }) {
-                        Image(systemName: "trash")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(AgentBuddyTheme.textSecondary)
-                            .frame(width: 30, height: 30)
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(12)
-                .background(style.background)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(style.border, lineWidth: 1)
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 14))
+                QueuedFollowUpRow(preview: preview, onSteer: onSteer, onDelete: onDelete)
             }
         }
-        .padding(12)
-        .background(AgentBuddyTheme.codeBackground.opacity(0.92))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .padding(.horizontal, BuddySpacing.sm)
+        .padding(.bottom, BuddySpacing.sm)
+        .buddyCard(.surface, radius: BuddyRadius.detailCard, padding: nil)
+    }
+}
+
+private struct QueuedFollowUpRow: View {
+    let preview: AppQueuedFollowUpPreview
+    let onSteer: (AppQueuedFollowUpPreview) -> Void
+    let onDelete: (AppQueuedFollowUpPreview) -> Void
+
+    var body: some View {
+        let style = QueuedFollowUpPreviewStyle.forKind(preview.kind)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: BuddySpacing.xxs) {
+                Label {
+                    Text(style.title)
+                } icon: {
+                    Image(systemName: style.symbol)
+                }
+                .buddyText(.caption, weight: .semibold)
+                .foregroundStyle(style.tint)
+                .lineLimit(1)
+
+                Spacer(minLength: 0)
+
+                if preview.kind == .message || preview.kind == .pendingSteer {
+                    steerButton
+                }
+
+                BuddyIconButton(
+                    systemImage: "trash",
+                    accessibilityLabel: "Remove queued message",
+                    tone: .plain
+                ) {
+                    onDelete(preview)
+                }
+            }
+
+            Text(verbatim: preview.text)
+                .buddyText(.label, weight: .regular)
+                .foregroundStyle(AgentBuddyTheme.textPrimary)
+                .lineLimit(4)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.trailing, BuddySpacing.sm)
+                .padding(.top, -BuddySpacing.xxs)
+                .padding(.bottom, BuddySpacing.sm)
+        }
+        .padding(.leading, BuddySpacing.sm)
+        .background(style.background, in: RoundedRectangle(cornerRadius: BuddyRadius.control, style: .continuous))
+    }
+
+    private var steerButton: some View {
+        let isPending = preview.kind == .pendingSteer
+        return Button(action: { onSteer(preview) }) {
+            HStack(spacing: BuddySpacing.xxs) {
+                Image(systemName: isPending ? "checkmark" : "arrow.turn.down.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .accessibilityHidden(true)
+                Text(isPending ? "Steering" : "Steer")
+                    .buddyText(.label, weight: .semibold)
+            }
+            .foregroundStyle(isPending ? AgentBuddyTheme.textSecondary : AgentBuddyTheme.textPrimary)
+            .padding(.horizontal, BuddySpacing.sm)
+            .frame(minHeight: BuddySize.compactPill)
+            .background(AgentBuddyTheme.surface, in: Capsule())
+            .overlay(Capsule().strokeBorder(AgentBuddyTheme.borderControl, lineWidth: 1))
+            .frame(minHeight: BuddySize.minHitTarget)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .fixedSize()
+        .disabled(isPending)
+        .accessibilityHint(Text("Sends this message into the running task now"))
     }
 }
 
 private struct QueuedFollowUpPreviewStyle {
-    let title: String
+    let title: LocalizedStringKey
     let symbol: String
     let tint: Color
     let background: Color
-    let border: Color
 
     static func forKind(_ kind: AppQueuedFollowUpKind) -> Self {
         switch kind {
         case .message:
-            let tint = AgentBuddyTheme.accent
             return Self(
                 title: "Queued message",
                 symbol: "text.bubble.fill",
-                tint: tint,
-                background: tint.opacity(0.08),
-                border: tint.opacity(0.24)
+                tint: AgentBuddyTheme.textSecondary,
+                background: AgentBuddyTheme.surfaceSoft
             )
         case .pendingSteer:
-            let tint = AgentBuddyTheme.accentStrong
             return Self(
                 title: "Steer queued",
                 symbol: "arrowshape.turn.up.right.fill",
-                tint: tint,
-                background: tint.opacity(0.10),
-                border: tint.opacity(0.28)
+                tint: AgentBuddyTheme.link,
+                background: AgentBuddyTheme.surfaceSoft
             )
         case .retryingSteer:
-            let tint = AgentBuddyTheme.warning
             return Self(
                 title: "Retrying steer",
                 symbol: "arrow.clockwise",
-                tint: tint,
-                background: tint.opacity(0.10),
-                border: tint.opacity(0.28)
+                tint: AgentBuddyTheme.warning,
+                background: AgentBuddyTheme.warningSurface
             )
         }
     }

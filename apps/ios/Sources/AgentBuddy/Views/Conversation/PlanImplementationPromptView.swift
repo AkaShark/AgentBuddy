@@ -1,54 +1,34 @@
 import SwiftUI
 
+/// Inline confirmation shown when a Plan-mode turn finishes: implement the plan
+/// in Default mode, or stay in Plan mode.
 struct PlanImplementationPromptView: View {
     let onImplement: () -> Void
     let onDismiss: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: BuddySpacing.sm) {
+            HStack(spacing: BuddySpacing.xs) {
                 Image(systemName: "list.bullet.clipboard.fill")
-                    .foregroundColor(AgentBuddyTheme.accent)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(AgentBuddyTheme.link)
+                    .accessibilityHidden(true)
                 Text("Implement Plan")
-                    .agentBuddyFont(.caption, weight: .semibold)
-                    .foregroundColor(AgentBuddyTheme.textPrimary)
-                Spacer()
+                    .buddyText(.heading)
+                    .foregroundStyle(AgentBuddyTheme.textPrimary)
+                Spacer(minLength: 0)
             }
 
             Text("Switch to Default mode and implement the plan?")
-                .agentBuddyFont(.caption)
-                .foregroundColor(AgentBuddyTheme.textSecondary)
+                .buddyText(.label, weight: .regular)
+                .foregroundStyle(AgentBuddyTheme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
 
-            HStack(spacing: 8) {
-                Button {
-                    onImplement()
-                } label: {
-                    Text("Implement")
-                        .agentBuddyFont(.caption2, weight: .semibold)
-                        .foregroundColor(Color.black)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(AgentBuddyTheme.accent)
-                        .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
-
-                Button {
-                    onDismiss()
-                } label: {
-                    Text("Stay in Plan")
-                        .agentBuddyFont(.caption2, weight: .semibold)
-                        .foregroundColor(AgentBuddyTheme.textPrimary)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(AgentBuddyTheme.surface.opacity(0.8))
-                        .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
+            HStack(spacing: BuddySpacing.xs) {
+                BuddyButton("Stay in Plan", kind: .secondary, action: onDismiss)
+                BuddyButton("Implement", kind: .primary, action: onImplement)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .modifier(GlassRectModifier(cornerRadius: 14))
+        .buddyCard(.surface, radius: BuddyRadius.confirmCard, padding: BuddySpacing.md)
     }
 }

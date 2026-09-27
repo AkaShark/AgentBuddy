@@ -35,95 +35,15 @@ struct PendingUserInputPromptView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: "questionmark.bubble.fill")
-                    .foregroundColor(AgentBuddyTheme.warning)
-                Text(promptTitle)
-                    .agentBuddyFont(.caption, weight: .semibold)
-                    .foregroundColor(AgentBuddyTheme.textPrimary)
-                Spacer()
-                Button(action: onDismiss) {
-                    Image(systemName: "xmark.circle.fill")
-                        .agentBuddyFont(.body)
-                        .foregroundColor(AgentBuddyTheme.textMuted)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Dismiss input request")
-            }
-
-            if let requesterLabel {
-                Text(requesterLabel)
-                    .agentBuddyFont(.caption2)
-                    .foregroundColor(AgentBuddyTheme.textMuted)
-            }
+        VStack(alignment: .leading, spacing: BuddySpacing.sm) {
+            header
 
             ForEach(request.questions, id: \.id) { question in
-                VStack(alignment: .leading, spacing: 6) {
-                    if let header = question.header, !header.isEmpty {
-                        Text(header.uppercased())
-                            .agentBuddyFont(.caption2, weight: .bold)
-                            .foregroundColor(AgentBuddyTheme.textMuted)
-                    }
-
-                    Text(question.question)
-                        .agentBuddyFont(.caption)
-                        .foregroundColor(AgentBuddyTheme.textPrimary)
-
-                    if question.isSecret || (!question.isOtherAllowed && question.options.isEmpty) {
-                        Text("This prompt type is not fully supported in the current iOS client.")
-                            .agentBuddyFont(.caption2)
-                            .foregroundColor(AgentBuddyTheme.textSecondary)
-                    } else {
-                        VStack(alignment: .leading, spacing: 8) {
-                            if !question.options.isEmpty {
-                                // ViewThatFits + VStack fallback so long
-                                // option labels wrap to a new row instead
-                                // of squeezing a short option into a narrow
-                                // column with character-by-character wrapping.
-                                let optionButtons = ForEach(question.options, id: \.label) { option in
-                                    let isSelected =
-                                        selectedAnswers[question.id] == option.label &&
-                                        trimmedOtherAnswer(for: question).isEmpty
-                                    Button {
-                                        selectedAnswers[question.id] = option.label
-                                        otherAnswers[question.id] = ""
-                                    } label: {
-                                        Text(option.label)
-                                            .agentBuddyFont(.caption2, weight: .semibold)
-                                            .foregroundColor(isSelected ? Color.black : AgentBuddyTheme.textPrimary)
-                                            .padding(.horizontal, 10)
-                                            .padding(.vertical, 6)
-                                            .background(isSelected ? AgentBuddyTheme.accent : AgentBuddyTheme.surface.opacity(0.8))
-                                            .clipShape(Capsule())
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                                ViewThatFits(in: .horizontal) {
-                                    HStack(spacing: 8) { optionButtons }
-                                    VStack(alignment: .leading, spacing: 8) { optionButtons }
-                                }
-                            }
-
-                            if question.isOtherAllowed {
-                                TextField(
-                                    question.options.isEmpty ? "Enter response" : "Other response",
-                                    text: otherAnswerBinding(for: question)
-                                )
-                                .agentBuddyFont(.caption2)
-                                .foregroundColor(AgentBuddyTheme.textPrimary)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 8)
-                                .background(AgentBuddyTheme.surface.opacity(0.8))
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                            }
-                        }
-                    }
-                }
+                questionBlock(question)
             }
 
             if canSubmit {
-                Button("Submit") {
+                BuddyButton("Submit", systemImage: "paperplane.fill", kind: .primary) {
                     let answers = request.questions.reduce(into: [String: [String]]()) { result, question in
                         let answer = resolvedAnswer(for: question)
                         guard !answer.isEmpty else { return }
@@ -131,17 +51,130 @@ struct PendingUserInputPromptView: View {
                     }
                     onSubmit(answers)
                 }
-                .agentBuddyFont(.caption, weight: .semibold)
-                .foregroundColor(Color.black)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(AgentBuddyTheme.accent)
-                .clipShape(Capsule())
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .modifier(GlassRectModifier(cornerRadius: 14))
+        .padding(.leading, BuddySpacing.md)
+        .padding(.trailing, BuddySpacing.xxs)
+        .padding(.bottom, BuddySpacing.md)
+        .buddyCard(.surface, radius: BuddyRadius.confirmCard, padding: nil)
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: BuddySpacing.xs) {
+                Image(systemName: "questionmark.bubble.fill")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(AgentBuddyTheme.warning)
+                    .accessibilityHidden(true)
+                Text(LocalizedStringKey(promptTitle))
+                    .buddyText(.heading)
+                    .foregroundStyle(AgentBuddyTheme.textPrimary)
+                Spacer(minLength: 0)
+                BuddyIconButton(
+                    systemImage: "xmark",
+                    accessibilityLabel: "Dismiss input request",
+                    tone: .plain,
+                    iconSize: 15,
+                    action: onDismiss
+                )
+            }
+
+            if let requesterLabel {
+                Text(verbatim: requesterLabel)
+                    .buddyText(.caption)
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
+                    .padding(.top, -BuddySpacing.xs)
+            }
+        }
+    }
+
+    private func questionBlock(_ question: PendingUserInputQuestion) -> some View {
+        VStack(alignment: .leading, spacing: BuddySpacing.xs) {
+            if let header = question.header, !header.isEmpty {
+                Text(verbatim: header)
+                    .buddyText(.caption, weight: .semibold)
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
+            }
+
+            Text(verbatim: question.question)
+                .buddyText(.body)
+                .foregroundStyle(AgentBuddyTheme.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if question.isSecret || (!question.isOtherAllowed && question.options.isEmpty) {
+                BuddyBanner(
+                    tone: .warning,
+                    message: Text("This prompt type is not fully supported in the current iOS client.")
+                )
+            } else {
+                answerControls(for: question)
+            }
+        }
+        .padding(.trailing, BuddySpacing.sm)
+    }
+
+    @ViewBuilder
+    private func answerControls(for question: PendingUserInputQuestion) -> some View {
+        if !question.options.isEmpty {
+            // ViewThatFits + VStack fallback so long option labels wrap to a new
+            // row instead of squeezing a short option into a narrow column.
+            let optionButtons = ForEach(question.options, id: \.label) { option in
+                optionButton(option, question: question)
+            }
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: BuddySpacing.xs) { optionButtons }
+                VStack(alignment: .leading, spacing: BuddySpacing.xxs) { optionButtons }
+            }
+        }
+
+        if question.isOtherAllowed {
+            TextField(
+                question.options.isEmpty ? "Enter response" : "Other response",
+                text: otherAnswerBinding(for: question),
+                axis: .vertical
+            )
+            .buddyText(.body)
+            .foregroundStyle(AgentBuddyTheme.textPrimary)
+            .tint(AgentBuddyTheme.focus)
+            .padding(.horizontal, BuddySpacing.sm)
+            .padding(.vertical, BuddySpacing.sm)
+            .frame(minHeight: BuddySize.control)
+            .background(AgentBuddyTheme.background, in: RoundedRectangle(cornerRadius: BuddyRadius.control, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: BuddyRadius.control, style: .continuous)
+                    .strokeBorder(AgentBuddyTheme.borderControl, lineWidth: 1)
+            }
+        }
+    }
+
+    private func optionButton(_ option: PendingUserInputOption, question: PendingUserInputQuestion) -> some View {
+        let isSelected =
+            selectedAnswers[question.id] == option.label &&
+            trimmedOtherAnswer(for: question).isEmpty
+        return Button {
+            selectedAnswers[question.id] = option.label
+            otherAnswers[question.id] = ""
+        } label: {
+            HStack(spacing: BuddySpacing.xxs) {
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 12, weight: .bold))
+                        .accessibilityHidden(true)
+                }
+                Text(verbatim: option.label)
+                    .buddyText(.label)
+                    .multilineTextAlignment(.leading)
+            }
+            .foregroundStyle(isSelected ? AgentBuddyTheme.onAction : AgentBuddyTheme.textPrimary)
+            .padding(.horizontal, BuddySpacing.sm)
+            .padding(.vertical, 7)
+            .frame(minHeight: BuddySize.compactPill)
+            .background(isSelected ? AgentBuddyTheme.action : AgentBuddyTheme.surfaceSoft, in: Capsule())
+            .frame(minHeight: BuddySize.minHitTarget)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private func otherAnswerBinding(for question: PendingUserInputQuestion) -> Binding<String> {

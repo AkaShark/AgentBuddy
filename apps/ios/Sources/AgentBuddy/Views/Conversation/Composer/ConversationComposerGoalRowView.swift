@@ -28,27 +28,29 @@ struct ConversationComposerGoalRowView: View {
     @State private var pulsing = false
     @State private var animatedProgress: Double = 0
 
-    private let cornerRadius: CGFloat = 12
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .center, spacing: 8) {
+        VStack(alignment: .leading, spacing: BuddySpacing.xs) {
+            HStack(alignment: .center, spacing: BuddySpacing.xs) {
                 statusPill
-
-                Text(goal.objective)
-                    .agentBuddyFont(.caption)
-                    .foregroundColor(AgentBuddyTheme.textPrimary)
-                    .lineLimit(2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        draftObjective = goal.objective
-                        showEditSheet = true
-                    }
-                    .accessibilityHint("Tap to edit objective")
-
+                Spacer(minLength: 0)
                 overflowMenu
             }
+
+            Text(verbatim: goal.objective)
+                .buddyText(.label, weight: .regular)
+                .foregroundStyle(AgentBuddyTheme.textPrimary)
+                .lineLimit(3)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.trailing, BuddySpacing.xs)
+                .padding(.top, -BuddySpacing.xs)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    draftObjective = goal.objective
+                    showEditSheet = true
+                }
+                .accessibilityHint("Tap to edit objective")
 
             if let progress = budgetProgress {
                 budgetGauge(progress: progress)
@@ -58,10 +60,11 @@ struct ConversationComposerGoalRowView: View {
                 usageMetricsRow
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(.leading, BuddySpacing.sm)
+        .padding(.trailing, BuddySpacing.xxs)
+        .padding(.vertical, BuddySpacing.xxs)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .modifier(GoalCardChromeModifier(statusTint: statusTint, cornerRadius: cornerRadius))
+        .buddyCard(.surface, radius: BuddyRadius.detailCard, padding: nil)
         .alert("Edit Goal", isPresented: $showEditSheet) {
             TextField("Objective", text: $draftObjective, axis: .vertical)
             Button("Save") {
@@ -96,7 +99,7 @@ struct ConversationComposerGoalRowView: View {
             if goal.status == .active { pulsing = true }
         }
         .onChange(of: budgetProgress ?? 0) { _, new in
-            withAnimation(.spring(response: 0.55, dampingFraction: 0.85)) {
+            withAnimation(reduceMotion ? nil : .spring(response: 0.55, dampingFraction: 0.85)) {
                 animatedProgress = new
             }
         }
@@ -107,29 +110,31 @@ struct ConversationComposerGoalRowView: View {
 
     private var statusPill: some View {
         Button(action: { if canTogglePause { actions.togglePause() } }) {
-            HStack(spacing: 5) {
-                Circle()
-                    .fill(statusTint)
-                    .frame(width: 6, height: 6)
-                    .opacity(goal.status == .active ? (pulsing ? 0.35 : 1.0) : 1.0)
+            HStack(spacing: BuddySpacing.xxs) {
+                Image(systemName: statusIcon)
+                    .font(.system(size: 12, weight: .bold))
+                    .opacity(goal.status == .active && !reduceMotion ? (pulsing ? 0.45 : 1.0) : 1.0)
                     .animation(
-                        goal.status == .active
+                        goal.status == .active && !reduceMotion
                             ? .easeInOut(duration: 1.1).repeatForever(autoreverses: true)
                             : .default,
                         value: pulsing
                     )
+                    .accessibilityHidden(true)
 
                 Text(statusLabel)
-                    .agentBuddyMonoFont(size: 10, weight: .semibold)
-                    .foregroundColor(statusTint)
-                    .textCase(.uppercase)
+                    .buddyText(.caption, weight: .semibold)
+                    .lineLimit(1)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(Capsule().fill(statusTint.opacity(0.14)))
-            .overlay(Capsule().stroke(statusTint.opacity(0.35), lineWidth: 0.5))
+            .foregroundStyle(statusTint)
+            .padding(.horizontal, BuddySpacing.xs)
+            .frame(minHeight: 28)
+            .background(statusSurface, in: Capsule())
+            .frame(minHeight: BuddySize.minHitTarget)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .fixedSize()
         .disabled(!canTogglePause)
         .accessibilityLabel(pauseToggleAccessibilityLabel)
     }
@@ -140,7 +145,7 @@ struct ConversationComposerGoalRowView: View {
                 Button {
                     actions.togglePause()
                 } label: {
-                    Label(pauseResume.label, systemImage: pauseResume.systemImage)
+                    Label(LocalizedStringKey(pauseResume.label), systemImage: pauseResume.systemImage)
                 }
             }
 
@@ -175,9 +180,9 @@ struct ConversationComposerGoalRowView: View {
             }
         } label: {
             Image(systemName: "ellipsis")
-                .agentBuddyFont(size: 12, weight: .bold)
-                .foregroundColor(AgentBuddyTheme.textSecondary)
-                .frame(width: 24, height: 22)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(AgentBuddyTheme.textSecondary)
+                .frame(width: BuddySize.minHitTarget, height: BuddySize.minHitTarget)
                 .contentShape(Rectangle())
         }
         .accessibilityLabel("Goal actions")
@@ -185,37 +190,35 @@ struct ConversationComposerGoalRowView: View {
 
     private func budgetGauge(progress: Double) -> some View {
         let percent = Int((progress * 100).rounded())
-        return HStack(spacing: 8) {
+        return HStack(spacing: BuddySpacing.xs) {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule()
-                        .fill(statusTint.opacity(0.10))
+                        .fill(AgentBuddyTheme.surfaceSoft)
                     Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [progressTint.opacity(0.85), progressTint],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
+                        .fill(progressTint)
                         .frame(width: max(geo.size.width * animatedProgress, animatedProgress > 0 ? 6 : 0))
                 }
             }
             .frame(height: 6)
             .clipShape(Capsule())
+            .accessibilityHidden(true)
 
-            HStack(spacing: 4) {
+            HStack(spacing: BuddySpacing.xxs) {
                 if let budgetLabel {
-                    Text(budgetLabel)
-                        .agentBuddyMonoFont(size: 10, weight: .semibold)
-                        .foregroundColor(AgentBuddyTheme.textSecondary)
+                    Text(verbatim: budgetLabel)
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
                 }
-                Text("\(percent)%")
-                    .agentBuddyMonoFont(size: 10, weight: .bold)
-                    .foregroundColor(progressTextTint)
+                Text(verbatim: "\(percent)%")
+                    .fontWeight(.semibold)
+                    .foregroundStyle(progressTextTint)
             }
+            .buddyText(.caption)
+            .monospacedDigit()
             .fixedSize()
         }
+        .padding(.trailing, BuddySpacing.xs)
+        .accessibilityElement(children: .combine)
     }
 
     private var canTogglePause: Bool {
@@ -249,21 +252,39 @@ struct ConversationComposerGoalRowView: View {
 
     private var statusTint: Color {
         switch goal.status {
-        case .active: return AgentBuddyTheme.accent
-        case .paused: return AgentBuddyTheme.textMuted
+        case .active: return AgentBuddyTheme.link
+        case .paused: return AgentBuddyTheme.textSecondary
         case .blocked, .usageLimited, .budgetLimited: return AgentBuddyTheme.warning
         case .complete: return AgentBuddyTheme.success
         }
     }
 
-    private var statusLabel: String {
+    private var statusSurface: Color {
         switch goal.status {
-        case .active: return "active"
-        case .paused: return "paused"
-        case .blocked: return "blocked"
-        case .usageLimited: return "usage limit"
-        case .budgetLimited: return "limited"
-        case .complete: return "complete"
+        case .active, .paused: return AgentBuddyTheme.surfaceSoft
+        case .blocked, .usageLimited, .budgetLimited: return AgentBuddyTheme.warningSurface
+        case .complete: return AgentBuddyTheme.successSurface
+        }
+    }
+
+    private var statusIcon: String {
+        switch goal.status {
+        case .active: return "target"
+        case .paused: return "pause.fill"
+        case .blocked: return "exclamationmark.triangle.fill"
+        case .usageLimited, .budgetLimited: return "gauge.with.dots.needle.100percent"
+        case .complete: return "checkmark"
+        }
+    }
+
+    private var statusLabel: LocalizedStringKey {
+        switch goal.status {
+        case .active: return "Goal active"
+        case .paused: return "Paused"
+        case .blocked: return "Blocked"
+        case .usageLimited: return "Usage limit"
+        case .budgetLimited: return "Budget reached"
+        case .complete: return "Complete"
         }
     }
 
@@ -307,32 +328,31 @@ struct ConversationComposerGoalRowView: View {
     }
 
     private var usageMetricsRow: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: BuddySpacing.xs) {
             if goal.tokensUsed > 0 {
-                HStack(spacing: 3) {
+                HStack(spacing: BuddySpacing.xxs) {
                     Image(systemName: "circle.hexagongrid")
-                        .agentBuddyMonoFont(size: 9, weight: .semibold)
+                        .accessibilityHidden(true)
                     RollingMetricText(formatTokens(goal.tokensUsed))
-                        .agentBuddyMonoFont(size: 10, weight: .semibold)
                 }
-                .foregroundColor(AgentBuddyTheme.textSecondary)
             }
             if goal.tokensUsed > 0 && goal.timeUsedSeconds > 0 {
-                Text("·")
-                    .agentBuddyMonoFont(size: 10, weight: .semibold)
-                    .foregroundColor(AgentBuddyTheme.textMuted.opacity(0.6))
+                Text(verbatim: "·")
+                    .accessibilityHidden(true)
             }
             if goal.timeUsedSeconds > 0 {
-                HStack(spacing: 3) {
+                HStack(spacing: BuddySpacing.xxs) {
                     Image(systemName: "clock")
-                        .agentBuddyMonoFont(size: 9, weight: .semibold)
+                        .accessibilityHidden(true)
                     RollingMetricText(formatSeconds(goal.timeUsedSeconds))
-                        .agentBuddyMonoFont(size: 10, weight: .semibold)
                 }
-                .foregroundColor(AgentBuddyTheme.textSecondary)
             }
             Spacer(minLength: 0)
         }
+        .buddyText(.caption)
+        .monospacedDigit()
+        .foregroundStyle(AgentBuddyTheme.textSecondary)
+        .padding(.bottom, BuddySpacing.xxs)
     }
 
     private func formatSeconds(_ seconds: Int64) -> String {
@@ -346,44 +366,5 @@ struct ConversationComposerGoalRowView: View {
         let hours = totalSeconds / 3600
         let remainMins = (totalSeconds % 3600) / 60
         return remainMins == 0 ? "\(hours)h" : "\(hours)h \(remainMins)m"
-    }
-}
-
-/// Card chrome for the goal row. On iOS 26+ uses Liquid Glass tinted with the
-/// status color; on older iOS falls back to a vertical gradient that blends
-/// the codeBackground into a subtle status-tinted wash at the bottom.
-private struct GoalCardChromeModifier: ViewModifier {
-    let statusTint: Color
-    let cornerRadius: CGFloat
-
-    func body(content: Content) -> some View {
-        if #available(iOS 26.0, *) {
-            content
-                .glassEffect(
-                    .regular.tint(statusTint.opacity(0.14)).interactive(),
-                    in: .rect(cornerRadius: cornerRadius)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .stroke(statusTint.opacity(0.20), lineWidth: 0.5)
-                )
-        } else {
-            content
-                .background(
-                    LinearGradient(
-                        colors: [
-                            AgentBuddyTheme.codeBackground.opacity(0.92),
-                            statusTint.opacity(0.08)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .stroke(statusTint.opacity(0.28), lineWidth: 1)
-                )
-        }
     }
 }
