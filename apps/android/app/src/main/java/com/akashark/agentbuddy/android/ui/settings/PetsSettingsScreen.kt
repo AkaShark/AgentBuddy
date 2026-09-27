@@ -1,31 +1,15 @@
 package com.akashark.agentbuddy.android.ui.settings
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Pets
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Widgets
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.outlined.Dns
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Pets
+import androidx.compose.material.icons.outlined.PhoneAndroid
+import androidx.compose.material.icons.outlined.PictureInPictureAlt
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -34,17 +18,19 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.akashark.agentbuddy.android.state.PetOverlayController
-import com.akashark.agentbuddy.android.state.connectionModeLabel
 import com.akashark.agentbuddy.android.state.isConnected
-import com.akashark.agentbuddy.android.ui.LocalAppModel
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
+import com.akashark.agentbuddy.android.ui.LocalAppModel
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyBanner
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyBannerTone
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyIconButton
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySize
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySpacing
 import kotlinx.coroutines.launch
 import uniffi.codex_mobile_client.AppPetSummary
 
@@ -97,147 +83,128 @@ internal fun PetsScreen(onBack: () -> Unit) {
         refresh()
     }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .imePadding()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        item {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = AgentBuddyTheme.accent)
-                }
-                Spacer(Modifier.weight(1f))
-                Text("宠物", color = AgentBuddyTheme.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.weight(1f))
-                IconButton(onClick = { refresh() }, enabled = selectedServerId.isNotBlank() && !loading) {
-                    Icon(Icons.Default.Refresh, "刷新", tint = AgentBuddyTheme.accent)
-                }
-            }
-        }
-
-        item { SectionHeader("唤醒") }
-        item {
-            SettingsRow(
-                label = "显示宠物",
-                subtitle = PetOverlayController.selectedPet?.displayName ?: "未选择宠物",
-                icon = { Icon(Icons.Default.Pets, null, tint = AgentBuddyTheme.accent, modifier = Modifier.size(18.dp)) },
-                trailing = {
-                    Switch(
-                        checked = PetOverlayController.visible,
-                        onCheckedChange = { PetOverlayController.setVisible(context, it) },
-                        colors = SwitchDefaults.colors(checkedTrackColor = AgentBuddyTheme.accent),
-                    )
-                },
+    SettingsPage(
+        title = "宠物",
+        onBack = onBack,
+        headerTrailing = {
+            BuddyIconButton(
+                icon = Icons.Outlined.Refresh,
+                contentDescription = "刷新宠物列表",
+                onClick = { refresh() },
+                enabled = selectedServerId.isNotBlank() && !loading,
+                iconSize = BuddySize.iconLarge,
             )
-        }
-        item {
-            SettingsRow(
-                label = "悬浮在其他应用之上",
-                subtitle = if (overlayPermissionGranted) {
-                    "已授予悬浮窗权限"
-                } else {
-                    "需要「显示在其他应用上层」权限"
-                },
-                icon = { Icon(Icons.Default.Widgets, null, tint = AgentBuddyTheme.accent, modifier = Modifier.size(18.dp)) },
-                trailing = {
-                    Switch(
-                        checked = PetOverlayController.overlayEnabled,
-                        onCheckedChange = { enabled ->
-                            PetOverlayController.setOverlayEnabled(context, enabled)
-                            if (enabled && !overlayPermissionGranted) {
-                                PetOverlayController.requestOverlayPermission(context)
-                            }
-                        },
-                        colors = SwitchDefaults.colors(checkedTrackColor = AgentBuddyTheme.accent),
-                    )
+        },
+    ) {
+        settingsSection("唤醒", key = "wake") {
+            SettingsSwitchRow(
+                title = "显示宠物",
+                subtitle = PetOverlayController.selectedPet?.displayName ?: "未选择宠物",
+                icon = Icons.Outlined.Pets,
+                checked = PetOverlayController.visible,
+                onCheckedChange = { PetOverlayController.setVisible(context, it) },
+            )
+            SettingsRowDivider()
+            SettingsSwitchRow(
+                title = "悬浮在其他应用之上",
+                subtitle = if (overlayPermissionGranted) "已授予悬浮窗权限" else "需要「显示在其他应用上层」权限",
+                icon = Icons.Outlined.PictureInPictureAlt,
+                checked = PetOverlayController.overlayEnabled,
+                onCheckedChange = { enabled ->
+                    PetOverlayController.setOverlayEnabled(context, enabled)
+                    if (enabled && !overlayPermissionGranted) {
+                        PetOverlayController.requestOverlayPermission(context)
+                    }
                 },
                 onClick = if (!overlayPermissionGranted) {
                     { PetOverlayController.requestOverlayPermission(context) }
                 } else {
                     null
                 },
+                onClickLabel = "授予悬浮窗权限",
             )
         }
 
-        item { SectionHeader("服务器") }
-        if (connectedServers.isEmpty()) {
-            item { SettingsRow(label = "请先连接到服务器") }
-        } else {
-            items(connectedServers, key = { it.serverId }) { server ->
-                SettingsRow(
-                    label = server.displayName,
-                    subtitle = server.connectionModeLabel,
-                    trailing = {
-                        if (server.serverId == selectedServerId) {
-                            Icon(Icons.Default.Check, null, tint = AgentBuddyTheme.accentStrong, modifier = Modifier.size(18.dp))
-                        }
-                    },
-                    onClick = { selectedServerId = server.serverId },
-                )
-            }
-        }
-
-        item { SectionHeader("宠物") }
-        when {
-            selectedServerId.isBlank() -> {
-                item { SettingsRow(label = "未选择服务器") }
-            }
-            loading -> {
-                item {
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .background(AgentBuddyTheme.surface.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), color = AgentBuddyTheme.accent, strokeWidth = 2.dp)
-                        Spacer(Modifier.width(10.dp))
-                        Text("正在加载宠物", color = AgentBuddyTheme.textSecondary, fontSize = 13.sp)
-                    }
-                }
-            }
-            error != null -> {
-                item { SettingsRow(label = "无法加载宠物", subtitle = error) }
-            }
-            pets.isEmpty() -> {
-                item { SettingsRow(label = "未找到宠物", subtitle = "~/.codex/pets 中没有 hatch-pet 包") }
-            }
-            else -> {
-                items(pets, key = { it.id }) { pet ->
-                    val selected = PetOverlayController.selectedPet?.serverId == selectedServerId &&
-                        PetOverlayController.selectedPet?.id == pet.id
-                    SettingsRow(
-                        label = pet.displayName,
-                        subtitle = pet.validationError ?: pet.description ?: pet.sourcePath,
-                        trailing = {
-                            if (PetOverlayController.isLoading && selected) {
-                                CircularProgressIndicator(modifier = Modifier.size(18.dp), color = AgentBuddyTheme.accent, strokeWidth = 2.dp)
-                            } else if (selected) {
-                                Icon(Icons.Default.Check, null, tint = AgentBuddyTheme.accentStrong, modifier = Modifier.size(18.dp))
-                            }
-                        },
-                        onClick = if (pet.hasValidSpritesheet) {
-                            {
-                                scope.launch {
-                                    PetOverlayController.selectPet(context, appModel, selectedServerId, pet)
-                                }
-                            }
-                        } else {
-                            null
-                        },
+        settingsSection("服务器", key = "servers") {
+            if (connectedServers.isEmpty()) {
+                SettingsNoteRow("请先连接到服务器", icon = Icons.Outlined.Info)
+            } else {
+                connectedServers.forEachIndexed { index, server ->
+                    if (index > 0) SettingsRowDivider()
+                    SettingsSelectRow(
+                        title = settingsServerDisplayName(server),
+                        subtitle = if (server.isLocal) "本地" else "远程",
+                        icon = if (server.isLocal) Icons.Outlined.PhoneAndroid else Icons.Outlined.Dns,
+                        selected = server.serverId == selectedServerId,
+                        onClick = { selectedServerId = server.serverId },
                     )
                 }
             }
         }
 
-        PetOverlayController.errorMessage?.let { message ->
-            item { SettingsRow(label = "宠物加载失败", subtitle = message) }
+        settingsSection("宠物", key = "pets") {
+            when {
+                selectedServerId.isBlank() -> SettingsNoteRow("未选择服务器", icon = Icons.Outlined.Info)
+                loading ->
+                    SettingsRow(
+                        title = "正在加载宠物",
+                        titleColor = AgentBuddyTheme.textSecondary,
+                        leading = { SettingsSpinner() },
+                    )
+                error != null ->
+                    SettingsRow(
+                        title = "无法加载宠物",
+                        subtitle = error,
+                        icon = Icons.Outlined.ErrorOutline,
+                        iconTint = AgentBuddyTheme.danger,
+                    )
+                pets.isEmpty() ->
+                    SettingsRow(
+                        title = "未找到宠物",
+                        subtitle = "~/.codex/pets 中没有 hatch-pet 包",
+                        icon = Icons.Outlined.Info,
+                    )
+                else ->
+                    pets.forEachIndexed { index, pet ->
+                        if (index > 0) SettingsRowDivider(indentForIcon = false)
+                        val selected = PetOverlayController.selectedPet?.serverId == selectedServerId &&
+                            PetOverlayController.selectedPet?.id == pet.id
+                        SettingsRow(
+                            title = pet.displayName,
+                            subtitle = pet.validationError ?: pet.description ?: pet.sourcePath,
+                            subtitleColor = if (pet.validationError != null) AgentBuddyTheme.danger else AgentBuddyTheme.textSecondary,
+                            titleWeight = if (selected) FontWeight.SemiBold else null,
+                            enabled = pet.hasValidSpritesheet,
+                            modifier = Modifier.selectable(
+                                selected = selected,
+                                enabled = pet.hasValidSpritesheet,
+                                role = Role.RadioButton,
+                                onClick = {
+                                    scope.launch {
+                                        PetOverlayController.selectPet(context, appModel, selectedServerId, pet)
+                                    }
+                                },
+                            ),
+                            trailing = {
+                                if (PetOverlayController.isLoading && selected) {
+                                    SettingsSpinner()
+                                } else if (selected) {
+                                    SettingsCheckmark()
+                                }
+                            },
+                        )
+                    }
+            }
         }
 
-        item { Spacer(Modifier.height(32.dp)) }
+        PetOverlayController.errorMessage?.let { message ->
+            item(key = "petError") {
+                BuddyBanner(
+                    tone = BuddyBannerTone.DANGER,
+                    message = "宠物加载失败：$message",
+                    modifier = Modifier.padding(top = BuddySpacing.md),
+                )
+            }
+        }
     }
 }

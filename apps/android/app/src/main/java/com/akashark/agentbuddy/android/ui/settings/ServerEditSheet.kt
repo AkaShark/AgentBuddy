@@ -179,7 +179,7 @@ internal fun ServerEditSheet(
 
             LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 item {
-                    SectionHeader("名称")
+                    SettingsSectionHeader("名称")
                     OutlinedTextField(
                         value = displayName,
                         onValueChange = { displayName = it },
@@ -191,7 +191,7 @@ internal fun ServerEditSheet(
                 }
 
                 item {
-                    SectionHeader(connectionMode.formHeader)
+                    SettingsSectionHeader(connectionMode.formHeader)
 
                     if (originalSaved?.alleycatNodeId != null || originalSaved?.alleycatAgentWire == "ssh-bridge") {
                         Text(

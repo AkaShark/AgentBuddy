@@ -104,7 +104,7 @@ internal fun AppearanceScreen(onBack: () -> Unit) {
 
         LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             // Appearance mode
-            item { SectionHeader("模式") }
+            item { SettingsSectionHeader("模式") }
             item {
                 AppearanceModePicker(
                     selectedMode = appearanceMode,
@@ -121,7 +121,7 @@ internal fun AppearanceScreen(onBack: () -> Unit) {
             }
 
             // Font size slider
-            item { SectionHeader("字号") }
+            item { SettingsSectionHeader("字号") }
             item {
                 Column(
                     Modifier.fillMaxWidth()
@@ -156,7 +156,7 @@ internal fun AppearanceScreen(onBack: () -> Unit) {
             }
 
             // Wallpaper picker
-            item { SectionHeader("聊天壁纸") }
+            item { SettingsSectionHeader("聊天壁纸") }
             item {
                 Row(
                     modifier = Modifier
@@ -207,7 +207,7 @@ internal fun AppearanceScreen(onBack: () -> Unit) {
             }
 
             // Conversation preview
-            item { SectionHeader("预览") }
+            item { SettingsSectionHeader("预览") }
             item {
                 val scale = com.akashark.agentbuddy.android.ui.ConversationTextSize.fromStep(textSizeStep.toInt()).scale
                 val previewFontSize = (14f * scale).sp
@@ -302,7 +302,7 @@ internal fun AppearanceScreen(onBack: () -> Unit) {
             }
 
             // Light theme picker
-            item { SectionHeader("浅色主题") }
+            item { SettingsSectionHeader("浅色主题") }
             item {
                 val selectedLight = AgentBuddyThemeManager.lightThemes.firstOrNull {
                     it.slug == AgentBuddyThemeManager.lightTheme.slug
@@ -311,7 +311,7 @@ internal fun AppearanceScreen(onBack: () -> Unit) {
             }
 
             // Dark theme picker
-            item { SectionHeader("深色主题") }
+            item { SettingsSectionHeader("深色主题") }
             item {
                 val selectedDark = AgentBuddyThemeManager.darkThemes.firstOrNull {
                     it.slug == AgentBuddyThemeManager.darkTheme.slug
