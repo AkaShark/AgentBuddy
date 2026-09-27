@@ -1,22 +1,9 @@
 package com.akashark.agentbuddy.android.ui.settings
 
 import android.app.Activity
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -24,12 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import com.akashark.agentbuddy.android.auth.ChatGPTOAuthActivity
@@ -37,7 +19,6 @@ import com.akashark.agentbuddy.android.state.ChatGPTOAuth
 import com.akashark.agentbuddy.android.state.ChatGPTOAuthTokenStore
 import com.akashark.agentbuddy.android.state.OpenAIApiKeyStore
 import com.akashark.agentbuddy.android.ui.LocalAppModel
-import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
 import com.akashark.agentbuddy.android.util.LLog
 import kotlinx.coroutines.launch
 import uniffi.codex_mobile_client.Account
@@ -76,7 +57,7 @@ fun AccountSheet(
         if (result.resultCode == Activity.RESULT_OK) {
             val tokens = ChatGPTOAuthActivity.parseResult(result.data)
             if (tokens == null) {
-                error = "ChatGPT login returned incomplete credentials."
+                error = "ChatGPT 登录返回的凭据不完整。"
                 LLog.w("ChatGPTOAuth", "account sheet auth result missing tokens")
                 return@rememberLauncherForActivityResult
             }
@@ -105,15 +86,12 @@ fun AccountSheet(
         }
     }
 
-    val allowsLocalEnvApiKey = server?.isLocal == true
-    val isChatGPTAccount = account is Account.Chatgpt
-
-    androidx.compose.runtime.LaunchedEffect(serverId, account) {
+    LaunchedEffect(serverId, account) {
         hasStoredApiKey = apiKeyStore.hasStoredKey()
         hasStoredBaseUrl = apiKeyStore.hasStoredBaseUrl()
     }
 
-    androidx.compose.runtime.LaunchedEffect(serverId) {
+    LaunchedEffect(serverId) {
         runCatching {
             appModel.client.refreshAccount(
                 serverId,
@@ -126,260 +104,115 @@ fun AccountSheet(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .imePadding()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(
-            text = "账户",
-            color = AgentBuddyTheme.textPrimary,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
-
-        Text(
-            text = server?.displayName ?: serverId,
-            color = AgentBuddyTheme.textSecondary,
-            fontSize = 13.sp,
-        )
-
-        // Current account status
-        when (account) {
-            is Account.Chatgpt -> {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(AgentBuddyTheme.surface, RoundedCornerShape(8.dp))
-                        .padding(12.dp),
-                ) {
-                    Text("已登录", color = AgentBuddyTheme.accent, fontSize = 13.sp)
-                    Text(account.email, color = AgentBuddyTheme.textPrimary, fontSize = 14.sp)
+    AccountSheetContent(
+        state = AccountSheetState(
+            serverName = server?.let(::settingsServerDisplayName) ?: serverId,
+            isLocal = server?.isLocal,
+            signIn = when (account) {
+                is Account.Chatgpt -> AccountSignIn.CHATGPT
+                is Account.ApiKey -> AccountSignIn.API_KEY
+                null -> AccountSignIn.NONE
+            },
+            email = (account as? Account.Chatgpt)?.email,
+            hasStoredApiKey = hasStoredApiKey,
+            hasStoredBaseUrl = hasStoredBaseUrl,
+            apiKey = apiKey,
+            baseUrl = openAIBaseUrl,
+            isAuthWorking = isAuthWorking,
+            error = error,
+        ),
+        actions = AccountSheetActions(
+            onDismiss = onDismiss,
+            onLogin = {
+                try {
+                    error = null
+                    isAuthWorking = true
+                    authLauncher.launch(
+                        ChatGPTOAuthActivity.createIntent(
+                            context,
+                            ChatGPTOAuth.createLoginAttempt(),
+                        ),
+                    )
+                } catch (e: Exception) {
+                    isAuthWorking = false
+                    error = e.localizedMessage ?: e.message
                 }
-            }
-
-            is Account.ApiKey -> {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(AgentBuddyTheme.surface, RoundedCornerShape(8.dp))
-                        .padding(12.dp),
-                ) {
-                    Text("API 密钥已配置", color = AgentBuddyTheme.accent, fontSize = 13.sp)
+            },
+            onLogout = {
+                scope.launch {
+                    ChatGPTOAuthTokenStore(context).clear()
+                    apiKeyStore.clear()
+                    appModel.client.logoutAccount(serverId)
+                    appModel.restartLocalServer()
                 }
-            }
-
-            null -> Unit
-        }
-
-        if (server?.isLocal == true && hasStoredApiKey) {
-            Text(
-                "本地 OpenAI API 密钥已保存。",
-                color = AgentBuddyTheme.accent,
-                fontSize = 12.sp,
-            )
-        }
-
-        if (server?.isLocal == true && hasStoredBaseUrl) {
-            Text(
-                "OpenAI 兼容的基础 URL 已保存。",
-                color = AgentBuddyTheme.accent,
-                fontSize = 12.sp,
-            )
-        }
-
-        if (server?.isLocal == true && account != null) {
-            OutlinedButton(
-                onClick = {
-                    scope.launch {
-                            ChatGPTOAuthTokenStore(context).clear()
-                            apiKeyStore.clear()
-                            appModel.client.logoutAccount(serverId)
-                            appModel.restartLocalServer()
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("退出登录")
-            }
-        }
-
-        if (server?.isLocal == true && !isChatGPTAccount) {
-            Button(
-                onClick = {
+            },
+            onApiKeyChange = { apiKey = it },
+            onSaveApiKey = {
+                scope.launch {
                     try {
-                        error = null
-                        isAuthWorking = true
-                        authLauncher.launch(
-                            ChatGPTOAuthActivity.createIntent(
-                                context,
-                                ChatGPTOAuth.createLoginAttempt(),
-                            ),
-                        )
-                    } catch (e: Exception) {
-                        isAuthWorking = false
-                        error = e.localizedMessage ?: e.message
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = AgentBuddyTheme.accent,
-                    contentColor = Color.Black,
-                ),
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !isAuthWorking,
-            ) {
-                Text("使用 ChatGPT 登录")
-            }
-        }
-
-        if (allowsLocalEnvApiKey) {
-            if (hasStoredApiKey) {
-                Text(
-                    "OpenAI API 密钥已保存在本地环境中。",
-                    color = AgentBuddyTheme.textSecondary,
-                    fontSize = 12.sp,
-                )
-            } else if (isChatGPTAccount) {
-                Text(
-                    "在本地 Codex 环境中保存 OpenAI API 密钥。",
-                    color = AgentBuddyTheme.textSecondary,
-                    fontSize = 12.sp,
-                )
-            } else {
-                Text("或为本地环境保存一个 API 密钥：", color = AgentBuddyTheme.textSecondary, fontSize = 12.sp)
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = apiKey,
-                    onValueChange = { apiKey = it },
-                    label = { Text("API 密钥") },
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier.weight(1f),
-                )
-                Button(
-                    onClick = {
-                        scope.launch {
-                            try {
-                                apiKeyStore.save(apiKey.trim())
-                                if (account is Account.ApiKey) {
-                                    appModel.client.logoutAccount(serverId)
-                                }
-                                appModel.restartLocalServer()
-                                hasStoredApiKey = apiKeyStore.hasStoredKey()
-                                if (hasStoredApiKey) {
-                                    apiKey = ""
-                                } else {
-                                    error = "API 密钥未能本地保存。"
-                                    return@launch
-                                }
-                                error = null
-                            } catch (e: Exception) {
-                                error = e.message
-                            }
+                        apiKeyStore.save(apiKey.trim())
+                        if (account is Account.ApiKey) {
+                            appModel.client.logoutAccount(serverId)
                         }
-                    },
-                    enabled = apiKey.isNotBlank(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = AgentBuddyTheme.accent,
-                        contentColor = Color.Black,
-                    ),
-                ) {
-                    Text(if (hasStoredApiKey) "更新 API 密钥" else "保存 API 密钥")
-                }
-            }
-
-            Text(
-                if (hasStoredBaseUrl) {
-                    "已为本地 Codex 服务器保存自定义的 OpenAI 兼容端点。"
-                } else {
-                    "用于本地模型的可选 OpenAI 兼容端点。"
-                },
-                color = AgentBuddyTheme.textSecondary,
-                fontSize = 12.sp,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = openAIBaseUrl,
-                    onValueChange = { openAIBaseUrl = it },
-                    label = { Text("Base URL") },
-                    placeholder = { Text("http://host:port/v1") },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f),
-                )
-                Button(
-                    onClick = {
-                        val normalized = normalizeOpenAIBaseUrl(openAIBaseUrl)
-                        if (normalized == null) {
-                            error = "Enter a valid http or https base URL."
+                        appModel.restartLocalServer()
+                        hasStoredApiKey = apiKeyStore.hasStoredKey()
+                        if (hasStoredApiKey) {
+                            apiKey = ""
                         } else {
-                            scope.launch {
-                                isAuthWorking = true
-                                try {
-                                    apiKeyStore.saveBaseUrl(normalized)
-                                    appModel.restartLocalServer()
-                                    hasStoredBaseUrl = apiKeyStore.hasStoredBaseUrl()
-                                    if (hasStoredBaseUrl) {
-                                        openAIBaseUrl = ""
-                                        error = null
-                                    } else {
-                                        error = "Base URL did not persist locally."
-                                    }
-                                } catch (e: Exception) {
-                                    error = e.message
-                                } finally {
-                                    isAuthWorking = false
-                                }
-                            }
+                            error = "API 密钥未能本地保存。"
+                            return@launch
                         }
-                    },
-                    enabled = openAIBaseUrl.isNotBlank() && !isAuthWorking,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = AgentBuddyTheme.accent,
-                        contentColor = Color.Black,
-                    ),
-                ) {
-                    Text(if (hasStoredBaseUrl) "更新" else "保存")
+                        error = null
+                    } catch (e: Exception) {
+                        error = e.message
+                    }
                 }
-            }
-            if (hasStoredBaseUrl) {
-                OutlinedButton(
-                    onClick = {
-                        scope.launch {
-                            isAuthWorking = true
-                            try {
-                                apiKeyStore.clearBaseUrl()
-                                appModel.restartLocalServer()
-                                hasStoredBaseUrl = apiKeyStore.hasStoredBaseUrl()
+            },
+            onBaseUrlChange = { openAIBaseUrl = it },
+            onSaveBaseUrl = {
+                val normalized = normalizeOpenAIBaseUrl(openAIBaseUrl)
+                if (normalized == null) {
+                    error = "请输入有效的 http 或 https Base URL。"
+                } else {
+                    scope.launch {
+                        isAuthWorking = true
+                        try {
+                            apiKeyStore.saveBaseUrl(normalized)
+                            appModel.restartLocalServer()
+                            hasStoredBaseUrl = apiKeyStore.hasStoredBaseUrl()
+                            if (hasStoredBaseUrl) {
                                 openAIBaseUrl = ""
                                 error = null
-                            } catch (e: Exception) {
-                                error = e.message
-                            } finally {
-                                isAuthWorking = false
+                            } else {
+                                error = "Base URL 未能本地保存。"
                             }
+                        } catch (e: Exception) {
+                            error = e.message
+                        } finally {
+                            isAuthWorking = false
                         }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !isAuthWorking,
-                ) {
-                    Text("清除 Base URL")
+                    }
                 }
-            }
-        } else if (server?.isLocal == false) {
-            Text(
-                "Remote servers request their own OAuth login when needed. Account login and API key entry stay local-only.",
-                color = AgentBuddyTheme.textSecondary,
-                fontSize = 12.sp,
-            )
-        }
-
-        error?.let {
-            Text(it, color = AgentBuddyTheme.danger, fontSize = 12.sp)
-        }
-    }
+            },
+            onClearBaseUrl = {
+                scope.launch {
+                    isAuthWorking = true
+                    try {
+                        apiKeyStore.clearBaseUrl()
+                        appModel.restartLocalServer()
+                        hasStoredBaseUrl = apiKeyStore.hasStoredBaseUrl()
+                        openAIBaseUrl = ""
+                        error = null
+                    } catch (e: Exception) {
+                        error = e.message
+                    } finally {
+                        isAuthWorking = false
+                    }
+                }
+            },
+        ),
+        modifier = Modifier.imePadding(),
+    )
 }
 
 private fun normalizeOpenAIBaseUrl(rawValue: String): String? {
