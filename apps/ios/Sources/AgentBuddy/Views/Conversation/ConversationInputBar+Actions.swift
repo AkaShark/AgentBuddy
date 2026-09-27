@@ -83,12 +83,15 @@ extension ConversationInputBar {
         let image = attachedImage
         let files = attachedFiles
         guard !text.isEmpty || image != nil || !files.isEmpty else { return }
+        let slashInvocation = (image == nil && files.isEmpty) ? parseSlashCommandInvocation(text) : nil
+        // Offline: keep the draft, attachments and any pending question; every
+        // send path (button, return key, expanded composer, Mac shortcut) ends
+        // up here. Slash commands are local and still run.
+        guard slashInvocation != nil || snapshot.isConnected else { return }
         if let request = snapshot.pendingUserInputRequest {
             appState.dismissPendingUserInput(id: request.id)
         }
-        if image == nil,
-           files.isEmpty,
-           let invocation = parseSlashCommandInvocation(text) {
+        if let invocation = slashInvocation {
             inputText = ""
             attachedImage = nil
             attachedFiles = []
@@ -97,9 +100,6 @@ extension ConversationInputBar {
             executeSlashCommand(invocation.command, args: invocation.args)
             return
         }
-        // Offline: keep the draft and attachments; every send path (button,
-        // return key, expanded composer, Mac shortcut) ends up here.
-        guard snapshot.isConnected else { return }
         inputText = ""
         attachedImage = nil
         attachedFiles = []
