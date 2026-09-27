@@ -26,6 +26,10 @@ internal fun effortDisplayName(value: ReasoningEffort): String = when (value) {
     ReasoningEffort.MAX -> "最高"
 }
 
+/** Display name for a wire effort string ("high" → 「高」); unknown values show as-is. */
+internal fun effortDisplayName(wireValue: String): String =
+    ReasoningEffort.entries.firstOrNull { effortLabel(it) == wireValue.trim() }?.let(::effortDisplayName) ?: wireValue
+
 internal fun ModelInfo.defaultReasoningEffortSelection(): String? =
     if (supportedReasoningEfforts.isEmpty()) null else effortLabel(defaultReasoningEffort)
 

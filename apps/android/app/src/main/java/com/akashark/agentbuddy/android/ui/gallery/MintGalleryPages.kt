@@ -26,4 +26,8 @@ val mintGalleryPages: List<MintGalleryPage> =
         MintGalleryPage("approval-banner", "审批横幅") { GalleryApprovalBannerPage() },
         MintGalleryPage("conversation-header", "会话标题栏") { GalleryConversationHeaderPage() },
         MintGalleryPage("composer", "输入框") { GalleryComposerPage() },
+        MintGalleryPage("info", "任务信息") { GalleryInfoPage() },
+        MintGalleryPage("info-server", "服务器信息") { GalleryServerInfoPage() },
+        MintGalleryPage("models", "模型面板") { GalleryModelsPage() },
+        MintGalleryPage("models-locked", "模型面板（锁定）") { GalleryModelsLockedPage() },
     )

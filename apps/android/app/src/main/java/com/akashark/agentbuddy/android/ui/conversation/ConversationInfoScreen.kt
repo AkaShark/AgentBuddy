@@ -1,34 +1,8 @@
 package com.akashark.agentbuddy.android.ui.conversation
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import android.content.Context
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.outlined.Terminal
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -36,18 +10,34 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
+import com.akashark.agentbuddy.android.state.PathDisplay
+import com.akashark.agentbuddy.android.state.displayModelLabel
+import com.akashark.agentbuddy.android.state.displayTitle
+import com.akashark.agentbuddy.android.state.hasActiveTurn
 import com.akashark.agentbuddy.android.ui.LocalAppModel
-import com.akashark.agentbuddy.android.ui.AgentBuddyTextStyle
-import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
-import com.akashark.agentbuddy.android.ui.scaled
+import com.akashark.agentbuddy.android.ui.common.effortDisplayName
+import com.akashark.agentbuddy.android.ui.common.titleDisplayLabel
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyConnectionState
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyTaskState
+import com.akashark.agentbuddy.android.ui.settings.SettingsAlertDialog
+import com.akashark.agentbuddy.android.ui.settings.SettingsTextField
 import kotlinx.coroutines.launch
-import uniffi.codex_mobile_client.ThreadKey
+import uniffi.codex_mobile_client.Account
 import uniffi.codex_mobile_client.AppRenameThreadRequest
+import uniffi.codex_mobile_client.AppServerSnapshot
+import uniffi.codex_mobile_client.AppServerTransportState
+import uniffi.codex_mobile_client.AppThreadSnapshot
+import uniffi.codex_mobile_client.PlanType
+import uniffi.codex_mobile_client.ThreadKey
+import uniffi.codex_mobile_client.ThreadSummaryStatus
 
+/**
+ * Task info (`threadKey != null`) or server info (`threadKey == null`).
+ * Reads the Rust snapshot, maps it to [TaskInfoState] and owns the fork /
+ * rename calls plus their UI-only progress and failure state.
+ */
 @Composable
 fun ConversationInfoScreen(
     threadKey: ThreadKey? = null,
@@ -57,282 +47,183 @@ fun ConversationInfoScreen(
     onOpenShell: (() -> Unit)? = null,
 ) {
     val appModel = LocalAppModel.current
+    val context = LocalContext.current
     val snapshot by appModel.snapshot.collectAsState()
     val scope = rememberCoroutineScope()
     var showRenameDialog by remember(threadKey) { mutableStateOf(false) }
     var renameText by remember(threadKey) { mutableStateOf("") }
+    var isForking by remember(threadKey) { mutableStateOf(false) }
+    var actionError by remember(threadKey) { mutableStateOf<String?>(null) }
 
-    val isServerOnly = threadKey == null
     val resolvedServerId = threadKey?.serverId ?: serverId
-
     val thread = remember(snapshot, threadKey) {
-        if (threadKey == null) null
-        else snapshot?.threads?.find { it.key == threadKey }
+        threadKey?.let { key -> snapshot?.threads?.find { it.key == key } }
     }
     val server = remember(snapshot, resolvedServerId) {
         snapshot?.servers?.find { it.serverId == resolvedServerId }
     }
 
-    val stats = remember(thread) { thread?.stats }
-    val serverUsage = remember(server) { server?.usageStats }
-    val rateLimits = remember(server) { server?.rateLimits }
+    val state = TaskInfoState(
+        isServerOnly = threadKey == null,
+        hero = thread?.let { taskInfoHero(it, server, context) },
+        context = thread?.let { t ->
+            val window = t.modelContextWindow?.toLong() ?: 0L
+            if (window > 0L) TaskContextUsage(usedTokens = t.contextTokensUsed?.toLong() ?: 0L, windowTokens = window) else null
+        },
+        stats = thread?.stats,
+        usage = server?.usageStats,
+        rateLimits = server?.rateLimits,
+        server = server?.let(::taskInfoServer),
+        canOpenShell = onOpenShell != null,
+        isForking = isForking,
+        actionError = actionError,
+    )
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(AgentBuddyTheme.background)
-            .statusBarsPadding()
-            .navigationBarsPadding(),
-    ) {
-        // Top bar
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(AgentBuddyTheme.surface)
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-        ) {
-            IconButton(onClick = onBack, modifier = Modifier.size(32.dp)) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "返回",
-                    tint = AgentBuddyTheme.textPrimary,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = if (isServerOnly) "服务器信息" else "会话信息",
-                color = AgentBuddyTheme.textPrimary,
-                fontSize = 16f.scaled,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
-
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            item { Spacer(Modifier.height(8.dp)) }
-
-            // Section A: Thread Details (thread mode only)
-            if (!isServerOnly) {
-                item {
-                    ThreadDetailsSection(thread = thread, isLocal = server?.isLocal == true)
-                }
-            }
-
-            // Action buttons row
-            if (!isServerOnly) {
-                item {
-                    ActionButtonsRow(
-                        onChangeWallpaper = onChangeWallpaper,
-                        onFork = {
-                            scope.launch {
-                                val t = thread ?: return@launch
-                                val tk = threadKey ?: return@launch
-                                try {
-                                    val newKey = appModel.client.forkThread(
-                                        tk.serverId,
-                                        appModel.launchState.threadForkRequest(
-                                            sourceThreadId = tk.threadId,
-                                            cwdOverride = t.info.cwd,
-                                            threadKey = tk,
-                                        ),
-                                    )
-                                    appModel.store.setActiveThread(newKey)
-                                    appModel.refreshThreadSnapshot(newKey)
-                                } catch (_: Exception) {}
-                            }
-                        },
-                        onRename = {
-                            renameText = thread?.info?.title.orEmpty()
-                            showRenameDialog = true
-                        },
-                    )
-                }
-            }
-
-            // Server-only: show just the Wallpaper button
-            if (isServerOnly) {
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                    ) {
-                        ActionCircleButton(
-                            icon = Icons.Default.Image,
-                            label = "壁纸",
-                            onClick = onChangeWallpaper,
+    ConversationInfoContent(
+        state = state,
+        actions = TaskInfoActions(
+            onBack = onBack,
+            onChangeWallpaper = onChangeWallpaper,
+            onFork = fork@{
+                val t = thread ?: return@fork
+                val tk = threadKey ?: return@fork
+                if (isForking) return@fork
+                isForking = true
+                actionError = null
+                scope.launch {
+                    try {
+                        val newKey = appModel.client.forkThread(
+                            tk.serverId,
+                            appModel.launchState.threadForkRequest(
+                                sourceThreadId = tk.threadId,
+                                cwdOverride = t.info.cwd,
+                                threadKey = tk,
+                            ),
                         )
-                        if (onOpenShell != null) {
-                            ActionCircleButton(
-                                icon = Icons.Outlined.Terminal,
-                                label = "Shell",
-                                onClick = onOpenShell,
-                            )
-                        }
+                        appModel.store.setActiveThread(newKey)
+                        appModel.refreshThreadSnapshot(newKey)
+                    } catch (e: Exception) {
+                        actionError = "分叉失败：${e.message?.trim().orEmpty().ifEmpty { "未知错误" }}"
+                    } finally {
+                        isForking = false
                     }
                 }
-            }
-
-            // Context window bar (thread mode only)
-            if (!isServerOnly && thread != null) {
-                item {
-                    ContextWindowBar(thread = thread)
-                }
-            }
-
-            // Per-conversation stats (thread mode only)
-            if (!isServerOnly && stats != null) {
-                item {
-                    StatsGrid(stats = stats)
-                }
-            }
-
-            // Section B: Server-Wide Charts
-            if (serverUsage != null) {
-                item {
-                    SectionHeader("服务器用量")
-                }
-
-                if (serverUsage.tokensByThread.isNotEmpty()) {
-                    item {
-                        TokenUsageChart(data = serverUsage.tokensByThread)
-                    }
-                }
-
-                if (serverUsage.activityByDay.isNotEmpty()) {
-                    item {
-                        ActivityChart(data = serverUsage.activityByDay)
-                    }
-                }
-
-                if (serverUsage.modelUsage.isNotEmpty()) {
-                    item {
-                        ModelBreakdownChart(data = serverUsage.modelUsage)
-                    }
-                }
-            }
-
-            if (rateLimits != null) {
-                item {
-                    RateLimitGauge(rateLimits = rateLimits)
-                }
-            }
-
-            // Section C: Server Info
-            if (server != null) {
-                item {
-                    ServerInfoSection(server = server)
-                }
-            }
-
-            item { Spacer(Modifier.height(32.dp)) }
-        }
-    }
+            },
+            onRename = {
+                renameText = thread?.info?.title.orEmpty()
+                showRenameDialog = true
+            },
+            onOpenShell = { onOpenShell?.invoke() },
+            onDismissError = { actionError = null },
+        ),
+        modifier = Modifier.statusBarsPadding().navigationBarsPadding(),
+    )
 
     if (showRenameDialog && threadKey != null) {
-        AlertDialog(
+        SettingsAlertDialog(
             onDismissRequest = { showRenameDialog = false },
-            title = { Text("重命名会话") },
-            text = {
-                OutlinedTextField(
-                    value = renameText,
-                    onValueChange = { renameText = it },
-                    label = { Text("名称") },
-                    singleLine = true,
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    val trimmed = renameText.trim()
-                    if (trimmed.isEmpty()) return@TextButton
+            title = "重命名任务",
+            confirmText = "重命名",
+            dismissText = "取消",
+            onConfirm = {
+                val trimmed = renameText.trim()
+                if (trimmed.isNotEmpty()) {
                     showRenameDialog = false
+                    actionError = null
                     scope.launch {
                         try {
                             appModel.client.renameThread(
                                 threadKey.serverId,
-                                AppRenameThreadRequest(
-                                    threadId = threadKey.threadId,
-                                    name = trimmed,
-                                ),
+                                AppRenameThreadRequest(threadId = threadKey.threadId, name = trimmed),
                             )
                             appModel.refreshThreadSnapshot(threadKey)
-                        } catch (_: Exception) {}
+                        } catch (e: Exception) {
+                            actionError = "重命名失败：${e.message?.trim().orEmpty().ifEmpty { "未知错误" }}"
+                        }
                     }
-                }) {
-                    Text("重命名")
                 }
             },
-            dismissButton = {
-                TextButton(onClick = { showRenameDialog = false }) {
-                    Text("取消")
-                }
+            text = {
+                SettingsTextField(value = renameText, onValueChange = { renameText = it }, label = "名称")
             },
         )
     }
 }
 
-@Composable
-private fun ActionButtonsRow(
-    onChangeWallpaper: () -> Unit,
-    onFork: () -> Unit,
-    onRename: () -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-    ) {
-        ActionCircleButton(
-            icon = Icons.Default.Image,
-            label = "壁纸",
-            onClick = onChangeWallpaper,
-        )
-        ActionCircleButton(
-            icon = Icons.Default.ContentCopy,
-            label = "分叉",
-            onClick = onFork,
-        )
-        ActionCircleButton(
-            icon = Icons.Default.Edit,
-            label = "重命名",
-            onClick = onRename,
-        )
+private fun taskInfoHero(
+    thread: AppThreadSnapshot,
+    server: AppServerSnapshot?,
+    context: Context,
+): TaskInfoHero {
+    val (status, statusTitle) = when {
+        thread.hasActiveTurn -> BuddyTaskState.RUNNING to BuddyTaskState.RUNNING.title
+        thread.info.status == ThreadSummaryStatus.SYSTEM_ERROR -> BuddyTaskState.FAILED to "出错"
+        thread.info.status == ThreadSummaryStatus.NOT_LOADED -> BuddyTaskState.IDLE to "未加载"
+        else -> BuddyTaskState.IDLE to BuddyTaskState.IDLE.title
     }
-}
-
-@Composable
-private fun ActionCircleButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    onClick: () -> Unit,
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable(onClick = onClick).padding(8.dp),
-    ) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(52.dp)
-                .background(AgentBuddyTheme.surface, RoundedCornerShape(14.dp)),
-        ) {
-            Icon(
-                icon,
-                contentDescription = label,
-                tint = AgentBuddyTheme.accent,
-                modifier = Modifier.size(20.dp),
-            )
+    val partner = thread.agentRuntimeKind.titleDisplayLabel
+    val host = server?.let { serverDisplayName(it.displayName) }?.trim()?.takeIf { it.isNotEmpty() }
+    val cwd = thread.info.cwd?.takeIf { it.isNotBlank() }
+    val cwdDisplay = cwd?.let {
+        if (server?.isLocal == true) {
+            PathDisplay.display(it, true, context)
+        } else {
+            it.replace(Regex("^/home/[^/]+"), "~").replace(Regex("^/Users/[^/]+"), "~")
         }
-        Spacer(Modifier.height(6.dp))
-        Text(
-            text = label,
-            color = AgentBuddyTheme.textSecondary,
-            fontSize = AgentBuddyTextStyle.caption2.scaled,
-            fontWeight = FontWeight.Medium,
-        )
     }
+    return TaskInfoHero(
+        title = thread.displayTitle,
+        status = status,
+        statusTitle = statusTitle,
+        partnerAndHost = if (host != null) "$partner · $host" else partner,
+        model = thread.displayModelLabel.trim().ifEmpty { null },
+        effort = thread.reasoningEffort?.trim()?.takeIf { it.isNotEmpty() }?.let(::effortDisplayName),
+        cwdDisplay = cwdDisplay,
+        cwdFull = cwd,
+        threadId = thread.key.threadId,
+        createdAt = thread.info.createdAt,
+        updatedAt = thread.info.updatedAt,
+    )
+}
+
+private fun taskInfoServer(server: AppServerSnapshot): TaskInfoServer {
+    val (connection, connectionTitle) = when (server.transportState) {
+        AppServerTransportState.CONNECTED ->
+            if (!server.isLocal && server.account == null) {
+                BuddyConnectionState.CONNECTING to "需要登录"
+            } else {
+                BuddyConnectionState.CONNECTED to BuddyConnectionState.CONNECTED.title
+            }
+        AppServerTransportState.CONNECTING -> BuddyConnectionState.CONNECTING to BuddyConnectionState.CONNECTING.title
+        AppServerTransportState.UNRESPONSIVE -> BuddyConnectionState.FAILED to "无响应"
+        AppServerTransportState.DISCONNECTED -> BuddyConnectionState.DISCONNECTED to BuddyConnectionState.DISCONNECTED.title
+        AppServerTransportState.UNKNOWN -> BuddyConnectionState.DISCONNECTED to "未知"
+    }
+    val account = server.account
+    return TaskInfoServer(
+        name = serverDisplayName(server.displayName),
+        address = "${server.host}:${server.port}",
+        mode = if (server.isLocal) "本地" else "远程",
+        connection = connection,
+        connectionTitle = connectionTitle,
+        accountEmail = (account as? Account.Chatgpt)?.email,
+        planLabel = (account as? Account.Chatgpt)?.planType?.let(::planTypeLabel),
+        usesApiKey = account is Account.ApiKey,
+        models = server.availableModels.orEmpty().map { it.displayName.ifBlank { it.id } },
+    )
+}
+
+/** The shared "This Device" sentinel is mapped at render time only. */
+private fun serverDisplayName(name: String): String = if (name == "This Device") "本设备" else name
+
+private fun planTypeLabel(planType: PlanType): String = when (planType) {
+    PlanType.FREE -> "Free"
+    PlanType.GO -> "Go"
+    PlanType.PLUS -> "Plus"
+    PlanType.PRO -> "Pro"
+    PlanType.TEAM -> "Team"
+    PlanType.BUSINESS -> "Business"
+    PlanType.ENTERPRISE -> "Enterprise"
+    PlanType.EDU -> "Edu"
+    PlanType.UNKNOWN -> "未知计划"
 }
