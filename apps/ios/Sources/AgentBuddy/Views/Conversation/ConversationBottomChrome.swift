@@ -161,7 +161,9 @@ struct ConversationHostStatusLine: View {
             .foregroundStyle(AgentBuddyTheme.textSecondary)
             .lineLimit(1)
             .frame(maxWidth: .infinity)
+            .padding(.horizontal, BuddySpacing.md)
             .padding(.top, 2)
+            .buddyChromeTypeLimit()
             .accessibilityElement(children: .combine)
         }
     }

@@ -97,6 +97,7 @@ struct ConversationView: View {
                 Task { await appModel.loadOlderTurns(threadId: key) }
             }
         )
+        .buddyHardTopScrollEdge()
         .overlay(alignment: .bottomLeading) {
             if let onTypingTap,
                minigameOverlay == .idle,

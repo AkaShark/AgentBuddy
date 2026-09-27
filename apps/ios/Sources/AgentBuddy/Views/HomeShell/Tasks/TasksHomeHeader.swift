@@ -14,6 +14,10 @@ struct TasksHomeHeader: View {
     }
 
     var body: some View {
+        headerRow.buddyChromeTypeLimit()
+    }
+
+    private var headerRow: some View {
         HStack(spacing: BuddySpacing.xs) {
             BuddyWordmark(markSize: 36)
                 .layoutPriority(0)

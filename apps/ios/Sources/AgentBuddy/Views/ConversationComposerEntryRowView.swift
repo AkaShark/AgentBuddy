@@ -93,6 +93,7 @@ struct ConversationComposerEntryRowView: View {
         VStack(alignment: .leading, spacing: BuddySpacing.xs) {
             editor
             controls
+                .buddyChromeTypeLimit()
         }
         .padding(.horizontal, BuddySpacing.sm)
         .padding(.top, BuddySpacing.xs)

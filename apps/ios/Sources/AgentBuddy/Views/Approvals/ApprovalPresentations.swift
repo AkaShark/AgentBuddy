@@ -77,6 +77,7 @@ struct ConversationApprovalStack: View {
                     }
                 )
                 .id(first.id)
+                .modifier(ApprovalHeightCap())
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
             } else if let outcome = coordinator.outcome(for: threadKey) {
                 ApprovalResultCard(outcome: outcome) {
@@ -193,5 +194,24 @@ struct PendingApprovalBanner: View {
         .padding(.vertical, BuddySpacing.xxs)
         .background(AgentBuddyTheme.warningSurface, in: RoundedRectangle(cornerRadius: BuddyRadius.detailCard, style: .continuous))
         .accessibilityElement(children: .contain)
+    }
+}
+
+/// Keeps the inline approval card from pushing the composer and header off
+/// screen at large text sizes: above 45% of the screen height the card
+/// scrolls inside that space instead of growing.
+private struct ApprovalHeightCap: ViewModifier {
+    @State private var contentHeight: CGFloat = 0
+
+    private var limit: CGFloat { UIScreen.main.bounds.height * 0.45 }
+
+    func body(content: Content) -> some View {
+        ScrollView {
+            content
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .scrollDisabled(contentHeight <= limit)
+        .frame(height: min(contentHeight, limit))
     }
 }

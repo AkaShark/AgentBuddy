@@ -139,3 +139,25 @@ struct BuddyDivider: View {
             .accessibilityHidden(true)
     }
 }
+
+// MARK: - Large text limits
+
+extension View {
+    /// Caps Dynamic Type for compact chrome (tab bars, chip rows, toolbar
+    /// headers) at the largest standard size. Content text keeps scaling into
+    /// the accessibility sizes; chrome would otherwise push controls off screen.
+    func buddyChromeTypeLimit() -> some View {
+        dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+    }
+
+    /// Makes the top scroll edge opaque on iOS 26 so a custom toolbar title
+    /// stays readable over content that scrolls under it.
+    @ViewBuilder
+    func buddyHardTopScrollEdge() -> some View {
+        if #available(iOS 26.0, *) {
+            scrollEdgeEffectStyle(.hard, for: .top)
+        } else {
+            self
+        }
+    }
+}

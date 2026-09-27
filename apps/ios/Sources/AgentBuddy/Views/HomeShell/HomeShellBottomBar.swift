@@ -9,6 +9,10 @@ struct HomeShellTabBar: View {
     @Binding var selection: HomeShellTab
 
     var body: some View {
+        tabs.buddyChromeTypeLimit()
+    }
+
+    private var tabs: some View {
         HStack(spacing: 0) {
             ForEach(HomeShellTab.allCases) { tab in
                 let isSelected = tab == selection
@@ -45,6 +49,10 @@ struct HomeComposerPill: View {
     var isStartingVoice = false
 
     var body: some View {
+        pill.buddyChromeTypeLimit()
+    }
+
+    private var pill: some View {
         HStack(spacing: BuddySpacing.xs) {
             Button(action: onCompose) {
                 Text("Got an idea? Hand it to AgentBuddy…")

@@ -86,9 +86,10 @@
 - 每个分支合并后都用 Xcode MCP 做了真机构建，并安装到回森 iPhone 16。
 - 截图来自 DEBUG 状态画廊，使用固定数据，不连接主机。启动参数为 `--mint-gallery=<页面>`，加 `--mint-dark` 切到深色。页面包括 `home`、`projects`、`hosts`、`newtask`、`conversation`、`approvals`、`composer`、`accessories`、`prompts`、`addhost`、`pair`、`tasks`、`info`、`models`、`settings`。
 - 浅色和深色都检查过首页、会话、审批、输入框和设置。
+- 大字号：用 `-UIPreferredContentSizeCategoryName` 启动参数检查了最大标准字号（XXXL）和辅助功能 L。首页、会话、输入框没有控件被挤出屏幕。标签栏、输入框按钮行、首页顶栏和会话标题栏的字号上限为 XXXL；正文仍可继续放大。审批按钮放不下时改为上下排列；审批卡最高占屏幕 45%，超出部分在卡内滚动。
 - 单元测试在真机上运行，结果见第 7 节。
 
-尚未验证：连接真实主机的端到端流程、320 pt 宽度、辅助功能大字号、VoiceOver 朗读顺序、横屏与 iPad。
+尚未验证：连接真实主机的端到端流程、320 pt 宽度、VoiceOver 朗读顺序、横屏与 iPad。
 
 ## 7. 已知问题与后续
 

@@ -57,22 +57,38 @@ struct ApprovalCard: View {
         }
     }
 
+    private var denyButton: some View {
+        BuddyButton(
+            "Deny",
+            kind: .secondary,
+            isLoading: submittingDecision == .decline,
+            action: { decide(.decline) }
+        )
+    }
+
+    private var allowOnceButton: some View {
+        BuddyButton(
+            "Allow once",
+            trailingSystemImage: "arrow.right",
+            kind: .primary,
+            isLoading: submittingDecision == .accept,
+            action: { decide(.accept) }
+        )
+    }
+
     private var actions: some View {
         VStack(alignment: .leading, spacing: BuddySpacing.xs) {
-            HStack(spacing: BuddySpacing.sm) {
-                BuddyButton(
-                    "Deny",
-                    kind: .secondary,
-                    isLoading: submittingDecision == .decline,
-                    action: { decide(.decline) }
-                )
-                BuddyButton(
-                    "Allow once",
-                    trailingSystemImage: "arrow.right",
-                    kind: .primary,
-                    isLoading: submittingDecision == .accept,
-                    action: { decide(.accept) }
-                )
+            // Side by side when both labels fit on one line; stacked (primary
+            // first) at large text sizes instead of wrapping letter by letter.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: BuddySpacing.sm) {
+                    denyButton
+                    allowOnceButton
+                }
+                VStack(spacing: BuddySpacing.xs) {
+                    allowOnceButton
+                    denyButton
+                }
             }
             .disabled(isSubmitting)
 

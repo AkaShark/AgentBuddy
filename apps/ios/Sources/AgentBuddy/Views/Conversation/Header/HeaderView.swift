@@ -35,6 +35,7 @@ struct HeaderView: View {
             .padding(.vertical, 6)
             .frame(maxWidth: isRegularSurface ? 420 : 260, alignment: .center)
         }
+        .buddyChromeTypeLimit()
         .layoutPriority(-1)
         .buttonStyle(.plain)
         .hoverEffect(.highlight)
