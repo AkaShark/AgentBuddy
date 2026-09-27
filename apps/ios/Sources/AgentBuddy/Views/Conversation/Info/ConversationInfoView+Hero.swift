@@ -4,12 +4,12 @@ extension ConversationInfoView {
     // MARK: - Server-Only Action Row
 
     var serverOnlyActionRow: some View {
-        HStack(spacing: 0) {
-            actionCircle(icon: "paintbrush", label: "Appearance") {
+        infoActionRow {
+            BuddyButton("Appearance", systemImage: "paintbrush", kind: .secondary) {
                 onOpenWallpaper?()
             }
             if let onOpenShell {
-                actionCircle(icon: "terminal", label: "Shell") {
+                BuddyButton("Shell", systemImage: "terminal", kind: .secondary) {
                     onOpenShell()
                 }
             }
@@ -18,156 +18,180 @@ extension ConversationInfoView {
 
     // MARK: - Hero Section
 
+    /// Task hero: status, title, "partner · host", working directory,
+    /// model / effort chips, then the thread id and timestamps.
     var heroSection: some View {
-        VStack(spacing: 12) {
-            // Status dot + title
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(statusColor)
-                    .frame(width: 10, height: 10)
-                Text(thread?.displayTitle ?? "Untitled session")
-                    .agentBuddyFont(size: 22, weight: .bold)
+        VStack(alignment: .leading, spacing: BuddySpacing.sm) {
+            statusBadge
+
+            VStack(alignment: .leading, spacing: BuddySpacing.xxs) {
+                Text(verbatim: thread?.displayTitle ?? "Untitled session")
+                    .buddyText(.title)
                     .foregroundStyle(AgentBuddyTheme.textPrimary)
                     .lineLimit(2)
-            }
-
-            // Model + reasoning badges
-            HStack(spacing: 8) {
-                if let model = thread?.displayModelLabel,
-                   !model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Text(model)
-                        .agentBuddyFont(size: 13, weight: .medium)
-                        .foregroundStyle(AgentBuddyTheme.accent)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .modifier(GlassRectModifier(cornerRadius: 8))
-                }
-                if let effort = thread?.reasoningEffort {
-                    Text(effort)
-                        .agentBuddyFont(size: 12, weight: .regular)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isHeader)
+                if let partnerAndHost {
+                    Text(verbatim: partnerAndHost)
+                        .buddyText(.label, weight: .regular)
                         .foregroundStyle(AgentBuddyTheme.textSecondary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .modifier(GlassRectModifier(cornerRadius: 8))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
                 }
             }
 
-            // Metadata row: cwd + timestamps
-            VStack(spacing: 6) {
-                if let cwd = thread?.info.cwd {
-                    HStack(spacing: 5) {
-                        Image(systemName: "folder.fill")
-                            .font(.system(size: 10))
-                            .foregroundStyle(AgentBuddyTheme.textMuted)
-                        Text(abbreviatePath(cwd))
-                            .agentBuddyFont(size: 12)
-                            .foregroundStyle(AgentBuddyTheme.textSecondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    }
+            if let cwd = thread?.info.cwd {
+                HStack(alignment: .firstTextBaseline, spacing: BuddySpacing.xs) {
+                    Image(systemName: "folder")
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
+                        .accessibilityHidden(true)
+                    Text(verbatim: abbreviatePath(cwd))
+                        .buddyText(.code)
+                        .foregroundStyle(AgentBuddyTheme.textPrimary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .textSelection(.enabled)
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(Text(verbatim: cwd))
+            }
 
-                if let tid = threadKey?.threadId {
-                    HStack(spacing: 5) {
-                        Image(systemName: "number")
-                            .font(.system(size: 10))
-                            .foregroundStyle(AgentBuddyTheme.textMuted)
-                        Text(tid)
-                            .agentBuddyFont(size: 11)
-                            .foregroundStyle(AgentBuddyTheme.textSecondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                            .textSelection(.enabled)
-                    }
+            modelChips
+
+            BuddyDivider()
+                .padding(.vertical, BuddySpacing.xxs)
+
+            metadataRows
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .buddyCard(.surface, radius: BuddyRadius.card, padding: BuddySpacing.lg)
+    }
+
+    @ViewBuilder
+    private var statusBadge: some View {
+        if let state = heroTaskState {
+            BuddyStatusPill(state: state)
+        } else {
+            Label {
+                Text(statusLabel)
+            } icon: {
+                Image(systemName: "circle.dashed")
+                    .accessibilityHidden(true)
+            }
+            .buddyText(.label, weight: .medium)
+            .foregroundStyle(AgentBuddyTheme.textSecondary)
+            .padding(.horizontal, BuddySpacing.sm)
+            .padding(.vertical, 6)
+            .background(AgentBuddyTheme.surfaceSoft, in: Capsule())
+        }
+    }
+
+    @ViewBuilder
+    private var modelChips: some View {
+        let model = thread?.displayModelLabel.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let effort = thread?.reasoningEffort
+        if !model.isEmpty || effort != nil {
+            HStack(spacing: BuddySpacing.xs) {
+                if !model.isEmpty {
+                    BuddyChip(model, systemImage: "cpu")
                 }
-
-                HStack(spacing: 12) {
-                    if let created = thread?.info.createdAt {
-                        HStack(spacing: 3) {
-                            Image(systemName: "clock")
-                                .font(.system(size: 9))
-                                .foregroundStyle(AgentBuddyTheme.textMuted)
-                            Text(relativeDate(created))
-                                .agentBuddyFont(size: 11)
-                                .foregroundStyle(AgentBuddyTheme.textMuted)
-                        }
-                    }
-                    if let updated = thread?.info.updatedAt {
-                        HStack(spacing: 3) {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.system(size: 9))
-                                .foregroundStyle(AgentBuddyTheme.textMuted)
-                            Text(relativeDate(updated))
-                                .agentBuddyFont(size: 11)
-                                .foregroundStyle(AgentBuddyTheme.textMuted)
-                        }
-                    }
+                if let effort {
+                    BuddyChip(effort, systemImage: "gauge.with.dots.needle.50percent")
                 }
             }
         }
-        .padding(.top, 16)
+    }
+
+    private var metadataRows: some View {
+        VStack(alignment: .leading, spacing: BuddySpacing.xs) {
+            if let tid = threadKey?.threadId {
+                HStack(alignment: .firstTextBaseline, spacing: BuddySpacing.xs) {
+                    Image(systemName: "number")
+                        .accessibilityHidden(true)
+                    Text(verbatim: tid)
+                        .buddyText(.code)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .textSelection(.enabled)
+                }
+                .foregroundStyle(AgentBuddyTheme.textSecondary)
+            }
+
+            HStack(spacing: BuddySpacing.md) {
+                if let created = thread?.info.createdAt {
+                    timestampLabel(systemImage: "clock", timestamp: created)
+                        .accessibilityLabel(Text("Created \(relativeDate(created))"))
+                }
+                if let updated = thread?.info.updatedAt {
+                    timestampLabel(systemImage: "arrow.clockwise", timestamp: updated)
+                        .accessibilityLabel(Text("Updated \(relativeDate(updated))"))
+                }
+            }
+        }
+    }
+
+    private var partnerAndHost: String? {
+        guard let thread else { return nil }
+        let partner = thread.agentRuntimeKind.displayLabel
+        guard let host = server?.displayName.trimmingCharacters(in: .whitespacesAndNewlines), !host.isEmpty else {
+            return partner
+        }
+        return "\(partner) · \(host)"
     }
 
     private func abbreviatePath(_ path: String) -> String {
         PathDisplay.display(path, isLocal: server?.isLocal == true)
     }
 
-    // MARK: - Action Buttons Row (Telegram-style)
+    // MARK: - Action Buttons Row
 
     var actionButtonsRow: some View {
-        HStack(spacing: 0) {
-            actionCircle(icon: "paintbrush", label: "Appearance") {
+        infoActionRow {
+            BuddyButton("Appearance", systemImage: "paintbrush", kind: .secondary) {
                 onOpenWallpaper?()
             }
-            actionCircle(icon: "arrow.branch", label: "Fork") {
+            BuddyButton("Fork", systemImage: "arrow.branch", kind: .secondary) {
                 Task { await forkConversation() }
             }
-            actionCircle(icon: "pencil", label: "Rename") {
+            BuddyButton("Rename", systemImage: "pencil", kind: .secondary) {
                 renameText = thread?.info.title ?? ""
                 isRenaming = true
             }
         }
     }
 
-    private func actionCircle(icon: String, label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(AgentBuddyTheme.accent)
-                    .frame(width: 52, height: 52)
-                    .modifier(GlassRectModifier(cornerRadius: 14))
-                Text(label)
-                    .agentBuddyFont(size: 11, weight: .medium)
-                    .foregroundStyle(AgentBuddyTheme.textSecondary)
-            }
-        }
-        .buttonStyle(.plain)
-        .frame(maxWidth: .infinity)
-    }
-
-    private func timestampLabel(_ label: String, timestamp: Int64) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label)
-                .agentBuddyFont(size: 10, weight: .medium)
-                .foregroundStyle(AgentBuddyTheme.textMuted)
-            Text(relativeDate(timestamp))
-                .agentBuddyFont(size: 12)
-                .foregroundStyle(AgentBuddyTheme.textSecondary)
+    /// Buttons side by side when they fit, stacked full width otherwise
+    /// (large text, narrow screens).
+    private func infoActionRow<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        let buttons = content()
+        return ViewThatFits(in: .horizontal) {
+            HStack(spacing: BuddySpacing.sm) { buttons }
+            VStack(spacing: BuddySpacing.sm) { buttons }
         }
     }
 
-    private var statusColor: Color {
+    private func timestampLabel(systemImage: String, timestamp: Int64) -> some View {
+        Label {
+            Text(verbatim: relativeDate(timestamp))
+        } icon: {
+            Image(systemName: systemImage)
+                .accessibilityHidden(true)
+        }
+        .buddyText(.caption)
+        .foregroundStyle(AgentBuddyTheme.textSecondary)
+    }
+
+    /// Thread status as a task state, so the pill pairs an icon with text.
+    private var heroTaskState: BuddyTaskState? {
         switch thread?.info.status {
-        case .active: return AgentBuddyTheme.success
-        case .idle: return AgentBuddyTheme.textMuted
-        case .systemError: return AgentBuddyTheme.danger
-        case .notLoaded: return AgentBuddyTheme.textMuted
-        default: return AgentBuddyTheme.textMuted
+        case .active: return .running
+        case .idle: return .idle
+        case .systemError: return .failed
+        default: return nil
         }
     }
 
-    private var statusLabel: String {
+    private var statusLabel: LocalizedStringKey {
         switch thread?.info.status {
         case .active: return "Active"
         case .idle: return "Idle"

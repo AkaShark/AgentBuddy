@@ -26,6 +26,7 @@ struct ConversationInfoView: View {
     @State var stats: AppConversationStats?
     @State var serverUsage: AppServerUsageStats?
     @State var isShowingMountedFolders = false
+    @State private var pageWidth: CGFloat = 0
 
     var thread: AppThreadSnapshot? {
         guard let threadKey else { return nil }
@@ -42,51 +43,34 @@ struct ConversationInfoView: View {
         return snapshot.threads.filter { $0.key.serverId == sid }
     }
 
+    /// Page gutter: 24, or 16 on screens narrower than 360pt.
+    private var pageGutter: CGFloat { BuddySpacing.pageGutter(forWidth: pageWidth) }
+
     var body: some View {
         ScrollView {
-            VStack(spacing: 0) {
-                if !isServerOnly {
-                    // Hero header
+            VStack(alignment: .leading, spacing: BuddySpacing.xl) {
+                if isServerOnly {
+                    serverOnlyActionRow
+                } else {
                     heroSection
-                        .padding(.bottom, 20)
-
-                    // Action buttons row (Telegram-style)
                     actionButtonsRow
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 24)
-
-                    // Thin divider
-                    Rectangle()
-                        .fill(AgentBuddyTheme.separator.opacity(0.4))
-                        .frame(height: 0.5)
-                        .padding(.horizontal, 24)
-                        .padding(.bottom, 20)
+                    contextWindowSection
+                    conversationStatsSection
                 }
-
-                // Content sections
-                VStack(spacing: 16) {
-                    if isServerOnly {
-                        // Server-only mode: just wallpaper button at top
-                        serverOnlyActionRow
-                            .padding(.top, 8)
-                    }
-                    if !isServerOnly {
-                        contextWindowSection
-                        conversationStatsSection
-                    }
-                    serverChartsSection
-                    serverInfoSection
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 40)
+                serverChartsSection
+                serverInfoSection
             }
+            .padding(.horizontal, pageGutter)
+            .padding(.top, BuddySpacing.md)
+            .padding(.bottom, BuddySpacing.xxxl)
         }
-        .background(AgentBuddyTheme.backgroundGradient)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { pageWidth = $0 }
+        .buddyPageBackground()
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) {
-                Text(isServerOnly ? "Server Info" : "Info")
-                    .agentBuddyFont(size: 16, weight: .semibold)
+                (isServerOnly ? Text("Server Info") : Text("Info"))
+                    .buddyText(.heading)
                     .foregroundStyle(AgentBuddyTheme.textPrimary)
             }
         }

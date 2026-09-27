@@ -17,20 +17,29 @@ struct ConversationOptionsSheet: View {
 
     var body: some View {
         // Present the inline selector exactly as it appears in the
-        // conversation popover — no NavigationStack, no title bar. The
-        // sheet drag indicator handles dismissal; a Done row from
-        // InlineModelSelectorView itself stays available via `onDismiss`.
-        InlineModelSelectorView(
-            models: models,
-            selectedModel: $selectedModel,
-            selectedAgentRuntimeKind: $selectedAgentRuntimeKind,
-            reasoningEffort: $reasoningEffort,
-            threadKey: threadKey,
-            collaborationMode: collaborationMode,
-            effectiveApprovalPolicy: effectiveApprovalPolicy,
-            effectiveSandboxPolicy: effectiveSandboxPolicy,
-            onDismiss: { dismiss() }
-        )
+        // conversation popover, under a sheet title. The sheet drag
+        // indicator handles dismissal; InlineModelSelectorView still gets
+        // `onDismiss` for its own close paths.
+        VStack(alignment: .leading, spacing: BuddySpacing.xs) {
+            Text("Partner, model and permissions")
+                .buddyText(.title)
+                .foregroundStyle(AgentBuddyTheme.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+                .padding(.horizontal, BuddySpacing.md)
+                .padding(.top, BuddySpacing.xl)
+            InlineModelSelectorView(
+                models: models,
+                selectedModel: $selectedModel,
+                selectedAgentRuntimeKind: $selectedAgentRuntimeKind,
+                reasoningEffort: $reasoningEffort,
+                threadKey: threadKey,
+                collaborationMode: collaborationMode,
+                effectiveApprovalPolicy: effectiveApprovalPolicy,
+                effectiveSandboxPolicy: effectiveSandboxPolicy,
+                onDismiss: { dismiss() }
+            )
+        }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(AgentBuddyTheme.surface.ignoresSafeArea())
     }

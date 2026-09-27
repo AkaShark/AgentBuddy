@@ -7,49 +7,41 @@ extension ConversationInfoView {
         Group {
             if let used = thread?.contextTokensUsed, let window = thread?.modelContextWindow, window > 0 {
                 let percent = Double(used) / Double(window)
-                VStack(spacing: 8) {
-                    HStack {
+                let level = InfoUsageLevel(fraction: percent)
+                VStack(alignment: .leading, spacing: BuddySpacing.sm) {
+                    HStack(alignment: .firstTextBaseline) {
                         Text("Context Window")
-                            .agentBuddyFont(size: 14, weight: .semibold)
+                            .buddyText(.heading)
                             .foregroundStyle(AgentBuddyTheme.textPrimary)
-                        Spacer()
-                        Text("\(Int(percent * 100))%")
-                            .agentBuddyFont(size: 14, weight: .bold)
-                            .foregroundStyle(contextColor(percent: percent))
+                        Spacer(minLength: BuddySpacing.xs)
+                        InfoUsageValue(level: level, text: "\(Int(percent * 100))%")
                     }
 
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(AgentBuddyTheme.border)
-                                .frame(height: 8)
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(contextColor(percent: percent))
-                                .frame(width: geo.size.width * min(1, percent), height: 8)
+                            Capsule()
+                                .fill(AgentBuddyTheme.surfaceSoft)
+                            Capsule()
+                                .fill(level.color)
+                                .frame(width: geo.size.width * min(1, percent))
                         }
                     }
                     .frame(height: 8)
+                    .accessibilityHidden(true)
 
                     HStack {
-                        Text(formatTokens(used))
-                            .agentBuddyFont(size: 11)
-                            .foregroundStyle(AgentBuddyTheme.textMuted)
+                        Text(verbatim: formatTokens(used))
                         Spacer()
-                        Text(formatTokens(window))
-                            .agentBuddyFont(size: 11)
-                            .foregroundStyle(AgentBuddyTheme.textMuted)
+                        Text(verbatim: formatTokens(window))
                     }
+                    .buddyText(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
                 }
-                .padding(16)
-                .modifier(GlassRectModifier(cornerRadius: 12))
+                .buddyCard(.surface, radius: BuddyRadius.card, padding: BuddySpacing.lg)
+                .accessibilityElement(children: .combine)
             }
         }
-    }
-
-    private func contextColor(percent: Double) -> Color {
-        if percent >= 0.8 { return AgentBuddyTheme.danger }
-        if percent >= 0.6 { return AgentBuddyTheme.warning }
-        return AgentBuddyTheme.accent
     }
 
     private func formatTokens(_ tokens: UInt64) -> String {
@@ -64,44 +56,56 @@ extension ConversationInfoView {
     // MARK: - Per-Conversation Stats
 
     var conversationStatsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Conversation Stats")
-                .agentBuddyFont(size: 14, weight: .semibold)
-                .foregroundStyle(AgentBuddyTheme.textPrimary)
+        VStack(alignment: .leading, spacing: BuddySpacing.xs) {
+            BuddySectionHeader("Conversation Stats")
 
             LazyVGrid(columns: [
-                GridItem(.flexible(), spacing: 12),
-                GridItem(.flexible(), spacing: 12)
-            ], spacing: 12) {
-                statCard("Messages", value: "\(stats?.totalMessages ?? 0)", detail: "\(stats?.userMessageCount ?? 0) user · \(stats?.assistantMessageCount ?? 0) assistant")
+                GridItem(.flexible(), spacing: BuddySpacing.sm, alignment: .top),
+                GridItem(.flexible(), spacing: BuddySpacing.sm, alignment: .top)
+            ], spacing: BuddySpacing.sm) {
+                statCard(
+                    "Messages",
+                    value: "\(stats?.totalMessages ?? 0)",
+                    detail: Text("\(Int(stats?.userMessageCount ?? 0)) user · \(Int(stats?.assistantMessageCount ?? 0)) assistant")
+                )
                 statCard("Turns", value: "\(stats?.turnCount ?? 0)")
-                statCard("Commands", value: "\(stats?.commandsExecuted ?? 0)", detail: "\(stats?.commandsSucceeded ?? 0) ok · \(stats?.commandsFailed ?? 0) fail")
-                statCard("Files Changed", value: "\(stats?.filesChanged ?? 0)", detail: "+\(stats?.diffAdditions ?? 0) / -\(stats?.diffDeletions ?? 0)")
+                statCard(
+                    "Commands",
+                    value: "\(stats?.commandsExecuted ?? 0)",
+                    detail: Text("\(Int(stats?.commandsSucceeded ?? 0)) ok · \(Int(stats?.commandsFailed ?? 0)) fail")
+                )
+                statCard(
+                    "Files Changed",
+                    value: "\(stats?.filesChanged ?? 0)",
+                    detail: Text(verbatim: "+\(stats?.diffAdditions ?? 0) / -\(stats?.diffDeletions ?? 0)")
+                )
                 statCard("MCP Calls", value: "\(stats?.mcpToolCallCount ?? 0)")
                 statCard("Exec Time", value: formatDuration(Int64(stats?.totalCommandDurationMs ?? 0)))
             }
         }
-        .padding(16)
-        .modifier(GlassRectModifier(cornerRadius: 12))
     }
 
-    private func statCard(_ title: String, value: String, detail: String? = nil) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(value)
-                .agentBuddyFont(size: 20, weight: .bold)
-                .foregroundStyle(AgentBuddyTheme.accent)
+    /// Small stat card (radius 16): value, label, optional breakdown.
+    private func statCard(_ title: LocalizedStringKey, value: String, detail: Text? = nil) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(verbatim: value)
+                .buddyText(.title)
+                .monospacedDigit()
+                .foregroundStyle(AgentBuddyTheme.textPrimary)
             Text(title)
-                .agentBuddyFont(size: 12, weight: .medium)
+                .buddyText(.label)
                 .foregroundStyle(AgentBuddyTheme.textSecondary)
             if let detail {
-                Text(detail)
-                    .agentBuddyFont(size: 10)
-                    .foregroundStyle(AgentBuddyTheme.textMuted)
+                detail
+                    .buddyText(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .modifier(GlassRectModifier(cornerRadius: 8))
+        .buddyCard(.soft, radius: BuddyRadius.tile, padding: BuddySpacing.md)
+        .accessibilityElement(children: .combine)
     }
 
     private func formatDuration(_ ms: Int64) -> String {
@@ -111,5 +115,61 @@ extension ConversationInfoView {
         let mins = Int(secs / 60)
         let remainSecs = Int(secs) % 60
         return "\(mins)m \(remainSecs)s"
+    }
+}
+
+// MARK: - Usage level
+
+/// Semantic colour for a usage fraction (context window, rate limits):
+/// under 60% success, from 60% warning, from 80% danger. Warning and
+/// danger also show an icon, so the level never relies on colour alone.
+struct InfoUsageLevel: Equatable {
+    enum Kind { case normal, elevated, critical }
+
+    let kind: Kind
+
+    init(fraction: Double) {
+        if fraction >= 0.8 {
+            kind = .critical
+        } else if fraction >= 0.6 {
+            kind = .elevated
+        } else {
+            kind = .normal
+        }
+    }
+
+    var color: Color {
+        switch kind {
+        case .normal: return AgentBuddyTheme.success
+        case .elevated: return AgentBuddyTheme.warning
+        case .critical: return AgentBuddyTheme.danger
+        }
+    }
+
+    var systemImage: String? {
+        switch kind {
+        case .normal: return nil
+        case .elevated: return "exclamationmark.triangle"
+        case .critical: return "exclamationmark.octagon"
+        }
+    }
+}
+
+/// Percentage text in the level colour, with the level icon when elevated.
+struct InfoUsageValue: View {
+    let level: InfoUsageLevel
+    let text: String
+
+    var body: some View {
+        HStack(spacing: BuddySpacing.xxs) {
+            if let systemImage = level.systemImage {
+                Image(systemName: systemImage)
+                    .accessibilityHidden(true)
+            }
+            Text(verbatim: text)
+                .monospacedDigit()
+        }
+        .buddyText(.label, weight: .semibold)
+        .foregroundStyle(level.color)
     }
 }

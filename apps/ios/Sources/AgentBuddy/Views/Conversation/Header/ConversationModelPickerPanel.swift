@@ -25,9 +25,8 @@ struct ConversationModelPickerPanel: View {
                 appState.showModelSelector = false
             }
         )
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
-        .padding(.bottom, 8)
+        .padding(.vertical, BuddySpacing.xs)
+        .presentationBackground(AgentBuddyTheme.surface)
         .task(id: thread.key) {
             await appModel.loadConversationMetadataIfNeeded(serverId: thread.key.serverId)
         }
