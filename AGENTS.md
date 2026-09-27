@@ -107,12 +107,24 @@ Before building on a new machine, verify:
 4. Desktop app: Node 22 and `npm ci` in `apps/desktop`; `make desktop-sidecar` needs the rustup toolchain.
 5. *(Optional)* `pymobiledevice3` enables `make ios-device-run` over Tailscale when the device is not on the local network. Install with `pipx install pymobiledevice3` (or `uv tool install pymobiledevice3`). Also requires Tailscale on both the Mac and the iOS device.
 
+## iOS Build & Run Policy (no simulator)
+- Do not build, run, or test iOS on the simulator. That rules out `make ios-sim`, `make ios-sim-fast`, `make rust-ios-sim-fast`, `xcrun simctl`, and any `-destination 'platform=iOS Simulator,…'`. The simulator lanes stay in the Makefile only for compatibility; do not use them locally.
+- Build to the physical iPhone through the Apple Xcode MCP (`mcp__xcode__*`, served by `xcrun mcpbridge`; not XcodeBuildMCP):
+  1. Open `apps/ios/AgentBuddy.xcodeproj` (of the checkout or worktree you are editing) in Xcode, scheme `AgentBuddy`.
+  2. The toolbar run destination must be the connected iPhone (or `Any iOS Device (arm64)` for a compile-only check). `BuildProject` builds whatever scheme and destination are selected and cannot switch them. Switch it with AppleScript instead of asking the user (do not name a variable `target`, it is reserved in Xcode's dictionary):
+     `osascript -e 'tell application "/Applications/Xcode-26.3.0.app"' -e 'repeat with d in workspace documents' -e 'if (path of d) contains "<checkout>" then set active run destination of d to (first run destination of d whose name is "<device name>")' -e 'end repeat' -e 'end tell'`
+     List the choices with `name of run destinations of d`; physical devices report platform `iphoneos`.
+  3. `XcodeListWindows` gives the `tabIdentifier`; then `BuildProject`, and read failures with `GetBuildLog` / `XcodeListNavigatorIssues`. Tests: `RunSomeTests` / `RunAllTests` on the same device destination.
+  4. Install and launch the built app: `xcrun devicectl device install app --device <id> <DerivedData>/Build/Products/Debug-iphoneos/AgentBuddy.app`, then `xcrun devicectl device process launch --device <id> com.akashark.agentbuddy`. Find `<id>` with `xcrun devicectl list devices`.
+- Device builds link `apps/ios/GeneratedRust/ios-device` (`make rust-ios-device-fast`) and sign with team `HNKUYWPBVC`. If the Xcode MCP is unavailable, the command-line fallback is `make ios-device-fast` (still a device build).
+- Do not recreate simulator caches. If `apps/ios/GeneratedRust/ios-sim` or `Debug-iphonesimulator` build products show up, delete them.
+
 ## Build System
 The root `Makefile` is the primary build interface. It orchestrates submodule sync, patching, UniFFI binding generation, Rust cross-compilation, raw staticlib generation, optional xcframework packaging, Xcode project generation, and platform builds — with stamp-file caching in `.build-stamps/` so repeated runs skip completed steps. If `sccache` is installed, package/CI builds use it via `RUSTC_WRAPPER=sccache` with a local disk cache; the remote S3/R2 backend is opt-in (R2: `SCCACHE_BUCKET` + `SCCACHE_ENDPOINT` + `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`; plain AWS S3: `SCCACHE_BUCKET` + AWS credentials or `AWS_PROFILE`/`SCCACHE_AWS_PROFILE`, optional `SCCACHE_REGION`/`AWS_REGION`; a bucket with neither endpoint nor credentials falls back to the local cache — see `tools/scripts/load-sccache-aws-creds.sh`).
 
 There are two distinct iOS Rust lanes:
 - Fast dev lane: raw staticlib + generated headers in `apps/ios/GeneratedRust/`, used by Debug/device builds (`make rust-ios-device-fast`, `make ios-device-fast`).
-- Fast simulator lane: raw simulator staticlib + generated headers in `apps/ios/GeneratedRust/ios-sim`, used by Debug/simulator builds (`make rust-ios-sim-fast`, `make ios-sim-fast`).
+- Fast simulator lane: raw simulator staticlib + generated headers in `apps/ios/GeneratedRust/ios-sim`, used by Debug/simulator builds (`make rust-ios-sim-fast`, `make ios-sim-fast`). Not used locally; see the iOS Build & Run Policy.
 - Package lane: device+sim Rust build plus `codex_mobile_client.xcframework` packaging (`make rust-ios-package`, `make ios`, `make ios-device`, `make ios-sim`).
 
 Incremental policy:
@@ -124,8 +136,8 @@ Incremental policy:
 |---|---|
 | `make ios` | Full iOS package lane: sync → patch → Ghostty → bindings → rust (device+sim) → xcframework → xcgen → simulator build (does not run `alpine-fs`) |
 | `make alpine-fs` | Download the pinned Alpine rootfs from `dnakov/litter-ish`; bump `ALPINE_FS_VERSION` in `Makefile` to upgrade. Not bundled into the iOS app while local iSH is disabled (see Fork Notes). |
-| `make ios-sim` | Full iOS package lane + simulator build |
-| `make ios-sim-fast` | Fast iOS simulator lane using raw simulator staticlib outputs in `GeneratedRust/ios-sim` |
+| `make ios-sim` | Full iOS package lane + simulator build (not used locally; see iOS Build & Run Policy) |
+| `make ios-sim-fast` | Fast iOS simulator lane using raw simulator staticlib outputs in `GeneratedRust/ios-sim` (not used locally) |
 | `make ios-device` | Full iOS package lane + device build |
 | `make ios-device-fast` | Fast iOS device lane using raw staticlib outputs in `GeneratedRust/` |
 | `make ios-run` | Full iOS build then opens Xcode |
@@ -135,7 +147,7 @@ Incremental policy:
 | `make all` | Both platforms |
 | `make rust-ios` | Alias for the full Rust iOS package lane |
 | `make rust-ios-package` | Build/package Rust for iOS (device+sim + xcframework) |
-| `make rust-ios-sim-fast` | Build raw Rust simulator staticlib + headers only |
+| `make rust-ios-sim-fast` | Build raw Rust simulator staticlib + headers only (not used locally) |
 | `make rust-ios-device-fast` | Build raw Rust device staticlib + headers only |
 | `make rust-android` | Just the Android JNI `.so` files |
 | `make rust-check` | Host `cargo check` for shared Rust crates |
@@ -179,12 +191,12 @@ Incremental policy:
 - Not wired up: there is no InjectionIII / `@ObserveInjection` integration in this repo.
 
 ## Autonomous Debugging Runbook
-- Prefer the fast lanes for local iteration before package/release lanes: `make ios-sim-fast`, `make ios-device-fast`, and `make android-emulator-fast`.
+- Prefer the fast lanes for local iteration before package/release lanes: iOS builds go to the physical iPhone through the Xcode MCP (fallback `make ios-device-fast`); Android uses `make android-emulator-fast`. Never use the iOS simulator.
 - For repeated store-feedback/crash triage across GitHub, TestFlight, and Play, start with `./tools/scripts/triage-mobile-feedback.py --last-hours 24` (or an explicit `--since` / `--until` window). Review `artifacts/mobile-triage/triage-board.md`, then mark handled rows with `./tools/scripts/triage-mobile-feedback.py mark '<item-id>' --status done --note 'fixed in ...'` or `--status pr-open --note 'Fix PR #...'`. Use `fetch-mobile-store-artifacts.py` directly only for one-off raw iOS/Android store snapshots or deeper ASC / Play API debugging.
-- For iOS simulator debugging, install the latest built app directly from DerivedData instead of trusting an older installed simulator copy: `xcrun simctl install booted <.../Build/Products/Debug-iphonesimulator/AgentBuddy.app>` then `xcrun simctl launch booted com.akashark.agentbuddy`.
+- For iOS debugging, install the latest device build directly from DerivedData instead of trusting an older installed copy: `xcrun devicectl device install app --device <id> <.../Build/Products/Debug-iphoneos/AgentBuddy.app>` then `xcrun devicectl device process launch --device <id> com.akashark.agentbuddy`.
 - For Xcode project regeneration, use `make xcgen` or `./apps/ios/scripts/regenerate-project.sh`. Do not run `xcodegen generate --spec project.yml --project AgentBuddy.xcodeproj` from inside `apps/ios`; that produces a nested `apps/ios/AgentBuddy.xcodeproj/AgentBuddy.xcodeproj`.
 - For Android emulator debugging, build with `make android-emulator-fast`, install with `adb -e install -r apps/android/app/build/outputs/apk/debug/app-debug.apk`, then launch with `adb -e shell am start -n com.akashark.agentbuddy.android/com.akashark.agentbuddy.android.MainActivity`.
-- Keep both runtimes available when validating shared Rust changes: boot a simulator with `xcrun simctl boot <device>` or through Simulator.app, and verify an emulator is visible with `adb devices -l`.
+- Keep both runtimes available when validating shared Rust changes: connect the iPhone (check `xcrun devicectl list devices`) and verify an Android emulator is visible with `adb devices -l`.
 - Mobile logs now stay local: use Xcode/device console for iOS, Logcat for Android, and normal Rust `tracing` output instead of a collector or spool directory.
 
 ## Coding Style & Naming Conventions
@@ -198,7 +210,7 @@ Incremental policy:
 ## Testing Guidelines
 - iOS tests: prefer XCTest under `apps/ios/Tests/AgentBuddyTests/` with files named `*Tests.swift`.
 - Android tests: place unit tests under `apps/android/app/src/test/java/`.
-- iOS test command: `xcodebuild test` using the same project/scheme/destination pattern as build commands.
+- iOS tests run on the connected iPhone, never the simulator: Xcode MCP `RunSomeTests` / `RunAllTests`, or `xcodebuild test -destination 'platform=iOS,id=<device-id>'`.
 - Android test command: `cd apps/android && ./gradlew :app:testDebugUnitTest`.
 - Keep `apps/android/docs/qa-matrix.md` updated when parity scope changes.
 
@@ -206,7 +218,7 @@ Incremental policy:
 - Use concise, imperative commit subjects with optional scope (example: `bridge: retry initialize handshake`).
 - PRs should include: purpose, key changes, verification steps (commands/device), and screenshots for UI changes.
 - If project structure changes, include updates to `apps/ios/project.yml` and mention whether project regeneration was run.
-- If using XcodeBuildMCP, use the installed XcodeBuildMCP skill before calling XcodeBuildMCP tools.
+- iOS builds and tests go through the Apple Xcode MCP (`mcp__xcode__*`) onto the physical iPhone; see the iOS Build & Run Policy.
 
 ## AgentBuddy Fork Notes
 
@@ -218,7 +230,7 @@ AgentBuddy (Chinese display name 「搭子」) is a rebranded, independently-pub
 - **alleycat fork**: the Rust deps in `shared/rust-bridge/Cargo.toml` and `services/kittylitter/Cargo.toml` point at the public `https://github.com/AkaShark/alleycat.git` fork, pinned to commit `a5bdd83f1dedc9169610efe5a245f82bb0198f13` on the fork branch `feat/host-push-notifications` (upstream `3c6dfe2` plus host push notifications, draft PR AkaShark/alleycat#1; not on the fork's `main` yet). `tools/scripts/update-alleycat-main.sh` is a no-op by default; only `AGENTBUDDY_REFRESH_ALLEYCAT=1` moves the pin to the fork's latest `main` — do not use it until that PR is merged, or host push support is lost. `.cargo/config.toml` sets `net.git-fetch-with-cli = true` so Cargo fetches git deps through the system `git`. (`ish-embed-host` legitimately stays on `dnakov/litter-ish` — an upstream dep, not forked.)
 - **Localization**: the base (English) display name is `AgentBuddy`; iOS zh-Hans strings live in `apps/ios/Sources/AgentBuddy/zh-Hans.lproj/Localizable.strings` and `InfoPlist.strings` and show 「搭子」. Android UI strings are **hardcoded Chinese literals in Kotlin** (no `values-zh` resources) — translate in place; `android:label` is 「搭子」. Note `Text(stringVariable)` renders verbatim; only `Text("literal")` / `LocalizedStringKey` localizes.
 - **Product deltas from upstream**: tipping/TipJar removed on both platforms; BYO-API-key (no hosted login); top logo, splash and home cat still use the Baozi-era art (brand artwork has not been replaced yet); the 喵闻联播 `cat_transmission` easter egg and the TipJar StoreKit configuration were removed.
-- **Push infrastructure**: turn completion notifications are host-reported. When a turn starts on an alleycat host that advertises `push.v1`, the shared Rust `PushManager` (`src/push/`) seals the platform push token to the Worker and sends `push_subscribe` over the iroh channel; the host (alleycat fork, `push` module) watches the turn's terminal state and reports it with a signed request to the AgentBuddy Cloudflare Worker `https://agentbuddy-push-proxy.aaksharker.workers.dev` (`services/push-proxy`, v2 API, `HostChannel` Durable Object), which sends a visible APNs/FCM alert. Platforms only hand over the token (`AppClient.setPushRegistration`), show/route notifications and suppress banners for the visible conversation. The old 30-second silent keep-alive (`/register`) is gone from the apps and stays on the Worker only until `LEGACY_KEEPALIVE_ENABLED=false`. Design, signing strings and test vectors: `docs/superpowers/specs/2026-09-24-host-push-notifications-design.md`; Worker API, secrets (`PUSH_TARGET_SEAL_KEY`, optional `DEBUG_PUSH_ADMIN_TOKEN`), migration and rollback: `services/push-proxy/README.md`; one-off test pushes: `tools/scripts/debug-push.py`. APNs and Firebase credentials and the seal key are Worker secrets and must not enter Git. The Android Alpine rootfs release repo still references `huangguang1999/baozi-ish` in `apps/android/scripts/download-alpine-fs.sh`. `[baozi-fork]` comments mark inherited changes and are kept as provenance.
+- **Push infrastructure**: turn completion notifications are host-reported. When a turn starts on an alleycat host that advertises `push.v1`, the shared Rust `PushManager` (`src/push/`) seals the platform push token to the Worker and sends `push_subscribe` over the iroh channel; the host (alleycat fork, `push` module) watches the turn's terminal state and reports it with a signed request to the AgentBuddy Cloudflare Worker `https://agentbuddy-push-proxy.aaksharker.workers.dev` (`services/push-proxy`, v2 API, `HostChannel` Durable Object), which sends a visible APNs/FCM alert. Platforms only hand over the token (`AppClient.setPushRegistration`), show/route notifications and keep every alert quiet while the app is in the foreground (any screen, including debug alerts). The old 30-second silent keep-alive (`/register`) is gone from the apps and stays on the Worker only until `LEGACY_KEEPALIVE_ENABLED=false`. Design, signing strings and test vectors: `docs/superpowers/specs/2026-09-24-host-push-notifications-design.md`; Worker API, secrets (`PUSH_TARGET_SEAL_KEY`, optional `DEBUG_PUSH_ADMIN_TOKEN`), migration and rollback: `services/push-proxy/README.md`; one-off test pushes: `tools/scripts/debug-push.py`. APNs and Firebase credentials and the seal key are Worker secrets and must not enter Git. The Android Alpine rootfs release repo still references `huangguang1999/baozi-ish` in `apps/android/scripts/download-alpine-fs.sh`. `[baozi-fork]` comments mark inherited changes and are kept as provenance.
 - **Shared sentinels**: `"This Device"` is a cross-platform sentinel compared in iOS/Android/Rust — never translate the stored value; map it to a display string at render time only.
 - **Pairing security (known risk, intentionally not fixed yet)**: alleycat pairing uses one shared bearer token for all phones (no per-device tokens/allowlist); revoking means `agentbuddy rotate`, which invalidates every phone. alleycat defaults enable the `shell` agent (PTY login shell), claude `bypass_permissions=true` (`--dangerously-skip-permissions`) and amp `dangerously_allow_all=true`, so anyone with the QR/pair payload can run commands as the Mac user. `host.key` / `host.toml` (token) are 0600 plaintext files, not Keychain. Mitigations today: disable agents or set those flags false in `host.toml` (desktop Agents page), and rotate the token after any exposure. The proper fix (per-device pairing) belongs in the `AkaShark/alleycat` fork.
 - **ChatGPT OAuth on iOS**: only the login button was removed (`[baozi-fork]`). `ChatGPTOAuth.swift` and its entry points (`AppModel.ensureLocalAuthForThreadStart` → `loginLocalChatGPTAccount`, `SettingsView`, `AccountView`) stay because Slingshot remote control and ChatGPT-backed voice transcription depend on the ChatGPT token. Keep it unless those features are dropped.
