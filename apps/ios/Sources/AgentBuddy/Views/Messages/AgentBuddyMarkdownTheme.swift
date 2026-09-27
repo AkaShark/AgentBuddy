@@ -1,6 +1,28 @@
 import SwiftUI
 import Hairball
 import HairballUI
+import UIKit
+
+// MARK: - Mint conversation sizes
+
+extension AgentBuddyFont {
+    /// Mint body size (16pt at the default Dynamic Type size) used for
+    /// assistant prose; line height 26 comes from `markdownLineSpacing`.
+    static var mintBodyPointSize: CGFloat {
+        UIFontMetrics(forTextStyle: .body).scaledValue(for: BuddyTextStyle.body.size)
+    }
+
+    /// Mint code size (14pt at the default Dynamic Type size).
+    static var mintCodePointSize: CGFloat {
+        UIFontMetrics(forTextStyle: .callout).scaledValue(for: BuddyTextStyle.code.size)
+    }
+}
+
+/// Extra spacing SwiftUI adds between lines so body text reaches the Mint
+/// 16 / 26 rhythm (the font's natural line height is about 1.2× its size).
+private func markdownLineSpacing(bodySize: CGFloat) -> CGFloat {
+    max(0, bodySize * (BuddyTextStyle.body.lineHeight / BuddyTextStyle.body.size - 1.2))
+}
 
 // MARK: - AgentBuddy Markdown Themes
 
@@ -8,16 +30,17 @@ private func agentBuddyContentTheme(bodySize: CGFloat, codeSize: CGFloat) -> Mar
     var theme = MarkdownTheme.default
     theme.bodyFont = .custom(AgentBuddyFont.markdownFontName, size: bodySize)
     theme.bodyFontSize = bodySize
-    theme.foregroundColor = AgentBuddyTheme.textBody
-    theme.paragraphSpacing = 8
-    theme.blockSpacing = 8
+    theme.foregroundColor = AgentBuddyTheme.textPrimary
+    theme.lineSpacing = markdownLineSpacing(bodySize: bodySize)
+    theme.paragraphSpacing = 12
+    theme.blockSpacing = 12
 
     theme.headingStyleSet = HeadingStyleSet(
-        h1: HeadingStyle(fontSize: bodySize * 1.43, weight: .bold,
+        h1: HeadingStyle(fontSize: bodySize * 1.5, weight: .semibold,
                          topSpacing: 16, bottomSpacing: 8, color: AgentBuddyTheme.textPrimary),
-        h2: HeadingStyle(fontSize: bodySize * 1.21, weight: .semibold,
+        h2: HeadingStyle(fontSize: bodySize * 1.25, weight: .semibold,
                          topSpacing: 12, bottomSpacing: 6, color: AgentBuddyTheme.textPrimary),
-        h3: HeadingStyle(fontSize: bodySize * 1.07, weight: .semibold,
+        h3: HeadingStyle(fontSize: bodySize * 1.0625, weight: .semibold,
                          topSpacing: 10, bottomSpacing: 4, color: AgentBuddyTheme.textPrimary),
         h4: HeadingStyle(fontSize: bodySize, weight: .semibold, color: AgentBuddyTheme.textPrimary),
         h5: HeadingStyle(fontSize: bodySize, weight: .semibold, color: AgentBuddyTheme.textPrimary),
@@ -25,18 +48,18 @@ private func agentBuddyContentTheme(bodySize: CGFloat, codeSize: CGFloat) -> Mar
     )
 
     theme.inlineCode = InlineCodeStyle(
-        backgroundColor: AgentBuddyTheme.surfaceLight,
+        backgroundColor: AgentBuddyTheme.surfaceSoft,
         textColor: AgentBuddyTheme.textPrimary,
-        font: .custom(AgentBuddyFont.markdownFontName, size: codeSize),
+        font: AgentBuddyFont.monospaced(size: codeSize),
         fontSize: codeSize
     )
 
     theme.codeBlock = CodeBlockStyle(
-        backgroundColor: AgentBuddyTheme.codeBackground.opacity(0.8),
+        backgroundColor: TimelineCodeStyle.fill(nested: false),
         textColor: AgentBuddyTheme.textPrimary,
-        font: .custom(AgentBuddyFont.markdownFontName, size: codeSize),
+        font: AgentBuddyFont.monospaced(size: codeSize),
         fontSize: codeSize,
-        cornerRadius: 8,
+        cornerRadius: BuddyRadius.control,
         showLanguageLabel: false,
         showCopyButton: false
     )
@@ -49,14 +72,14 @@ private func agentBuddyContentTheme(bodySize: CGFloat, codeSize: CGFloat) -> Mar
     )
 
     theme.table = TableStyle(
-        borderStyle: .solid(color: AgentBuddyTheme.border, width: 0.5),
-        headerBackground: AgentBuddyTheme.surfaceLight,
+        borderStyle: .solid(color: AgentBuddyTheme.border, width: 1),
+        headerBackground: AgentBuddyTheme.surfaceSoft,
         headerFontWeight: .semibold,
         backgroundStyle: .alternatingRows(
-            even: AgentBuddyTheme.surface.opacity(0.5),
+            even: AgentBuddyTheme.surface,
             odd: .clear
         ),
-        cornerRadius: 8
+        cornerRadius: BuddyRadius.control
     )
 
     theme.list = ListStyleConfiguration(
@@ -65,7 +88,7 @@ private func agentBuddyContentTheme(bodySize: CGFloat, codeSize: CGFloat) -> Mar
         tightItemSpacing: 4
     )
 
-    theme.link = LinkStyle(color: AgentBuddyTheme.accent, underline: false)
+    theme.link = LinkStyle(color: AgentBuddyTheme.link, underline: false)
 
     theme.thematicBreak = ThematicBreakStyle(
         color: AgentBuddyTheme.border,
@@ -79,12 +102,13 @@ private func agentBuddySystemTheme(bodySize: CGFloat, codeSize: CGFloat) -> Mark
     var theme = MarkdownTheme.default
     theme.bodyFont = .custom(AgentBuddyFont.markdownFontName, size: bodySize)
     theme.bodyFontSize = bodySize
-    theme.foregroundColor = AgentBuddyTheme.textSystem
-    theme.paragraphSpacing = 6
-    theme.blockSpacing = 6
+    theme.foregroundColor = AgentBuddyTheme.textSecondary
+    theme.lineSpacing = markdownLineSpacing(bodySize: bodySize)
+    theme.paragraphSpacing = 8
+    theme.blockSpacing = 8
 
     theme.headingStyleSet = HeadingStyleSet(
-        h1: HeadingStyle(fontSize: bodySize * 1.31, weight: .bold,
+        h1: HeadingStyle(fontSize: bodySize * 1.31, weight: .semibold,
                          topSpacing: 12, bottomSpacing: 6, color: AgentBuddyTheme.textPrimary),
         h2: HeadingStyle(fontSize: bodySize * 1.15, weight: .semibold,
                          topSpacing: 10, bottomSpacing: 4, color: AgentBuddyTheme.textPrimary),
@@ -96,18 +120,18 @@ private func agentBuddySystemTheme(bodySize: CGFloat, codeSize: CGFloat) -> Mark
     )
 
     theme.inlineCode = InlineCodeStyle(
-        backgroundColor: AgentBuddyTheme.surfaceLight,
+        backgroundColor: AgentBuddyTheme.surfaceSoft,
         textColor: AgentBuddyTheme.textPrimary,
-        font: .custom(AgentBuddyFont.markdownFontName, size: codeSize),
+        font: AgentBuddyFont.monospaced(size: codeSize),
         fontSize: codeSize
     )
 
     theme.codeBlock = CodeBlockStyle(
-        backgroundColor: AgentBuddyTheme.codeBackground.opacity(0.8),
+        backgroundColor: TimelineCodeStyle.fill(nested: false),
         textColor: AgentBuddyTheme.textPrimary,
-        font: .custom(AgentBuddyFont.markdownFontName, size: codeSize),
+        font: AgentBuddyFont.monospaced(size: codeSize),
         fontSize: codeSize,
-        cornerRadius: 8,
+        cornerRadius: BuddyRadius.control,
         showLanguageLabel: false,
         showCopyButton: false
     )
@@ -120,14 +144,14 @@ private func agentBuddySystemTheme(bodySize: CGFloat, codeSize: CGFloat) -> Mark
     )
 
     theme.table = TableStyle(
-        borderStyle: .solid(color: AgentBuddyTheme.border, width: 0.5),
-        headerBackground: AgentBuddyTheme.surfaceLight,
+        borderStyle: .solid(color: AgentBuddyTheme.border, width: 1),
+        headerBackground: AgentBuddyTheme.surfaceSoft,
         headerFontWeight: .semibold,
         backgroundStyle: .alternatingRows(
-            even: AgentBuddyTheme.surface.opacity(0.5),
+            even: AgentBuddyTheme.surface,
             odd: .clear
         ),
-        cornerRadius: 8
+        cornerRadius: BuddyRadius.control
     )
 
     theme.list = ListStyleConfiguration(
@@ -136,7 +160,7 @@ private func agentBuddySystemTheme(bodySize: CGFloat, codeSize: CGFloat) -> Mark
         tightItemSpacing: 3
     )
 
-    theme.link = LinkStyle(color: AgentBuddyTheme.accent, underline: false)
+    theme.link = LinkStyle(color: AgentBuddyTheme.link, underline: false)
 
     theme.thematicBreak = ThematicBreakStyle(
         color: AgentBuddyTheme.border,
@@ -265,6 +289,7 @@ private struct ScaledContentMarkdownModifier: ViewModifier {
         let _ = syncHighlighterTheme(for: colorScheme)
         let themed = content
             .markdownTheme(agentBuddyContentTheme(bodySize: scaledBody, codeSize: scaledCode))
+            .lineSpacing(markdownLineSpacing(bodySize: scaledBody))
             .codeSyntaxHighlighter(sharedHighlighter)
             .codeBlockRenderer(AgentBuddyCodeBlockRenderer())
         if selectionEnabled {
@@ -288,6 +313,7 @@ private struct ScaledSystemMarkdownModifier: ViewModifier {
         let _ = syncHighlighterTheme(for: colorScheme)
         let themed = content
             .markdownTheme(agentBuddySystemTheme(bodySize: scaledBody, codeSize: scaledCode))
+            .lineSpacing(markdownLineSpacing(bodySize: scaledBody))
             .codeSyntaxHighlighter(sharedHighlighter)
             .codeBlockRenderer(AgentBuddyCodeBlockRenderer())
         if selectionEnabled {
@@ -300,8 +326,8 @@ private struct ScaledSystemMarkdownModifier: ViewModifier {
 
 extension View {
     func agentBuddyContentMarkdown(
-        bodySize: CGFloat = AgentBuddyFont.conversationBodyPointSize,
-        codeSize: CGFloat = AgentBuddyFont.conversationBodyPointSize,
+        bodySize: CGFloat = AgentBuddyFont.mintBodyPointSize,
+        codeSize: CGFloat = AgentBuddyFont.mintCodePointSize,
         selectionEnabled: Bool = true
     ) -> some View {
         modifier(
@@ -314,8 +340,8 @@ extension View {
     }
 
     func agentBuddySystemMarkdown(
-        bodySize: CGFloat = AgentBuddyFont.conversationBodyPointSize,
-        codeSize: CGFloat = AgentBuddyFont.conversationBodyPointSize,
+        bodySize: CGFloat = AgentBuddyFont.mintBodyPointSize,
+        codeSize: CGFloat = AgentBuddyFont.mintCodePointSize,
         selectionEnabled: Bool = true
     ) -> some View {
         modifier(

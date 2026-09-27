@@ -9,13 +9,6 @@ struct ComputerUseToolCallView: View {
     @State private var expanded: Bool
     @State private var a11yExpanded = false
     @State private var errorExpanded = false
-    /// Header row (icon + summary). A half-step smaller than body so tool
-    /// calls read as secondary to assistant messages.
-    private let summaryFontSize: CGFloat = 13
-    /// Expanded content size — matches the bash/command output size
-    /// (`ConversationCommandOutputViewport` renders at 12pt) so tool-call
-    /// details share a typographic baseline with terminal output.
-    private let contentFontSize: CGFloat = 12
     private let maxVisibleTextCharacters = 2_000
 
     init(
@@ -36,7 +29,7 @@ struct ComputerUseToolCallView: View {
             header
 
             if resolvedExpanded {
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: BuddySpacing.sm) {
                     if let screenshot = view.screenshotPng {
                         screenshotPreview(screenshot)
                     }
@@ -47,18 +40,14 @@ struct ComputerUseToolCallView: View {
                         accessibilityBlock(text)
                     }
                 }
-                .padding(.top, 6)
+                .padding(.top, BuddySpacing.xxs)
+                .padding(.bottom, BuddySpacing.sm)
                 .transition(.sectionReveal)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
-        .background(AgentBuddyTheme.surface)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(AgentBuddyTheme.border, lineWidth: 0.5)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(.horizontal, BuddySpacing.md)
+        .padding(.vertical, BuddySpacing.xxs)
+        .timelineDetailCard()
         .animation(.spring(duration: 0.32, bounce: 0.12), value: resolvedExpanded)
         .onChange(of: data.status) { _, newStatus in
             if newStatus == .failed {
@@ -80,40 +69,26 @@ struct ComputerUseToolCallView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 8) {
-            Image(systemName: toolIcon)
-                .agentBuddyFont(size: 12, weight: .semibold)
-                .foregroundColor(AgentBuddyTheme.accent)
+        HStack(spacing: BuddySpacing.sm) {
+            TimelineStatusGlyph(status: data.status.toolCallStatus, fallbackSystemImage: toolIcon)
 
             Text(view.summary)
-                .agentBuddyFont(size: summaryFontSize)
-                .foregroundColor(AgentBuddyTheme.textSystem)
+                .buddyText(.label)
+                .foregroundStyle(AgentBuddyTheme.textPrimary)
                 .lineLimit(1)
                 .truncationMode(.middle)
 
-            Spacer()
+            Spacer(minLength: BuddySpacing.xs)
 
             if let duration = formatDuration(data.durationMs), !duration.isEmpty {
-                Text(duration)
-                    .agentBuddyFont(.caption2)
-                    .foregroundColor(durationStatusColor)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 2)
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill(durationStatusColor.opacity(0.10))
-                    )
-                    .overlay(
-                        Capsule(style: .continuous)
-                            .stroke(durationStatusColor.opacity(0.22), lineWidth: 0.5)
-                    )
+                TimelineDurationText(text: duration)
             }
 
-            Image(systemName: resolvedExpanded ? "chevron.up" : "chevron.down")
-                .agentBuddyFont(size: 11, weight: .medium)
-                .foregroundColor(AgentBuddyTheme.textMuted)
+            TimelineDisclosureChevron(expanded: resolvedExpanded)
         }
+        .frame(minHeight: BuddySize.minHitTarget)
         .contentShape(Rectangle())
+        .accessibilityAddTraits(.isButton)
         .onTapGesture {
             withAnimation(.easeInOut(duration: 0.2)) {
                 setExpanded(!resolvedExpanded)
@@ -128,10 +103,10 @@ struct ComputerUseToolCallView: View {
                 .resizable()
                 .scaledToFit()
                 .frame(maxWidth: .infinity)
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: BuddyRadius.control, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(AgentBuddyTheme.border.opacity(0.4), lineWidth: 0.5)
+                    RoundedRectangle(cornerRadius: BuddyRadius.control, style: .continuous)
+                        .strokeBorder(AgentBuddyTheme.border, lineWidth: 1)
                 )
         } else {
             placeholderTile("Screenshot unavailable", tone: AgentBuddyTheme.textSecondary)
@@ -139,13 +114,13 @@ struct ComputerUseToolCallView: View {
     }
 
     private func errorBlock(_ message: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("ERROR")
-                .agentBuddyFont(.caption2, weight: .bold)
-                .foregroundColor(AgentBuddyTheme.danger)
+        VStack(alignment: .leading, spacing: BuddySpacing.xxs) {
+            Label("Error", systemImage: "exclamationmark.triangle")
+                .buddyText(.caption, weight: .medium)
+                .foregroundStyle(AgentBuddyTheme.danger)
             Text(errorExpanded ? message : limitedText(message))
-                .agentBuddyFont(size: contentFontSize)
-                .foregroundColor(AgentBuddyTheme.danger)
+                .buddyText(.label, weight: .regular)
+                .foregroundStyle(AgentBuddyTheme.danger)
                 .fixedSize(horizontal: false, vertical: true)
             if shouldLimitText(message) {
                 Button {
@@ -154,8 +129,7 @@ struct ComputerUseToolCallView: View {
                     }
                 } label: {
                     Text(errorExpanded ? "Show less" : "Show more")
-                        .agentBuddyFont(.caption2, weight: .semibold)
-                        .foregroundColor(AgentBuddyTheme.accent)
+                        .timelineLinkAction()
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(errorExpanded ? "Show less error text" : "Show more error text")
@@ -165,11 +139,9 @@ struct ComputerUseToolCallView: View {
 
     @ViewBuilder
     private func accessibilityBlock(_ text: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                Text("ACCESSIBILITY TREE")
-                    .agentBuddyFont(.caption2, weight: .bold)
-                    .foregroundColor(AgentBuddyTheme.textSecondary)
+        VStack(alignment: .leading, spacing: BuddySpacing.xxs) {
+            HStack(spacing: BuddySpacing.xs) {
+                TimelineSectionLabel("Accessibility tree")
                 Spacer()
                 Button {
                     withAnimation(.easeInOut(duration: 0.18)) {
@@ -177,35 +149,28 @@ struct ComputerUseToolCallView: View {
                     }
                 } label: {
                     Text(a11yExpanded ? "Show less" : "Show more")
-                        .agentBuddyFont(.caption2, weight: .medium)
-                        .foregroundColor(AgentBuddyTheme.accent)
+                        .timelineLinkAction()
                 }
                 .buttonStyle(.plain)
             }
 
             Text(a11yExpanded ? text : collapsedPreview(text))
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundColor(AgentBuddyTheme.textSecondary)
+                .buddyText(.code)
+                .foregroundStyle(AgentBuddyTheme.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(10)
+                .padding(BuddySpacing.sm)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(AgentBuddyTheme.codeBackground.opacity(0.82))
-                )
+                .timelineCodeSurface()
         }
     }
 
-    private func placeholderTile(_ message: String, tone: Color) -> some View {
-        Text(message)
-            .agentBuddyFont(.caption)
-            .foregroundColor(tone)
+    private func placeholderTile(_ message: LocalizedStringKey, tone: Color) -> some View {
+        Label(message, systemImage: "photo")
+            .buddyText(.label, weight: .regular)
+            .foregroundStyle(tone)
             .frame(maxWidth: .infinity, alignment: .center)
-            .padding(.vertical, 24)
-            .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(AgentBuddyTheme.codeBackground.opacity(0.82))
-            )
+            .padding(.vertical, BuddySpacing.xl)
+            .timelineCodeSurface()
     }
 
     private func collapsedPreview(_ text: String) -> String {
@@ -231,14 +196,6 @@ struct ComputerUseToolCallView: View {
     private func setExpanded(_ newValue: Bool) {
         expanded = newValue
         onExpandedChange?(newValue)
-    }
-
-    private var durationStatusColor: Color {
-        switch data.status {
-        case .failed: return AgentBuddyTheme.danger
-        case .completed: return AgentBuddyTheme.accent
-        default: return AgentBuddyTheme.textMuted
-        }
     }
 
     private var toolIcon: String {

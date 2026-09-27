@@ -12,7 +12,8 @@ struct AssistantBubble: View, Equatable {
     var compact: Bool = false
     var themeVersion: Int = 0
     var allowsInlineSelection: Bool = true
-    private let contentFontSize = AgentBuddyFont.conversationBodyPointSize
+    private let contentFontSize = AgentBuddyFont.mintBodyPointSize
+    private let codeFontSize = AgentBuddyFont.mintCodePointSize
 
     init(
         text: String,
@@ -60,7 +61,7 @@ struct AssistantBubble: View, Equatable {
                     markdown: markdownString,
                     style: .content,
                     bodySize: contentFontSize,
-                    codeSize: contentFontSize
+                    codeSize: codeFontSize
                 ) {
                     bubbleContent
                 }
@@ -74,17 +75,17 @@ struct AssistantBubble: View, Equatable {
     }
 
     private var bubbleContent: some View {
-        VStack(alignment: .leading, spacing: compact ? 4 : 8) {
+        VStack(alignment: .leading, spacing: compact ? BuddySpacing.xxs : BuddySpacing.xs) {
             if let label {
                 Text(label)
-                    .agentBuddyFont(.caption2, weight: .semibold)
-                    .foregroundColor(AgentBuddyTheme.textSecondary)
+                    .buddyText(.caption, weight: .medium)
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
             }
             AgentBuddyMarkdownView(
                 markdown: markdownString,
                 style: .content,
                 bodySize: contentFontSize,
-                codeSize: contentFontSize
+                codeSize: codeFontSize
             )
             .fixedSize(horizontal: false, vertical: true)
             .transaction { $0.animation = nil }
@@ -96,15 +97,16 @@ struct AssistantBlocksBubble: View {
     let segments: [MessageRenderCache.AssistantSegment]
     var label: String? = nil
     var compact: Bool = false
-    private let contentFontSize = AgentBuddyFont.conversationBodyPointSize
+    private let contentFontSize = AgentBuddyFont.mintBodyPointSize
+    private let codeFontSize = AgentBuddyFont.mintCodePointSize
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
-            VStack(alignment: .leading, spacing: compact ? 4 : 8) {
+            VStack(alignment: .leading, spacing: compact ? BuddySpacing.xxs : BuddySpacing.sm) {
                 if let label {
                     Text(label)
-                        .agentBuddyFont(.caption2, weight: .semibold)
-                        .foregroundColor(AgentBuddyTheme.textSecondary)
+                        .buddyText(.caption, weight: .medium)
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
                 }
 
                 ForEach(segments) { segment in
@@ -129,7 +131,7 @@ struct AssistantBlocksBubble: View {
                 markdown: content,
                 style: .content,
                 bodySize: contentFontSize,
-                codeSize: contentFontSize
+                codeSize: codeFontSize
             )
             .frame(maxWidth: .infinity, alignment: .leading)
             .id(identity)
@@ -142,7 +144,7 @@ struct AssistantBlocksBubble: View {
                 CodeBlockView(
                     language: language ?? "",
                     code: code,
-                    fontSize: contentFontSize
+                    fontSize: codeFontSize
                 )
                 .id(identity)
             }
@@ -166,7 +168,7 @@ struct AssistantBlocksBubble: View {
                             .resizable()
                             .scaledToFit()
                             .frame(maxHeight: 300)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .clipShape(RoundedRectangle(cornerRadius: BuddyRadius.control, style: .continuous))
                             .draggable(Image(uiImage: ui)) {
                                 Image(uiImage: ui)
                                     .resizable()
@@ -178,7 +180,7 @@ struct AssistantBlocksBubble: View {
                             .resizable()
                             .scaledToFit()
                             .frame(maxHeight: 300)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .clipShape(RoundedRectangle(cornerRadius: BuddyRadius.control, style: .continuous))
                     }
                 }
             }

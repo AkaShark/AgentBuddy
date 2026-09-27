@@ -7,7 +7,7 @@ struct ConversationDiffDetailSheet: View {
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.dismiss) private var dismiss
     @State private var collapsedSectionIDs: Set<String> = []
-    private let fullDiffFontSize = AgentBuddyFont.conversationDiffPointSize
+    private let fullDiffFontSize = BuddyTextStyle.code.size
     private let maxStickyDiffSections = 8
     private let maxStickyDiffCharacters = 20_000
 
@@ -33,22 +33,26 @@ struct ConversationDiffDetailSheet: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 8) {
-                    Text("+\(stats.additions)")
-                        .agentBuddyFont(.caption2, weight: .semibold)
-                        .foregroundColor(AgentBuddyTheme.success)
-                    Text("-\(stats.deletions)")
-                        .agentBuddyFont(.caption2, weight: .semibold)
-                        .foregroundColor(AgentBuddyTheme.danger)
+                HStack(spacing: BuddySpacing.xs) {
+                    Text(verbatim: "+\(stats.additions)")
+                        .buddyText(.label, weight: .semibold)
+                        .monospacedDigit()
+                        .foregroundStyle(AgentBuddyTheme.success)
+                    Text(verbatim: "−\(stats.deletions)")
+                        .buddyText(.label, weight: .semibold)
+                        .monospacedDigit()
+                        .foregroundStyle(AgentBuddyTheme.danger)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-                .padding(.bottom, 8)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text("\(stats.additions) additions, \(stats.deletions) deletions"))
+                .padding(.horizontal, BuddySpacing.md)
+                .padding(.top, BuddySpacing.sm)
+                .padding(.bottom, BuddySpacing.xs)
 
                 ScrollView(.vertical) {
                     LazyVStack(
                         alignment: .leading,
-                        spacing: 8,
+                        spacing: BuddySpacing.xs,
                         pinnedViews: usesStickyHeaders ? [.sectionHeaders] : []
                     ) {
                         ForEach(sections) { section in
@@ -63,11 +67,11 @@ struct ConversationDiffDetailSheet: View {
                             }
                         }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 16)
+                    .padding(.horizontal, BuddySpacing.md)
+                    .padding(.bottom, BuddySpacing.md)
                 }
             }
-            .background(AgentBuddyTheme.backgroundGradient.ignoresSafeArea())
+            .buddyPageBackground()
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -75,10 +79,12 @@ struct ConversationDiffDetailSheet: View {
                     Button("Done") {
                         dismiss()
                     }
+                    .foregroundStyle(AgentBuddyTheme.link)
                 }
             }
         }
         .presentationDetents([.medium, .large])
+        .buddySheetStyle()
         .id(themeManager.themeVersion)
     }
 
@@ -99,11 +105,10 @@ struct ConversationDiffDetailSheet: View {
                         titleHint: section.title.isEmpty ? nil : section.title,
                         fontSize: fullDiffFontSize
                     )
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 6)
+                        .padding(.horizontal, BuddySpacing.sm)
+                        .padding(.vertical, BuddySpacing.xs)
                 }
-                .background(AgentBuddyTheme.codeBackground.opacity(0.72))
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .timelineCodeSurface(nested: false)
             }
         }
     }
@@ -116,26 +121,27 @@ struct ConversationDiffDetailSheet: View {
                 toggleSection(section.id)
             }
         } label: {
-            HStack(spacing: 8) {
-                Text(section.title)
-                    .agentBuddyFont(.caption2, weight: .bold)
-                    .foregroundColor(AgentBuddyTheme.textSecondary)
-                    .textCase(.uppercase)
+            HStack(spacing: BuddySpacing.xs) {
+                Text(verbatim: section.title)
+                    .buddyText(.code)
+                    .foregroundStyle(AgentBuddyTheme.textPrimary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
                 Spacer(minLength: 0)
-                Text("+\(section.stats.additions)")
-                    .agentBuddyFont(.caption2, weight: .semibold)
-                    .foregroundColor(AgentBuddyTheme.success)
-                Text("-\(section.stats.deletions)")
-                    .agentBuddyFont(.caption2, weight: .semibold)
-                    .foregroundColor(AgentBuddyTheme.danger)
-                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                    .agentBuddyFont(size: 10, weight: .medium)
-                    .foregroundColor(AgentBuddyTheme.textMuted)
+                Text(verbatim: "+\(section.stats.additions)")
+                    .buddyText(.caption, weight: .semibold)
+                    .monospacedDigit()
+                    .foregroundStyle(AgentBuddyTheme.success)
+                Text(verbatim: "−\(section.stats.deletions)")
+                    .buddyText(.caption, weight: .semibold)
+                    .monospacedDigit()
+                    .foregroundStyle(AgentBuddyTheme.danger)
+                TimelineDisclosureChevron(expanded: isExpanded)
             }
+            .frame(minHeight: BuddySize.minHitTarget)
             .contentShape(Rectangle())
-            .padding(.vertical, 6)
-            .padding(.horizontal, 12)
-            .background(AgentBuddyTheme.backgroundGradient)
+            .padding(.horizontal, BuddySpacing.xxs)
+            .background(AgentBuddyTheme.background)
         }
         .buttonStyle(.plain)
     }

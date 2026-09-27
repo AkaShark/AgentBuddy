@@ -6,19 +6,19 @@ extension ToolCallCardView {
         switch section.value {
         case .kv(let label, let entries):
             if !entries.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: BuddySpacing.xs) {
                     sectionLabel(label)
                     VStack(alignment: .leading, spacing: 4) {
                         ForEach(identifiedKeyValueEntries(entries)) { entry in
                             let textID = "\(section.id)-kv-\(entry.id)"
-                            HStack(alignment: .top, spacing: 8) {
+                            HStack(alignment: .firstTextBaseline, spacing: BuddySpacing.xs) {
                                 Text(entry.value.key + ":")
-                                    .agentBuddyFont(size: contentFontSize, weight: .semibold)
-                                    .foregroundColor(AgentBuddyTheme.textSecondary)
-                                VStack(alignment: .leading, spacing: 4) {
+                                    .buddyText(.code, weight: .semibold)
+                                    .foregroundStyle(AgentBuddyTheme.textSecondary)
+                                VStack(alignment: .leading, spacing: BuddySpacing.xxs) {
                                     Text(visibleText(entry.value.value, id: textID))
-                                        .agentBuddyFont(size: contentFontSize)
-                                        .foregroundColor(AgentBuddyTheme.textSystem)
+                                        .buddyText(.code)
+                                        .foregroundStyle(AgentBuddyTheme.textPrimary)
                                         .textSelection(.enabled)
                                     longTextToggle(for: entry.value.value, id: textID)
                                 }
@@ -26,9 +26,9 @@ extension ToolCallCardView {
                             }
                         }
                     }
-                    .padding(8)
-                    .background(AgentBuddyTheme.surface.opacity(0.6))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .padding(BuddySpacing.sm)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .timelineCodeSurface()
                 }
             }
         case .code(let label, let language, let content):
@@ -41,47 +41,49 @@ extension ToolCallCardView {
             inlineTextSection(id: section.id, label: label, content: content)
         case .list(let label, let items):
             if !items.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: BuddySpacing.xs) {
                     sectionLabel(label)
                     VStack(alignment: .leading, spacing: 4) {
                         ForEach(identifiedTextItems(items, prefix: "list")) { item in
                             let textID = "\(section.id)-list-\(item.id)"
-                            HStack(alignment: .top, spacing: 6) {
-                                Text("•")
-                                    .agentBuddyFont(size: contentFontSize)
-                                    .foregroundColor(AgentBuddyTheme.textSecondary)
-                                VStack(alignment: .leading, spacing: 4) {
+                            HStack(alignment: .firstTextBaseline, spacing: BuddySpacing.xs) {
+                                Text(verbatim: "•")
+                                    .buddyText(.label, weight: .regular)
+                                    .foregroundStyle(AgentBuddyTheme.textSecondary)
+                                    .accessibilityHidden(true)
+                                VStack(alignment: .leading, spacing: BuddySpacing.xxs) {
                                     Text(visibleText(item.value, id: textID))
-                                        .agentBuddyFont(size: contentFontSize)
-                                        .foregroundColor(AgentBuddyTheme.textSystem)
+                                        .buddyText(.label, weight: .regular)
+                                        .foregroundStyle(AgentBuddyTheme.textPrimary)
                                         .textSelection(.enabled)
                                     longTextToggle(for: item.value, id: textID)
                                 }
                             }
                         }
                     }
-                    .padding(8)
-                    .background(AgentBuddyTheme.surface.opacity(0.6))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .padding(BuddySpacing.sm)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .timelineCodeSurface()
                 }
             }
         case .progress(let label, let items):
             if !items.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: BuddySpacing.xs) {
                     sectionLabel(label)
                     VStack(alignment: .leading, spacing: 6) {
                         let identifiedItems = identifiedTextItems(items, prefix: "progress")
                         ForEach(identifiedItems) { item in
                             let textID = "\(section.id)-progress-\(item.id)"
-                            HStack(alignment: .top, spacing: 8) {
+                            HStack(alignment: .top, spacing: BuddySpacing.xs) {
                                 Circle()
-                                    .fill(item.index == identifiedItems.count - 1 ? kindAccent : AgentBuddyTheme.textMuted)
+                                    .fill(item.index == identifiedItems.count - 1 ? kindAccent : AgentBuddyTheme.textSecondary)
                                     .frame(width: 6, height: 6)
-                                    .padding(.top, 5)
-                                VStack(alignment: .leading, spacing: 4) {
+                                    .padding(.top, 7)
+                                    .accessibilityHidden(true)
+                                VStack(alignment: .leading, spacing: BuddySpacing.xxs) {
                                     Text(visibleText(item.value, id: textID))
-                                        .agentBuddyFont(size: contentFontSize)
-                                        .foregroundColor(AgentBuddyTheme.textSystem)
+                                        .buddyText(.label, weight: .regular)
+                                        .foregroundStyle(AgentBuddyTheme.textPrimary)
                                         .textSelection(.enabled)
                                     longTextToggle(for: item.value, id: textID)
                                 }
@@ -89,24 +91,22 @@ extension ToolCallCardView {
                             }
                         }
                     }
-                    .padding(8)
-                    .background(AgentBuddyTheme.surface.opacity(0.6))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .padding(BuddySpacing.sm)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .timelineCodeSurface()
                 }
             }
         }
     }
 
     private func sectionLabel(_ label: String) -> some View {
-        Text(label.uppercased())
-            .agentBuddyFont(.caption2, weight: .bold)
-            .foregroundColor(AgentBuddyTheme.textSecondary)
+        TimelineSectionLabel(verbatim: label)
     }
 
     private func codeLikeSection(id: String, label: String, language: String, content: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             sectionLabel(label)
-            CodeBlockView(language: language, code: visibleText(content, id: id), fontSize: contentFontSize)
+            CodeBlockView(language: language, code: visibleText(content, id: id), fontSize: contentFontSize, nested: true)
             longTextToggle(for: content, id: id)
         }
     }
@@ -115,14 +115,13 @@ extension ToolCallCardView {
         VStack(alignment: .leading, spacing: 6) {
             sectionLabel(label)
             Text(verbatim: visibleText(content, id: id))
-                .agentBuddyMonoFont(size: contentFontSize)
-                .foregroundColor(AgentBuddyTheme.textBody)
+                .buddyText(.code)
+                .foregroundStyle(AgentBuddyTheme.textPrimary)
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(AgentBuddyTheme.codeBackground.opacity(0.72))
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .padding(.horizontal, BuddySpacing.sm)
+                .padding(.vertical, BuddySpacing.xs)
+                .timelineCodeSurface()
                 .fixedSize(horizontal: false, vertical: true)
             longTextToggle(for: content, id: id)
         }
@@ -139,13 +138,12 @@ extension ToolCallCardView {
                         toggleDiffSection(id)
                     }
                 } label: {
-                    HStack(spacing: 8) {
+                    HStack(spacing: BuddySpacing.xs) {
                         sectionLabel(label)
                         Spacer(minLength: 0)
-                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                            .agentBuddyFont(size: 10, weight: .medium)
-                            .foregroundColor(AgentBuddyTheme.textMuted)
+                        TimelineDisclosureChevron(expanded: isExpanded)
                     }
+                    .frame(minHeight: BuddySize.minHitTarget)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -160,11 +158,10 @@ extension ToolCallCardView {
                         titleHint: label.isEmpty ? nil : label,
                         fontSize: terminalFontSize
                     )
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, BuddySpacing.sm)
+                    .padding(.vertical, BuddySpacing.xs)
                 }
-                .background(AgentBuddyTheme.codeBackground.opacity(0.72))
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .timelineCodeSurface()
                 longTextToggle(for: content, id: id)
             }
         }
@@ -202,8 +199,7 @@ extension ToolCallCardView {
                 }
             } label: {
                 Text(expandedLongTextIDs.contains(id) ? "Show less" : "Show more")
-                    .agentBuddyFont(.caption2, weight: .semibold)
-                    .foregroundColor(AgentBuddyTheme.accent)
+                    .timelineLinkAction()
             }
             .buttonStyle(.plain)
             .accessibilityLabel(expandedLongTextIDs.contains(id) ? "Show less text" : "Show more text")

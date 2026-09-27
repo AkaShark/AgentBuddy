@@ -11,32 +11,31 @@ struct AgentBuddyCodeBlockRenderer: CodeBlockRenderer {
                 if configuration.hasLanguage {
                     HStack {
                         Text(configuration.languageDisplayName)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                            .buddyText(.caption, weight: .medium)
+                            .foregroundStyle(AgentBuddyTheme.textSecondary)
                         Spacer()
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.top, 8)
-                    .padding(.bottom, 4)
+                    .padding(.horizontal, BuddySpacing.sm)
+                    .padding(.top, BuddySpacing.xs)
+                    .padding(.bottom, BuddySpacing.xxs)
                 }
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     SyntaxHighlightedDiffText(
                         diff: configuration.code,
                         titleHint: configuration.language,
-                        fontSize: AgentBuddyFont.conversationDiffPointSize
+                        fontSize: BuddyTextStyle.code.size
                     )
                     .padding(configuration.theme.codeBlock.padding)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             .background(configuration.theme.codeBlock.backgroundColor)
-            .clipShape(RoundedRectangle(cornerRadius: configuration.theme.codeBlock.cornerRadius))
-            .modifier(GlassRectModifier(cornerRadius: 8))
+            .clipShape(RoundedRectangle(cornerRadius: configuration.theme.codeBlock.cornerRadius, style: .continuous))
             .modifier(CodeBlockTerminalContextMenu(code: configuration.code))
         } else {
             DefaultCodeBlockRenderer().makeBody(configuration: configuration)
-                .modifier(GlassRectModifier(cornerRadius: 8))
+                .clipShape(RoundedRectangle(cornerRadius: configuration.theme.codeBlock.cornerRadius, style: .continuous))
                 .modifier(CodeBlockTerminalContextMenu(code: configuration.code))
         }
     }

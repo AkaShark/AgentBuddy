@@ -122,10 +122,10 @@ struct ConversationMessageList: View {
                                     onLoadOlderTurns(activeThreadKey)
                                 } label: {
                                     Text("Load earlier messages")
-                                        .agentBuddyFont(.caption, weight: .semibold)
-                                        .foregroundColor(AgentBuddyTheme.accent)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 8)
+                                        .buddyText(.label, weight: .semibold)
+                                        .foregroundStyle(AgentBuddyTheme.link)
+                                        .frame(maxWidth: .infinity, minHeight: BuddySize.minHitTarget)
+                                        .contentShape(Rectangle())
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -296,53 +296,67 @@ struct ConversationMessageList: View {
     }
 }
 
+/// "Latest" jump pill: surface capsule with a hairline border at compact-pill
+/// height inside a 44pt hit area. No looping motion.
 private struct ScrollToBottomIndicator: View {
     let action: () -> Void
-    @State private var bob = false
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 8) {
+            HStack(spacing: BuddySpacing.xs) {
                 Image(systemName: "arrow.down")
-                    .agentBuddyFont(.caption, weight: .bold)
-                    .offset(y: bob ? 1.5 : -1.5)
-                    .animation(.easeInOut(duration: 0.75).repeatForever(autoreverses: true), value: bob)
+                    .font(.system(size: 17, weight: .semibold))
+                    .accessibilityHidden(true)
                 Text("Latest")
-                    .agentBuddyFont(.caption, weight: .semibold)
+                    .buddyText(.label, weight: .semibold)
             }
-            .foregroundColor(AgentBuddyTheme.textPrimary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .modifier(GlassCapsuleModifier())
-        }
-        .contentShape(Capsule())
-        .onAppear {
-            bob = true
+            .foregroundStyle(AgentBuddyTheme.textPrimary)
+            .padding(.horizontal, BuddySpacing.md)
+            .frame(minHeight: BuddySize.compactPill)
+            .background(AgentBuddyTheme.surface, in: Capsule())
+            .overlay {
+                Capsule().strokeBorder(AgentBuddyTheme.border, lineWidth: 1)
+            }
+            .shadow(color: AgentBuddyTheme.floatingShadow, radius: 12, x: 0, y: 8)
+            .frame(minHeight: BuddySize.minHitTarget)
+            .contentShape(Rectangle())
         }
     }
 }
 
+/// Loading label in textSecondary. A soft shimmer runs only when Reduce
+/// Motion is off.
 private struct ConversationLoadingIndicator: View {
-    let label: String
+    let label: LocalizedStringKey
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shimmerOffset: CGFloat = -1
 
     var body: some View {
-        Text(label)
-            .agentBuddyFont(.body, weight: .medium)
-            .foregroundStyle(
-                LinearGradient(
-                    colors: [
-                        AgentBuddyTheme.textSecondary.opacity(0.4),
-                        AgentBuddyTheme.textSecondary.opacity(0.7),
-                        AgentBuddyTheme.textSecondary.opacity(0.4),
-                    ],
-                    startPoint: UnitPoint(x: shimmerOffset - 0.3, y: 0.5),
-                    endPoint: UnitPoint(x: shimmerOffset + 0.3, y: 0.5)
+        if reduceMotion {
+            text
+                .foregroundStyle(AgentBuddyTheme.textSecondary)
+        } else {
+            text
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [
+                            AgentBuddyTheme.textSecondary.opacity(0.55),
+                            AgentBuddyTheme.textSecondary,
+                            AgentBuddyTheme.textSecondary.opacity(0.55),
+                        ],
+                        startPoint: UnitPoint(x: shimmerOffset - 0.3, y: 0.5),
+                        endPoint: UnitPoint(x: shimmerOffset + 0.3, y: 0.5)
+                    )
                 )
-            )
-            .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: false), value: shimmerOffset)
-            .onAppear {
-                shimmerOffset = 2
-            }
+                .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: false), value: shimmerOffset)
+                .onAppear {
+                    shimmerOffset = 2
+                }
+        }
+    }
+
+    private var text: some View {
+        Text(label)
+            .buddyText(.label)
     }
 }
