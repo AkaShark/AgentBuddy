@@ -1,19 +1,6 @@
 package com.akashark.agentbuddy.android.ui.sessions
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -22,19 +9,22 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
+import com.akashark.agentbuddy.android.state.PathDisplay
+import com.akashark.agentbuddy.android.state.VoiceRuntimeController
 import com.akashark.agentbuddy.android.state.isConnected
 import com.akashark.agentbuddy.android.ui.LocalAppModel
-import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
 import com.akashark.agentbuddy.android.ui.RecentDirectoryEntry
 import com.akashark.agentbuddy.android.ui.RecentDirectoryStore
 import kotlinx.coroutines.launch
+import uniffi.codex_mobile_client.AppSessionSummary
 import uniffi.codex_mobile_client.ThreadKey
 
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+/**
+ * 全部任务: every task on the connected hosts, grouped by project, with
+ * search, host / fork filters and sorting. Refreshes sessions on entry, seeds
+ * [RecentDirectoryStore] from them and scrolls to the open task.
+ */
 @Composable
 fun SessionsScreen(
     serverId: String?,
@@ -58,6 +48,10 @@ fun SessionsScreen(
     }
 
     var searchQuery by remember { mutableStateOf("") }
+    var serverFilterId by remember(serverId) { mutableStateOf(serverId) }
+    var renameTarget by remember { mutableStateOf<AppSessionSummary?>(null) }
+    var archiveTarget by remember { mutableStateOf<AppSessionSummary?>(null) }
+    val voiceController = remember { VoiceRuntimeController.shared }
     var isLoading by remember { mutableStateOf(false) }
     var isForkingActiveThread by remember { mutableStateOf(false) }
     var hasLoadedInitialSessions by remember { mutableStateOf(false) }
@@ -65,14 +59,14 @@ fun SessionsScreen(
     val derived = remember(
         snapshot,
         searchQuery,
-        serverId,
+        serverFilterId,
         sessionsUiState.sortMode,
         sessionsUiState.showOnlyForks,
     ) {
         val summaries = snapshot?.sessionSummaries ?: emptyList()
         SessionsDerivation.derive(
             summaries = summaries,
-            serverFilter = serverId,
+            serverFilter = serverFilterId,
             searchQuery = searchQuery,
             sortMode = sessionsUiState.sortMode,
             forkOnly = sessionsUiState.showOnlyForks,
@@ -122,7 +116,7 @@ fun SessionsScreen(
         }
 
         pendingActiveSessionScroll = false
-        listState.scrollToItem(flatIndex)
+        listState.scrollToItem(SESSIONS_HEADER_ITEM_COUNT + flatIndex)
     }
 
     suspend fun loadSessions(force: Boolean = false) {
@@ -143,7 +137,7 @@ fun SessionsScreen(
         }
     }
 
-    suspend fun forkThread(summary: uniffi.codex_mobile_client.AppSessionSummary) {
+    suspend fun forkThread(summary: AppSessionSummary) {
         if (isForkingActiveThread) return
         isForkingActiveThread = true
         try {
@@ -217,60 +211,107 @@ fun SessionsScreen(
         scrollToActiveSessionIfNeeded()
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Top bar
-        SessionsTopBar(
-            title = title,
+    // A host filter pointing at a host that went away falls back to all hosts.
+    LaunchedEffect(connectedServerIds) {
+        val filter = serverFilterId
+        if (filter != null && filter != serverId && filter !in connectedServerIds) {
+            serverFilterId = null
+        }
+    }
+
+    val summaries = snapshot?.sessionSummaries.orEmpty()
+    fun summaryFor(key: ThreadKey): AppSessionSummary? = summaries.firstOrNull { it.key == key }
+    val activeSummary = snapshot?.activeThread?.let { activeKey -> summaries.firstOrNull { it.key == activeKey } }
+    val localServerIds = snapshot?.servers?.filter { it.isLocal }?.map { it.serverId }?.toSet().orEmpty()
+    val viewState = SessionsViewState(
+        title = title,
+        totalCount = derived.totalCount,
+        filteredCount = derived.filteredCount,
+        connectedHostCount = connectedServerIds.size,
+        groups = buildSessionsGroups(
             derived = derived,
-            snapshot = snapshot,
-            isForkingActiveThread = isForkingActiveThread,
-            isLoading = isLoading,
-            hasLoadedInitialSessions = hasLoadedInitialSessions,
-            connectedServerIds = connectedServerIds,
+            allSummaries = summaries,
+            activeKey = snapshot?.activeThread,
+            collapsedGroupKeys = sessionsUiState.collapsedWorkspaceGroupKeys,
+            collapsedNodeKeys = sessionsUiState.collapsedSessionNodeKeys,
+            pathLabel = { groupServerId, cwd ->
+                PathDisplay.display(cwd, groupServerId in localServerIds, context)
+            },
+        ),
+        isLoading = isLoading,
+        hasLoadedInitialSessions = hasLoadedInitialSessions,
+        searchQuery = searchQuery,
+        serverOptions = snapshot?.servers
+            ?.filter { it.isConnected }
+            ?.sortedBy { it.serverId }
+            ?.map { SessionsServerOption(it.serverId, sessionsHostLabel(it.displayName)) }
+            .orEmpty(),
+        serverFilterId = serverFilterId,
+        showOnlyForks = sessionsUiState.showOnlyForks,
+        sortMode = sessionsUiState.sortMode,
+        canForkCurrent = activeSummary?.let { !it.hasActiveTurn },
+        isForkingCurrent = isForkingActiveThread,
+        showsInfo = onInfo != null,
+        canCreateTask = onNewSession != null,
+    )
+
+    SessionsContent(
+        state = viewState,
+        listState = listState,
+        actions = SessionsCallbacks(
             onBack = onBack,
-            onForkThread = { summary -> scope.launch { forkThread(summary) } },
             onRefresh = { scope.launch { loadSessions(force = true) } },
             onInfo = onInfo,
-        )
-
-        if (serverId != null) {
-            Button(
-                onClick = { onNewSession?.invoke() },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = AgentBuddyTheme.accent,
-                    contentColor = Color.Black,
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-            ) {
-                Icon(
-                    Icons.Default.Add,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(6.dp))
-                Text("新建会话(对话)")
-            }
-        }
-
-        // Search bar + filter chips
-        SessionsSearchBar(
-            searchQuery = searchQuery,
+            onForkCurrent = { activeSummary?.let { summary -> scope.launch { forkThread(summary) } } },
+            onNewTask = onNewSession,
+            onConnectHost = onNewSession,
             onSearchQueryChange = { searchQuery = it },
-            sessionsUiState = sessionsUiState,
-            onSortModeChanged = { scheduleActiveSessionScrollIfNeeded() },
-        )
+            onSelectServer = { serverFilterId = it },
+            onToggleForksOnly = { sessionsUiState.showOnlyForks = !sessionsUiState.showOnlyForks },
+            onSelectSort = { mode ->
+                sessionsUiState.sortMode = mode
+                scheduleActiveSessionScrollIfNeeded()
+            },
+            onClearFilters = {
+                serverFilterId = null
+                sessionsUiState.showOnlyForks = false
+            },
+            onToggleGroup = { groupKey -> sessionsUiState.toggleWorkspaceGroup(groupKey) },
+            onToggleNode = { key ->
+                sessionsUiState.toggleSessionNode(key)
+                scheduleActiveSessionScrollIfNeeded()
+            },
+            onOpen = { key ->
+                summaryFor(key)?.let { summary ->
+                    appModel.launchState.updateCurrentCwd(summary.cwd)
+                    onOpenConversation(summary.key)
+                }
+            },
+            onFork = { key -> summaryFor(key)?.let { summary -> scope.launch { forkThread(summary) } } },
+            onRename = { key -> renameTarget = summaryFor(key) },
+            onArchive = { key -> archiveTarget = summaryFor(key) },
+        ),
+    )
 
-        SessionsListContent(
-            derived = derived,
-            isLoading = isLoading,
-            listState = listState,
-            sessionsUiState = sessionsUiState,
-            appModel = appModel,
-            onOpenConversation = onOpenConversation,
-            onSessionNodeToggled = { scheduleActiveSessionScrollIfNeeded() },
-            onForkThread = { summary -> scope.launch { forkThread(summary) } },
+    renameTarget?.let { summary ->
+        SessionRenameDialog(
+            summary = summary,
+            onDismiss = { renameTarget = null },
+            onConfirm = { newName ->
+                renameTarget = null
+                scope.launch { renameSession(appModel, summary, newName) }
+            },
+        )
+    }
+
+    archiveTarget?.let { summary ->
+        SessionArchiveDialog(
+            summary = summary,
+            onDismiss = { archiveTarget = null },
+            onConfirm = {
+                archiveTarget = null
+                scope.launch { archiveSession(appModel, voiceController, summary) }
+            },
         )
     }
 }
@@ -301,7 +342,7 @@ private fun flatListIndexForThread(
 
 private fun ancestorThreadKeys(
     key: ThreadKey,
-    parentByKey: Map<ThreadKey, uniffi.codex_mobile_client.AppSessionSummary>,
+    parentByKey: Map<ThreadKey, AppSessionSummary>,
 ): List<ThreadKey> {
     val ancestors = mutableListOf<ThreadKey>()
     val visited = mutableSetOf<ThreadKey>()

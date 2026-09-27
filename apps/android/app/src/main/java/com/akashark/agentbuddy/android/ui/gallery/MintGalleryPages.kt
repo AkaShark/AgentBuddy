@@ -49,4 +49,7 @@ val mintGalleryPages: List<MintGalleryPage> =
         MintGalleryPage("ssh-login", "SSH 登录") { GallerySshLoginPage() },
         MintGalleryPage("ssh-agents", "远程智能体") { GallerySshAgentsPage() },
         MintGalleryPage("slingshot", "已连接电脑") { GallerySlingshotPage() },
+        MintGalleryPage("tasks-all", "全部任务") { GalleryTasksAllPage() },
+        MintGalleryPage("tasks-all-forks", "全部任务（只看分叉）") { GalleryTasksAllPage(GallerySessionsFixtures.state(showOnlyForks = true)) },
+        MintGalleryPage("tasks-all-empty", "全部任务（无主机）") { GalleryTasksAllPage(GallerySessionsFixtures.state(summaries = emptyList(), connectedHostCount = 0, activeKey = null)) },
     )
