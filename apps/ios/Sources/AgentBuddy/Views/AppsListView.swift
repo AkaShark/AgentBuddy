@@ -87,14 +87,14 @@ struct AppsListView: View {
                     } label: {
                         Label("Delete", systemImage: "trash")
                     }
-                    .tint(AgentBuddyTheme.danger)
+                    .tint(AgentBuddyTheme.swipeFill(.danger))
                     Button {
                         renameText = app.title
                         renameTarget = app
                     } label: {
                         Label("Rename", systemImage: "pencil")
                     }
-                    .tint(AgentBuddyTheme.link)
+                    .tint(AgentBuddyTheme.swipeFill(.link))
                 }
             }
         }

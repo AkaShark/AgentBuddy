@@ -191,7 +191,7 @@ struct WallpaperAdjustView: View {
 
     /// Checkbox-style option: the symbol shape (filled check vs. empty square)
     /// and the selected trait carry the state, not just the colour.
-    private func toggleOption(label: String, isOn: Binding<Bool>) -> some View {
+    private func toggleOption(label: LocalizedStringKey, isOn: Binding<Bool>) -> some View {
         Button {
             isOn.wrappedValue.toggle()
         } label: {

@@ -120,7 +120,7 @@ extension WallpaperSelectionView {
             segmentedControl(
                 ["Linear", "Continuous"],
                 isSelected: { typingEffectConfig.revealMode == $0 },
-                title: { Text($0) }
+                title: { Text(LocalizedStringKey($0)) }
             ) { mode in
                 typingEffectConfig.revealMode = mode
                 persistTypingEffect()

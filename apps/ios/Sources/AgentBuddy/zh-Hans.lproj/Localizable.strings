@@ -31,8 +31,8 @@
 "Agents" = "智能体";
 "Allow camera access in Settings to scan an Alleycat pairing QR code." = "请在“设置”中允许访问相机，以扫描 Alleycat 配对 QR 码。";
 "Appearance" = "外观";
-"Apply for This Server" = "申请此服务器";
-"Apply for This Thread" = "申请此会话(线程)";
+"Apply for This Server" = "应用到此主机";
+"Apply for This Thread" = "应用到此任务";
 "Attach" = "附加";
 "Authentication" = "身份验证";
 "Available Models" = "可用模型";
@@ -813,3 +813,14 @@
 "Tasks from your connected hosts show up here. Pull down to check again." = "已连接主机上的任务会显示在这里。下拉可重新检查。";
 "No tasks from this partner yet." = "这个搭档还没有任务。";
 "Show all partners" = "显示全部搭档";
+"Suggested" = "推荐";
+"All themes" = "全部主题";
+"App options" = "应用选项";
+"View Conversation" = "查看对话";
+"Title" = "标题";
+"Reply…" = "回复…";
+"Paste video URL" = "粘贴视频链接";
+"Blurred" = "模糊";
+"Motion" = "动态";
+"Linear" = "线性";
+"Continuous" = "连续";
