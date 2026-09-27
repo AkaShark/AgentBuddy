@@ -2,40 +2,40 @@ import SwiftUI
 
 struct RealtimeVoiceScreen: View {
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(AppModel.self) private var appModel
-    @Environment(VoiceRuntimeController.self) private var voiceRuntime
+    @Environment(AppModel.self) var appModel
+    @Environment(VoiceRuntimeController.self) var voiceRuntime
     let threadKey: ThreadKey
     let onEnd: () -> Void
     let onToggleSpeaker: () -> Void
 
-    @State private var apiKey = ""
-    @State private var isSavingApiKey = false
-    @State private var hasCheckedAuth = false
-    @State private var hasStoredApiKey = OpenAIApiKeyStore.shared.hasStoredKey
-    @State private var apiKeyError: String?
-    @State private var isRetryingAfterAuthSave = false
+    @State var apiKey = ""
+    @State var isSavingApiKey = false
+    @State var hasCheckedAuth = false
+    @State var hasStoredApiKey = OpenAIApiKeyStore.shared.hasStoredKey
+    @State var apiKeyError: String?
+    @State var isRetryingAfterAuthSave = false
 
     private var glowPalette: GlowPalette {
         .from(colorScheme: colorScheme)
     }
 
-    private var primaryTextColor: Color {
+    var primaryTextColor: Color {
         AgentBuddyTheme.textPrimary
     }
 
-    private var secondaryTextColor: Color {
+    var secondaryTextColor: Color {
         AgentBuddyTheme.textSecondary
     }
 
-    private var promptFillColor: Color {
+    var promptFillColor: Color {
         AgentBuddyTheme.surface.opacity(colorScheme == .dark ? 0.82 : 0.92)
     }
 
-    private var promptStrokeColor: Color {
+    var promptStrokeColor: Color {
         AgentBuddyTheme.border.opacity(colorScheme == .dark ? 0.55 : 0.8)
     }
 
-    private var controlFillColor: Color {
+    var controlFillColor: Color {
         AgentBuddyTheme.surfaceLight.opacity(colorScheme == .dark ? 0.72 : 0.88)
     }
     private var session: VoiceSessionState? {
@@ -44,7 +44,7 @@ struct RealtimeVoiceScreen: View {
         return session
     }
 
-    private var server: AppServerSnapshot? {
+    var server: AppServerSnapshot? {
         appModel.snapshot?.serverSnapshot(for: threadKey.serverId)
     }
 
@@ -128,7 +128,7 @@ struct RealtimeVoiceScreen: View {
         return true
     }
 
-    private var trimmedApiKey: String {
+    var trimmedApiKey: String {
         apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
@@ -327,150 +327,6 @@ struct RealtimeVoiceScreen: View {
         }
     }
 
-    private var realtimeApiKeyPrompt: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Realtime needs an API key")
-                .font(AgentBuddyFont.styled(.headline, weight: .semibold))
-                .foregroundColor(primaryTextColor)
-
-            Text("Enter your OpenAI API key for this device. AgentBuddy will store it in the local Codex environment as OPENAI_API_KEY.")
-                .font(AgentBuddyFont.styled(.caption))
-                .foregroundColor(secondaryTextColor)
-                .fixedSize(horizontal: false, vertical: true)
-
-            SecureField("sk-...", text: $apiKey)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .font(AgentBuddyFont.monospaced(.body))
-                .foregroundColor(primaryTextColor)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-                .background(controlFillColor)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(promptStrokeColor.opacity(1.75), lineWidth: 1)
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-
-            if let apiKeyError, !apiKeyError.isEmpty {
-                Text(apiKeyError)
-                    .font(AgentBuddyFont.styled(.caption))
-                    .foregroundColor(AgentBuddyTheme.danger)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            apiKeySaveButton
-        }
-        .padding(18)
-        .frame(maxWidth: 420)
-        .background(promptFillColor)
-        .overlay(
-            RoundedRectangle(cornerRadius: 24)
-                .stroke(promptStrokeColor, lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 24))
-    }
-
-    private func saveApiKeyAndRetry() {
-        guard !trimmedApiKey.isEmpty, !isSavingApiKey else { return }
-        guard server?.isLocal == true else {
-            apiKeyError = "API keys are only saved on the local server."
-            return
-        }
-
-        isSavingApiKey = true
-        apiKeyError = nil
-
-        Task {
-            var apiKeySaved = false
-            var authError: String?
-            do {
-                try OpenAIApiKeyStore.shared.save(trimmedApiKey)
-                if case .apiKey? = server?.account {
-                    _ = try await appModel.client.logoutAccount(serverId: threadKey.serverId)
-                }
-                await voiceRuntime.stopActiveVoiceSession()
-                try await appModel.restartLocalServer()
-                let persisted = OpenAIApiKeyStore.shared.hasStoredKey
-                guard persisted else {
-                    authError = "API key did not persist locally."
-                    throw CancellationError()
-                }
-                apiKeySaved = true
-                authError = nil
-            } catch {
-                apiKeySaved = false
-                if authError == nil {
-                    authError = error.localizedDescription
-                }
-            }
-
-            if apiKeySaved {
-                await MainActor.run {
-                    isRetryingAfterAuthSave = true
-                }
-                await voiceRuntime.stopActiveVoiceSession()
-                try? await Task.sleep(for: .milliseconds(150))
-                do {
-                    try await voiceRuntime.startVoiceOnThread(threadKey)
-                } catch {
-                    await MainActor.run {
-                        isRetryingAfterAuthSave = false
-                        apiKeyError = error.localizedDescription
-                    }
-                }
-            }
-
-            await MainActor.run {
-                isSavingApiKey = false
-                hasCheckedAuth = true
-                if apiKeySaved {
-                    hasStoredApiKey = true
-                    apiKey = ""
-                }
-                if !apiKeySaved {
-                    isRetryingAfterAuthSave = false
-                    apiKeyError = authError ?? "Failed to save API key"
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var apiKeySaveButton: some View {
-        Button {
-            saveApiKeyAndRetry()
-        } label: {
-            apiKeySaveButtonLabel
-                .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(controlFillColor)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(promptStrokeColor, lineWidth: 1)
-                )
-        }
-        .buttonStyle(.plain)
-        .disabled(trimmedApiKey.isEmpty || isSavingApiKey)
-        .opacity(trimmedApiKey.isEmpty || isSavingApiKey ? 0.55 : 1)
-    }
-
-    private var apiKeySaveButtonLabel: some View {
-        HStack(spacing: 10) {
-            if isSavingApiKey {
-                ProgressView()
-                    .tint(primaryTextColor)
-                    .scaleEffect(0.85)
-            }
-            Text(isSavingApiKey ? "Saving…" : "Save API Key")
-                .font(AgentBuddyFont.styled(.subheadline, weight: .semibold))
-        }
-        .foregroundColor(primaryTextColor)
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
-    }
-
     private var phaseColor: Color {
         switch phase {
         case .connecting:
@@ -482,27 +338,6 @@ struct RealtimeVoiceScreen: View {
         case .error:
             return AgentBuddyTheme.danger
         }
-    }
-}
-
-struct GlowPalette: Equatable {
-    let background: String
-    let accent: String
-    let accentStrong: String
-    let warning: String
-    let success: String
-    let danger: String
-
-    static func from(colorScheme: ColorScheme) -> GlowPalette {
-        let theme = colorScheme == .dark ? ThemeStore.shared.dark : ThemeStore.shared.light
-        return GlowPalette(
-            background: theme.background,
-            accent: theme.accent,
-            accentStrong: theme.accentStrong,
-            warning: theme.warning,
-            success: theme.success,
-            danger: theme.danger
-        )
     }
 }
 
@@ -534,123 +369,5 @@ private struct VoiceScreenPulsingDot: View {
                     }
                 }
             }
-    }
-}
-
-private struct SiriEdgeGlow: View {
-    let intensity: CGFloat
-    let phase: VoiceSessionPhase
-    let palette: GlowPalette
-
-    var body: some View {
-        TimelineView(.animation(minimumInterval: 0.5)) { timeline in
-            let _ = timeline.date
-            GeometryReader { geometry in
-                let cornerRadius: CGFloat = UIScreen.main.displayCornerRadius
-                let rect = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                let gradient = makeAngularGradient(for: phase)
-
-                ZStack {
-                    rect
-                        .strokeBorder(gradient, lineWidth: 4 + intensity * 3)
-
-                    rect
-                        .strokeBorder(gradient, lineWidth: 6 + intensity * 4)
-                        .blur(radius: 4)
-
-                    rect
-                        .strokeBorder(gradient, lineWidth: 8 + intensity * 6)
-                        .blur(radius: 12)
-
-                    rect
-                        .strokeBorder(gradient, lineWidth: 12 + intensity * 8)
-                        .blur(radius: 20)
-                        .opacity(0.7)
-                }
-                .opacity(Double(intensity))
-                .frame(width: geometry.size.width, height: geometry.size.height)
-            }
-        }
-        .animation(.easeInOut(duration: 0.6), value: phase)
-    }
-
-    private func makeAngularGradient(for phase: VoiceSessionPhase) -> AngularGradient {
-        let colors = phaseColors(for: phase)
-        var positions = (0..<colors.count).map { index in
-            let base = Double(index) / Double(colors.count)
-            return base + Double.random(in: -0.08...0.08)
-        }.sorted()
-        positions = positions.map { min(1, max(0, $0)) }
-
-        let stops = zip(colors, positions).map { color, position in
-            Gradient.Stop(color: color, location: position)
-        }
-        return AngularGradient(gradient: Gradient(stops: stops), center: .center)
-    }
-
-    private func phaseColors(for phase: VoiceSessionPhase) -> [Color] {
-        let accent = Color(hex: palette.accent)
-        let accentStrong = Color(hex: palette.accentStrong)
-        let warning = Color(hex: palette.warning)
-        let success = Color(hex: palette.success)
-        let danger = Color(hex: palette.danger)
-
-        switch phase {
-        case .listening:
-            return [
-                accentStrong,
-                accentStrong.opacity(0.7),
-                accent,
-                success,
-                accentStrong.opacity(0.5),
-                accent.opacity(0.8),
-            ]
-        case .speaking:
-            return [
-                warning,
-                warning.opacity(0.7),
-                warning.opacity(0.9),
-                warning.opacity(0.5),
-                warning.opacity(0.8),
-                warning.opacity(0.6),
-            ]
-        case .thinking, .handoff:
-            return [
-                warning.opacity(0.6),
-                accent.opacity(0.4),
-                warning.opacity(0.4),
-                accentStrong.opacity(0.3),
-                warning.opacity(0.5),
-                accent.opacity(0.3),
-            ]
-        case .connecting:
-            return [
-                accent.opacity(0.4),
-                accentStrong.opacity(0.3),
-                accent.opacity(0.2),
-                Color.gray.opacity(0.2),
-                accent.opacity(0.3),
-                accentStrong.opacity(0.2),
-            ]
-        case .error:
-            return [
-                danger,
-                danger.opacity(0.6),
-                danger.opacity(0.5),
-                danger.opacity(0.4),
-                danger.opacity(0.3),
-                danger.opacity(0.5),
-            ]
-        }
-    }
-}
-
-private extension UIScreen {
-    var displayCornerRadius: CGFloat {
-        let key = "_displayCornerRadius"
-        guard let value = self.value(forKey: key) as? CGFloat, value > 0 else {
-            return 50
-        }
-        return value
     }
 }
