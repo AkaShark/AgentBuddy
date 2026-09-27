@@ -1,78 +1,49 @@
 package com.akashark.agentbuddy.android.ui.discovery
 
 import android.Manifest
-import android.content.Context
 import android.content.pm.PackageManager
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.ImageAnalysis
-import androidx.camera.core.Preview
-import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.google.mlkit.vision.barcode.BarcodeScannerOptions
-import com.google.mlkit.vision.barcode.BarcodeScanning
-import com.google.mlkit.vision.barcode.common.Barcode
-import com.google.mlkit.vision.common.InputImage
 import com.akashark.agentbuddy.android.core.bridge.UniffiInit
 import com.akashark.agentbuddy.android.state.AlleycatCredentialStore
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
 import com.akashark.agentbuddy.android.ui.LocalAppModel
-import com.akashark.agentbuddy.android.ui.common.AgentIconView
-import com.akashark.agentbuddy.android.ui.common.BetaBadge
 import com.akashark.agentbuddy.android.ui.common.isBetaAgentName
-import java.util.concurrent.Executors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -90,7 +61,7 @@ data class AlleycatConnectedTarget(
     val agentWire: AppAlleycatAgentWire,
 )
 
-private const val LOG_TAG = "AlleycatSheet"
+internal const val LOG_TAG = "AlleycatSheet"
 
 @Composable
 fun AlleycatAddServerSheet(
@@ -310,57 +281,17 @@ fun AlleycatAddServerSheet(
             )
         }
 
-        DisclosureRow(
-            expanded = showPaste,
-            label = "粘贴配对 JSON",
-            onToggle = { showPaste = !showPaste },
+        AlleycatPastePairJsonSection(
+            showPaste = showPaste,
+            onTogglePaste = { showPaste = !showPaste },
+            pasteJson = pasteJson,
+            onPasteJsonChange = { pasteJson = it },
+            onPasteFromClipboard = {
+                clipboardManager.getText()?.text?.let { pasteJson = it }
+            },
+            parsedParams = parsedParams,
+            onParse = { handleScannedPayload(pasteJson) },
         )
-        if (showPaste) {
-            OutlinedTextField(
-                value = pasteJson,
-                onValueChange = { pasteJson = it },
-                placeholder = {
-                    Text(
-                        text = "{\"v\":1,\"node_id\":\"...\",\"token\":\"...\",\"relay\":\"https://...\"}",
-                        color = AgentBuddyTheme.textMuted,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp,
-                    )
-                },
-                minLines = 3,
-                maxLines = 6,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                TextButton(
-                    onClick = {
-                        clipboardManager.getText()?.text?.let { pasteJson = it }
-                    },
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ContentCopy,
-                        contentDescription = null,
-                        tint = AgentBuddyTheme.accent,
-                        modifier = Modifier.size(16.dp),
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text("从剪贴板粘贴", color = AgentBuddyTheme.accent)
-                }
-                TextButton(
-                    onClick = { handleScannedPayload(pasteJson) },
-                    enabled = pasteJson.trim().isNotEmpty(),
-                ) {
-                    Text(
-                        text = if (parsedParams == null) "解析 JSON" else "重新解析 JSON",
-                        color = AgentBuddyTheme.accent,
-                    )
-                }
-            }
-        }
 
         parseError?.let { message ->
             Text(message, color = AgentBuddyTheme.warning, fontSize = 12.sp)
@@ -368,94 +299,32 @@ fun AlleycatAddServerSheet(
 
         val params = parsedParams
         if (params != null) {
-            SectionHeader(label = "扫描到的主机")
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(AgentBuddyTheme.surface, RoundedCornerShape(8.dp))
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                PreviewRow("node", shortNodeId(params.nodeId))
-                PreviewRow("protocol", "v${params.v.toInt()}")
-                params.relay?.takeIf { it.isNotBlank() }?.let {
-                    PreviewRow("relay", it)
-                }
-                params.hostName?.takeIf { it.isNotBlank() }?.let {
-                    PreviewRow("host", it)
-                }
-            }
-
-            OutlinedTextField(
-                value = displayName,
-                onValueChange = { displayName = it },
-                label = { Text("显示名称（可选）") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+            AlleycatScannedHostSection(
+                params = params,
+                displayName = displayName,
+                onDisplayNameChange = { displayName = it },
+                agents = agents,
+                availableAgents = availableAgents,
+                selectedAgents = selectedAgents,
+                selectedAgentNames = selectedAgentNames,
+                isLoadingAgents = isLoadingAgents,
+                onToggleAllAgents = {
+                    selectedAgentNames = if (selectedAgents.size == availableAgents.size) {
+                        emptySet()
+                    } else {
+                        availableAgents.map { it.name }.toSet()
+                    }
+                },
+                onAgentCheckedChange = { agent, checked ->
+                    if (agent.available) {
+                        selectedAgentNames = if (checked) {
+                            selectedAgentNames + agent.name
+                        } else {
+                            selectedAgentNames - agent.name
+                        }
+                    }
+                },
             )
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                SectionHeader(label = "智能体", modifier = Modifier.weight(1f))
-                if (availableAgents.isNotEmpty()) {
-                    TextButton(
-                        onClick = {
-                            selectedAgentNames = if (selectedAgents.size == availableAgents.size) {
-                                emptySet()
-                            } else {
-                                availableAgents.map { it.name }.toSet()
-                            }
-                        },
-                    ) {
-                        Text(
-                            text = if (selectedAgents.size == availableAgents.size) "无" else "全部",
-                            color = AgentBuddyTheme.accent,
-                            fontSize = 12.sp,
-                        )
-                    }
-                }
-            }
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(AgentBuddyTheme.surface, RoundedCornerShape(8.dp))
-                    .padding(vertical = 4.dp),
-            ) {
-                when {
-                    isLoadingAgents -> Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(8.dp),
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            strokeWidth = 2.dp,
-                            color = AgentBuddyTheme.accent,
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text("正在加载智能体", color = AgentBuddyTheme.textSecondary, fontSize = 12.sp)
-                    }
-                    agents.isEmpty() -> Text(
-                        text = "此主机上没有可用的智能体。",
-                        color = AgentBuddyTheme.textMuted,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(8.dp),
-                    )
-                    else -> agents.forEach { agent ->
-                        AgentRow(
-                            agent = agent,
-                            selected = agent.name in selectedAgentNames,
-                            onCheckedChange = { checked ->
-                                if (agent.available) {
-                                    selectedAgentNames = if (checked) {
-                                        selectedAgentNames + agent.name
-                                    } else {
-                                        selectedAgentNames - agent.name
-                                    }
-                                }
-                            },
-                        )
-                    }
-                }
-            }
         }
 
         agentError?.let { message ->
@@ -488,408 +357,14 @@ fun AlleycatAddServerSheet(
     }
 }
 
-@Composable
-private fun AgentRow(
-    agent: AppAlleycatAgentInfo,
-    selected: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    // Plain clickable Row instead of TextButton — TextButton injects
-    // Material's minimum touch target (~48dp) plus internal content
-    // padding, which made each agent row much taller than the actual
-    // text content needed and forced the agent list to take far more
-    // vertical space than necessary on small screens.
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(
-                if (agent.available) {
-                    Modifier.clickable { onCheckedChange(!selected) }
-                } else {
-                    Modifier
-                },
-            )
-            .padding(horizontal = 12.dp, vertical = 4.dp),
-    ) {
-        AgentIconView(
-            kind = agent.name,
-            sizeDp = 22,
-            modifier = Modifier.alpha(if (agent.available) 1f else 0.45f),
-        )
-        Spacer(Modifier.width(10.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = agent.displayName,
-                    color = if (agent.available) AgentBuddyTheme.textPrimary else AgentBuddyTheme.textMuted,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium,
-                )
-                if (isBetaAgentName(agent.name, agent.displayName)) {
-                    Spacer(Modifier.width(6.dp))
-                    BetaBadge()
-                }
-            }
-            Text(
-                text = wireLabel(agent.wire),
-                color = AgentBuddyTheme.textSecondary,
-                fontSize = 11.sp,
-            )
-        }
-        if (!agent.available) {
-            Text("不可用", color = AgentBuddyTheme.textMuted, fontSize = 11.sp)
-        } else {
-            Checkbox(
-                checked = selected,
-                onCheckedChange = onCheckedChange,
-                enabled = true,
-                modifier = Modifier.size(28.dp),
-            )
-        }
-    }
-}
-
-
-@Composable
-private fun SectionHeader(label: String, modifier: Modifier = Modifier) {
-    Text(
-        text = label.uppercase(),
-        color = AgentBuddyTheme.textSecondary,
-        fontSize = 10.sp,
-        fontWeight = FontWeight.SemiBold,
-        modifier = modifier.padding(top = 4.dp),
-    )
-}
-
-@Composable
-private fun PreviewRow(label: String, value: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            text = label,
-            color = AgentBuddyTheme.textSecondary,
-            fontSize = 11.sp,
-            modifier = Modifier.width(96.dp),
-        )
-        Text(
-            text = value,
-            color = AgentBuddyTheme.textPrimary,
-            fontSize = 12.sp,
-            fontFamily = FontFamily.Monospace,
-        )
-    }
-}
-
-@Composable
-private fun DisclosureRow(
-    expanded: Boolean,
-    label: String,
-    onToggle: () -> Unit,
-) {
-    TextButton(onClick = onToggle, modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = (if (expanded) "▾ " else "▸ ") + label,
-            color = AgentBuddyTheme.textSecondary,
-            fontSize = 12.sp,
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
-}
-
-private fun shortNodeId(raw: String): String =
+internal fun shortNodeId(raw: String): String =
     if (raw.length <= 16) raw else raw.take(8) + "..." + raw.takeLast(8)
 
 private fun suggestedDisplayName(params: AppAlleycatPairPayload): String =
     params.hostName?.trim()?.takeIf { it.isNotEmpty() }
         ?: "Alleycat ${shortNodeId(params.nodeId)}"
 
-private fun wireLabel(wire: AppAlleycatAgentWire): String = when (wire) {
-    AppAlleycatAgentWire.WEBSOCKET -> "websocket"
-    AppAlleycatAgentWire.JSONL -> "jsonl"
-}
-
 fun alleycatWireStorageValue(wire: AppAlleycatAgentWire): String = when (wire) {
     AppAlleycatAgentWire.WEBSOCKET -> "websocket"
     AppAlleycatAgentWire.JSONL -> "jsonl"
-}
-
-private const val PAIR_COMMAND = "/Applications/AgentBuddy.app/Contents/MacOS/agentbuddy pair --qr"
-
-@Composable
-private fun QrScannerScreen(
-    onScanned: (String) -> Unit,
-    onCancel: () -> Unit,
-) {
-    val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-    val executor = remember { Executors.newSingleThreadExecutor() }
-    val barcodeScanner = remember {
-        BarcodeScanning.getClient(
-            BarcodeScannerOptions.Builder()
-                .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
-                .build()
-        )
-    }
-    var scanned by remember { mutableStateOf(false) }
-
-    DisposableEffect(Unit) {
-        onDispose {
-            executor.shutdown()
-            barcodeScanner.close()
-        }
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(androidx.compose.ui.graphics.Color.Black),
-    ) {
-        AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = { ctx ->
-                val previewView = PreviewView(ctx).apply {
-                    scaleType = PreviewView.ScaleType.FILL_CENTER
-                }
-                bindCameraUseCases(
-                    context = ctx,
-                    lifecycleOwner = lifecycleOwner,
-                    previewView = previewView,
-                    barcodeScanner = barcodeScanner,
-                    executor = executor,
-                    onResult = { payload ->
-                        if (!scanned) {
-                            scanned = true
-                            onScanned(payload)
-                        }
-                    },
-                )
-                previewView
-            },
-        )
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(320.dp)
-                .background(
-                    androidx.compose.ui.graphics.Brush.verticalGradient(
-                        colors = listOf(
-                            androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.55f),
-                            androidx.compose.ui.graphics.Color.Black.copy(alpha = 0f),
-                        ),
-                    ),
-                )
-                .align(Alignment.TopCenter),
-        )
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Row(modifier = Modifier.fillMaxWidth()) {
-                Spacer(Modifier.weight(1f))
-                TextButton(
-                    onClick = onCancel,
-                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
-                        contentColor = androidx.compose.ui.graphics.Color.White,
-                    ),
-                    modifier = Modifier
-                        .background(
-                            androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.45f),
-                            RoundedCornerShape(50),
-                        ),
-                ) {
-                    Text(
-                        text = "取消",
-                        color = androidx.compose.ui.graphics.Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-            }
-
-            InstructionsCard()
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            FramingHint()
-        }
-    }
-}
-
-@Composable
-private fun InstructionsCard() {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.55f),
-                RoundedCornerShape(14.dp),
-            )
-            .padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(
-            text = "与 搭子 配对",
-            color = androidx.compose.ui.graphics.Color.White,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
-        StepRow(number = "1", title = "在你要连接的电脑上运行：")
-        CommandRow()
-        StepRow(number = "2", title = "用相机对准它打印出的二维码。")
-    }
-}
-
-@Composable
-private fun StepRow(number: String, title: String) {
-    Row(
-        verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Box(
-            modifier = Modifier
-                .size(20.dp)
-                .background(AgentBuddyTheme.accent, androidx.compose.foundation.shape.CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = number,
-                color = androidx.compose.ui.graphics.Color.Black,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-            )
-        }
-        Text(
-            text = title,
-            color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.92f),
-            fontSize = 13.sp,
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
-}
-
-@Composable
-private fun CommandRow() {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var copied by remember { mutableStateOf(false) }
-
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        modifier = Modifier.padding(start = 30.dp),
-    ) {
-        Text(
-            text = PAIR_COMMAND,
-            color = androidx.compose.ui.graphics.Color.White,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-            fontFamily = FontFamily.Monospace,
-            modifier = Modifier
-                .weight(1f)
-                .background(
-                    androidx.compose.ui.graphics.Color.White.copy(alpha = 0.12f),
-                    RoundedCornerShape(8.dp),
-                )
-                .padding(horizontal = 12.dp, vertical = 9.dp),
-        )
-        TextButton(
-            onClick = {
-                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE)
-                    as? android.content.ClipboardManager
-                clipboard?.setPrimaryClip(
-                    android.content.ClipData.newPlainText("搭子", PAIR_COMMAND),
-                )
-                copied = true
-                scope.launch {
-                    kotlinx.coroutines.delay(1400)
-                    copied = false
-                }
-            },
-            modifier = Modifier
-                .size(36.dp)
-                .background(
-                    androidx.compose.ui.graphics.Color.White.copy(alpha = 0.14f),
-                    androidx.compose.foundation.shape.CircleShape,
-                ),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
-        ) {
-            Icon(
-                imageVector = if (copied) Icons.Default.Check else Icons.Default.ContentCopy,
-                contentDescription = if (copied) "已复制" else "复制命令",
-                tint = androidx.compose.ui.graphics.Color.White,
-                modifier = Modifier.size(16.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun FramingHint() {
-    Text(
-        text = "请保持稳定 —— QR 码会被自动识别。",
-        color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.75f),
-        fontSize = 12.sp,
-        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.4f),
-                RoundedCornerShape(50),
-            )
-            .padding(horizontal = 14.dp, vertical = 8.dp),
-    )
-}
-
-private fun bindCameraUseCases(
-    context: Context,
-    lifecycleOwner: LifecycleOwner,
-    previewView: PreviewView,
-    barcodeScanner: com.google.mlkit.vision.barcode.BarcodeScanner,
-    executor: java.util.concurrent.ExecutorService,
-    onResult: (String) -> Unit,
-) {
-    val providerFuture = ProcessCameraProvider.getInstance(context)
-    providerFuture.addListener({
-        val provider = providerFuture.get()
-        val preview = Preview.Builder().build().also {
-            it.setSurfaceProvider(previewView.surfaceProvider)
-        }
-        val analysis = ImageAnalysis.Builder()
-            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-            .build()
-        analysis.setAnalyzer(executor) { proxy ->
-            val media = proxy.image
-            if (media == null) {
-                proxy.close()
-                return@setAnalyzer
-            }
-            val image = InputImage.fromMediaImage(media, proxy.imageInfo.rotationDegrees)
-            barcodeScanner.process(image)
-                .addOnSuccessListener { barcodes ->
-                    barcodes
-                        .firstOrNull { it.format == Barcode.FORMAT_QR_CODE }
-                        ?.rawValue
-                        ?.let(onResult)
-                }
-                .addOnFailureListener { err ->
-                    Log.w(LOG_TAG, "barcode analyze failed", err)
-                }
-                .addOnCompleteListener { proxy.close() }
-        }
-        runCatching {
-            provider.unbindAll()
-            provider.bindToLifecycle(
-                lifecycleOwner,
-                CameraSelector.DEFAULT_BACK_CAMERA,
-                preview,
-                analysis,
-            )
-        }.onFailure {
-            Log.w(LOG_TAG, "bindToLifecycle failed", it)
-        }
-    }, ContextCompat.getMainExecutor(context))
 }
