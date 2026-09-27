@@ -6,43 +6,27 @@ extension SettingsView {
     var conversationSection: some View {
         Section {
             Toggle(isOn: $collapseTurns) {
-                HStack(spacing: 10) {
-                    Image(systemName: "rectangle.compress.vertical")
-                        .foregroundColor(AgentBuddyTheme.accent)
-                        .frame(width: 20)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Collapse Turns")
-                            .agentBuddyFont(.subheadline)
-                            .foregroundColor(AgentBuddyTheme.textPrimary)
-                        Text("Collapse previous turns into cards")
-                            .agentBuddyFont(.caption)
-                            .foregroundColor(AgentBuddyTheme.textSecondary)
-                    }
-                }
+                SettingsMintRowLabel(
+                    "Collapse Turns",
+                    subtitle: "Collapse previous turns into cards",
+                    systemImage: "rectangle.compress.vertical"
+                )
             }
-            .tint(AgentBuddyTheme.accent)
-            .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+            .tint(AgentBuddyTheme.action)
+            .settingsMintRow()
 
             Toggle(isOn: Binding(
                 get: { homeZoomLevel >= 3 },
                 set: { homeZoomLevel = $0 ? 4 : 2 }
             )) {
-                HStack(spacing: 10) {
-                    Image(systemName: "list.bullet.rectangle")
-                        .foregroundColor(AgentBuddyTheme.accent)
-                        .frame(width: 20)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Show task details on Home")
-                            .agentBuddyFont(.subheadline)
-                            .foregroundColor(AgentBuddyTheme.textPrimary)
-                        Text("Show the latest step under each task")
-                            .agentBuddyFont(.caption)
-                            .foregroundColor(AgentBuddyTheme.textSecondary)
-                    }
-                }
+                SettingsMintRowLabel(
+                    "Show task details on Home",
+                    subtitle: "Show the latest step under each task",
+                    systemImage: "list.bullet.rectangle"
+                )
             }
-            .tint(AgentBuddyTheme.accent)
-            .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+            .tint(AgentBuddyTheme.action)
+            .settingsMintRow()
 
             transcriptDisplayPicker(
                 title: "Internal Thinking",
@@ -66,7 +50,7 @@ extension SettingsView {
             )
         } header: {
             Text("Conversation")
-                .foregroundColor(AgentBuddyTheme.textSecondary)
+                .settingsMintHeader()
         }
     }
 
@@ -81,22 +65,10 @@ extension SettingsView {
                 Text(LocalizedStringKey(mode.displayName)).tag(mode.rawValue)
             }
         } label: {
-            HStack(spacing: 10) {
-                Image(systemName: systemImage)
-                    .foregroundColor(AgentBuddyTheme.accent)
-                    .frame(width: 20)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .agentBuddyFont(.subheadline)
-                        .foregroundColor(AgentBuddyTheme.textPrimary)
-                    Text(subtitle)
-                        .agentBuddyFont(.caption)
-                        .foregroundColor(AgentBuddyTheme.textSecondary)
-                }
-            }
+            SettingsMintRowLabel(title, subtitle: subtitle, systemImage: systemImage)
         }
         .pickerStyle(.menu)
-        .tint(AgentBuddyTheme.accent)
-        .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+        .tint(AgentBuddyTheme.link)
+        .settingsMintRow()
     }
 }

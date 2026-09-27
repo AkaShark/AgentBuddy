@@ -1,33 +1,23 @@
 import SwiftUI
 
 extension SettingsView {
-    // MARK: - Experimental Section
+    // MARK: - Pet Section
 
     var petSection: some View {
         Section {
             NavigationLink {
                 PetSettingsView()
             } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "pawprint.fill")
-                        .foregroundColor(AgentBuddyTheme.accent)
-                        .frame(width: 20)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Wake Pet")
-                            .agentBuddyFont(.subheadline)
-                            .foregroundColor(AgentBuddyTheme.textPrimary)
-                        if let pet = PetOverlayController.shared.selectedPet {
-                            Text(pet.displayName)
-                                .agentBuddyFont(.caption)
-                                .foregroundColor(AgentBuddyTheme.textSecondary)
-                        }
-                    }
-                }
+                SettingsMintRowLabel(
+                    title: Text("Wake Pet"),
+                    subtitle: PetOverlayController.shared.selectedPet.map { Text(verbatim: $0.displayName) },
+                    systemImage: "pawprint.fill"
+                )
             }
-            .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+            .settingsMintRow()
         } header: {
             Text("Pet")
-                .foregroundColor(AgentBuddyTheme.textSecondary)
+                .settingsMintHeader()
         }
     }
 
@@ -38,19 +28,12 @@ extension SettingsView {
             NavigationLink {
                 ExperimentalFeaturesView()
             } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "flask")
-                        .foregroundColor(AgentBuddyTheme.accent)
-                        .frame(width: 20)
-                    Text("Experimental Features")
-                        .agentBuddyFont(.subheadline)
-                        .foregroundColor(AgentBuddyTheme.textPrimary)
-                }
+                SettingsMintRowLabel("Experimental Features", systemImage: "flask")
             }
-            .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+            .settingsMintRow()
         } header: {
             Text("Experimental")
-                .foregroundColor(AgentBuddyTheme.textSecondary)
+                .settingsMintHeader()
         }
     }
 }

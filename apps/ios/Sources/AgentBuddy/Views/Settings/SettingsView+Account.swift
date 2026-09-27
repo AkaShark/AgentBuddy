@@ -17,13 +17,20 @@ extension SettingsView {
 private struct SettingsDisconnectedAccountSection: View {
     var body: some View {
         Section {
-            Text("Local Codex isn't running. ChatGPT login and API key entry require the local bridge.")
-                .agentBuddyFont(.caption)
-                .foregroundColor(AgentBuddyTheme.textMuted)
-                .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+            HStack(alignment: .firstTextBaseline, spacing: BuddySpacing.sm) {
+                Image(systemName: "info.circle")
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
+                    .accessibilityHidden(true)
+                Text("Local Codex isn't running. ChatGPT login and API key entry require the local bridge.")
+                    .buddyText(.label, weight: .regular)
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.vertical, BuddySpacing.xxs)
+            .settingsMintRow()
         } header: {
             Text("Account")
-                .foregroundColor(AgentBuddyTheme.textSecondary)
+                .settingsMintHeader()
         }
     }
 }

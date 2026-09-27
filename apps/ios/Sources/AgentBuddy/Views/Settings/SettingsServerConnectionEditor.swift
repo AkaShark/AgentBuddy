@@ -65,21 +65,18 @@ struct SettingsServerConnectionEditor: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                AgentBuddyTheme.backgroundGradient.ignoresSafeArea()
-                Form {
-                    nameSection
-                    connectionSection
-                    actionSection
-                }
-                .scrollContentBackground(.hidden)
+            Form {
+                nameSection
+                connectionSection
+                actionSection
             }
+            .settingsMintList()
             .navigationTitle("Edit Server")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Cancel") { dismiss() }
-                        .foregroundColor(AgentBuddyTheme.accent)
+                        .foregroundStyle(AgentBuddyTheme.link)
                 }
             }
             .alert("Invalid Server", isPresented: Binding(
@@ -91,30 +88,26 @@ struct SettingsServerConnectionEditor: View {
                 Text(validationError ?? "Check the server details.")
             }
         }
+        .tint(AgentBuddyTheme.link)
     }
 
     private var nameSection: some View {
         Section {
             TextField("Server name", text: $displayName)
-                .agentBuddyFont(.footnote)
-                .foregroundColor(AgentBuddyTheme.textPrimary)
+                .settingsMintFormField()
         } header: {
             Text("Name")
-                .foregroundColor(AgentBuddyTheme.textSecondary)
+                .settingsMintHeader()
         }
-        .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+        .settingsMintRow()
     }
 
     private var connectionSection: some View {
         Section {
             if isSpecialPairedServer {
-                Text("This paired server uses saved pairing metadata. Edit its display name here, or remove and add it again to change the pairing.")
-                    .agentBuddyFont(.caption)
-                    .foregroundColor(AgentBuddyTheme.textSecondary)
+                explanation("This paired server uses saved pairing metadata. Edit its display name here, or remove and add it again to change the pairing.")
             } else if connectionMode == .local {
-                Text("This device's local runtime is managed automatically.")
-                    .agentBuddyFont(.caption)
-                    .foregroundColor(AgentBuddyTheme.textSecondary)
+                explanation("This device's local runtime is managed automatically.")
             } else {
                 Picker("Connection Type", selection: $connectionMode) {
                     ForEach(availableModes) { mode in
@@ -122,6 +115,7 @@ struct SettingsServerConnectionEditor: View {
                     }
                 }
                 .pickerStyle(.segmented)
+                .padding(.vertical, BuddySpacing.xxs)
 
                 switch connectionMode {
                 case .local:
@@ -129,67 +123,79 @@ struct SettingsServerConnectionEditor: View {
                 case .ssh:
                     hostField
                     TextField("ssh port", text: $sshPort)
-                        .agentBuddyFont(.footnote)
-                        .foregroundColor(AgentBuddyTheme.textPrimary)
                         .keyboardType(.numberPad)
+                        .settingsMintFormField()
                     TextField("wake MAC (optional)", text: $wakeMAC)
-                        .agentBuddyFont(.footnote)
-                        .foregroundColor(AgentBuddyTheme.textPrimary)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled(true)
+                        .settingsMintFormField()
                 case .directCodex:
                     hostField
                     TextField("codex port", text: $codexPort)
-                        .agentBuddyFont(.footnote)
-                        .foregroundColor(AgentBuddyTheme.textPrimary)
                         .keyboardType(.numberPad)
+                        .settingsMintFormField()
                 case .websocket:
                     TextField("ws://host:port or wss://...", text: $websocketURL)
-                        .agentBuddyFont(.footnote)
-                        .foregroundColor(AgentBuddyTheme.textPrimary)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled(true)
                         .keyboardType(.URL)
+                        .settingsMintFormField()
                 }
             }
         } header: {
             Text(connectionMode.formHeader)
-                .foregroundColor(AgentBuddyTheme.textSecondary)
+                .settingsMintHeader()
         } footer: {
             if !isSpecialPairedServer, connectionMode == .websocket {
-                Text("Prefer SSH when possible. If you run codex manually, bind loopback and tunnel it yourself; do not expose it directly to the internet unless you know what you are doing.")
-                    .agentBuddyFont(.caption2)
-                    .foregroundColor(AgentBuddyTheme.textMuted)
+                Label {
+                    Text("Prefer SSH when possible. If you run codex manually, bind loopback and tunnel it yourself; do not expose it directly to the internet unless you know what you are doing.")
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle")
+                        .foregroundStyle(AgentBuddyTheme.warning)
+                        .accessibilityHidden(true)
+                }
+                .settingsMintFooter()
             }
         }
-        .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+        .settingsMintRow()
     }
 
     private var hostField: some View {
         TextField("hostname or IP", text: $host)
-            .agentBuddyFont(.footnote)
-            .foregroundColor(AgentBuddyTheme.textPrimary)
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled(true)
+            .settingsMintFormField()
     }
 
+    private func explanation(_ text: LocalizedStringKey) -> some View {
+        Text(text)
+            .buddyText(.label, weight: .regular)
+            .foregroundStyle(AgentBuddyTheme.textSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.vertical, BuddySpacing.xxs)
+    }
+
+    /// Save is the main decision; reconnecting is offered as the secondary step.
     private var actionSection: some View {
         Section {
-            Button("Save") {
-                submit(reconnect: false)
-            }
-            .foregroundColor(AgentBuddyTheme.accent)
-            .agentBuddyFont(.subheadline)
-
-            if !isSpecialPairedServer {
-                Button(connectionMode == .local ? "Save & Restart" : "Save & Reconnect") {
-                    submit(reconnect: true)
+            VStack(spacing: BuddySpacing.sm) {
+                BuddyButton("Save") {
+                    submit(reconnect: false)
                 }
-                .foregroundColor(AgentBuddyTheme.accent)
-                .agentBuddyFont(.subheadline)
+
+                if !isSpecialPairedServer {
+                    BuddyButton(
+                        connectionMode == .local ? "Save & Restart" : "Save & Reconnect",
+                        systemImage: "arrow.clockwise",
+                        kind: .secondary
+                    ) {
+                        submit(reconnect: true)
+                    }
+                }
             }
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets())
         }
-        .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
     }
 
     private func submit(reconnect: Bool) {

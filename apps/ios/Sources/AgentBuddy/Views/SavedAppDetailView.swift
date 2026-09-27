@@ -29,7 +29,7 @@ struct SavedAppDetailView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            AgentBuddyTheme.background.ignoresSafeArea()
             if let payload {
                 ZStack {
                     WidgetWebView(
@@ -61,7 +61,7 @@ struct SavedAppDetailView: View {
                 brokenAppPlaceholder
             } else {
                 ProgressView()
-                    .tint(AgentBuddyTheme.accent)
+                    .tint(AgentBuddyTheme.textSecondary)
             }
 
             if showUpdateOverlay {
@@ -82,14 +82,21 @@ struct SavedAppDetailView: View {
             if let message = updateSuccessMessage {
                 VStack {
                     Spacer()
-                    Text(message)
-                        .agentBuddyFont(.footnote, weight: .semibold)
-                        .foregroundColor(AgentBuddyTheme.textPrimary)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                        .background(AgentBuddyTheme.surfaceLight.opacity(0.9))
-                        .clipShape(Capsule())
-                        .padding(.bottom, 28)
+                    Label {
+                        Text(message)
+                    } icon: {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(AgentBuddyTheme.success)
+                            .accessibilityHidden(true)
+                    }
+                    .buddyText(.label, weight: .semibold)
+                    .foregroundStyle(AgentBuddyTheme.textPrimary)
+                    .padding(.horizontal, BuddySpacing.md)
+                    .frame(minHeight: BuddySize.compactPill + 6)
+                    .background(AgentBuddyTheme.surface, in: Capsule())
+                    .overlay { Capsule().strokeBorder(AgentBuddyTheme.border, lineWidth: 1) }
+                    .shadow(color: AgentBuddyTheme.floatingShadow, radius: 12, y: 8)
+                    .padding(.bottom, BuddySpacing.xxl)
                 }
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
@@ -109,8 +116,19 @@ struct SavedAppDetailView: View {
             }
         }
         .sheet(isPresented: $showRenameSheet) {
-            renameSheet
-                .presentationDetents([.medium])
+            SavedAppRenameSheet(
+                text: $renameText,
+                onCancel: { showRenameSheet = false },
+                onSave: {
+                    let trimmed = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !trimmed.isEmpty else { showRenameSheet = false; return }
+                    _ = try? store.rename(id: appId, title: trimmed)
+                    showRenameSheet = false
+                    reloadPayload()
+                }
+            )
+            .presentationDetents([.medium])
+            .buddySheetStyle()
         }
         .alert(
             "Delete \"\(payload?.app.title ?? "")\"?",
@@ -147,105 +165,105 @@ struct SavedAppDetailView: View {
         }
     }
 
+    /// Floating header over the widget: surface circles and a title capsule,
+    /// with Update as the one emphasised action (brand fill).
     private func topBar(for app: SavedApp) -> some View {
-        GlassMorphContainer(spacing: 10) {
-            HStack(spacing: 10) {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .agentBuddyFont(size: 17, weight: .semibold)
-                        .foregroundColor(AgentBuddyTheme.textPrimary)
-                        .frame(width: 38, height: 38)
-                        .contentShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .modifier(GlassCircleModifier())
-                .accessibilityLabel("Back")
+        HStack(spacing: BuddySpacing.xs) {
+            BuddyIconButton(
+                systemImage: "chevron.left",
+                accessibilityLabel: "Back",
+                tone: .surface,
+                diameter: 38,
+                iconSize: 17
+            ) {
+                dismiss()
+            }
+            .shadow(color: AgentBuddyTheme.floatingShadow, radius: 12, y: 8)
 
+            Button {
+                renameText = app.title
+                showRenameSheet = true
+            } label: {
+                Text(verbatim: app.title)
+                    .buddyText(.label, weight: .semibold)
+                    .foregroundStyle(AgentBuddyTheme.textPrimary)
+                    .lineLimit(1)
+                    .padding(.horizontal, BuddySpacing.md)
+                    .frame(minHeight: 38)
+                    .background(AgentBuddyTheme.surface, in: Capsule())
+                    .overlay { Capsule().strokeBorder(AgentBuddyTheme.border, lineWidth: 1) }
+                    .shadow(color: AgentBuddyTheme.floatingShadow, radius: 12, y: 8)
+                    .frame(minHeight: BuddySize.minHitTarget)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(Text("Rename"))
+
+            Spacer(minLength: 0)
+
+            Menu {
                 Button {
                     renameText = app.title
                     showRenameSheet = true
                 } label: {
-                    Text(app.title)
-                        .agentBuddyFont(.headline, weight: .semibold)
-                        .foregroundColor(AgentBuddyTheme.textPrimary)
-                        .lineLimit(1)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .contentShape(Capsule())
+                    Label("Rename", systemImage: "pencil")
                 }
-                .buttonStyle(.plain)
-                .modifier(GlassCapsuleModifier(interactive: true))
-
-                Spacer(minLength: 0)
-
-                Menu {
-                    Button {
-                        renameText = app.title
-                        showRenameSheet = true
-                    } label: {
-                        Label("Rename", systemImage: "pencil")
-                    }
-                    Button(role: .destructive) {
-                        showDeleteConfirm = true
-                    } label: {
-                        Label("Delete", systemImage: "trash")
-                    }
+                Button(role: .destructive) {
+                    showDeleteConfirm = true
                 } label: {
-                    Image(systemName: "ellipsis")
-                        .agentBuddyFont(size: 17, weight: .semibold)
-                        .foregroundColor(AgentBuddyTheme.textPrimary)
-                        .frame(width: 38, height: 38)
-                        .contentShape(Circle())
+                    Label("Delete", systemImage: "trash")
                 }
-                .modifier(GlassCircleModifier())
-                .accessibilityLabel("App options")
-
-                if let threadId = app.originThreadId, threadExists(threadId) {
-                    Button {
-                        SavedAppsNavigation.shared.requestConversation(threadId: threadId)
-                        dismiss()
-                    } label: {
-                        Image(systemName: "text.bubble.fill")
-                            .agentBuddyFont(size: 15, weight: .semibold)
-                            .foregroundColor(AgentBuddyTheme.textPrimary)
-                            .frame(width: 38, height: 38)
-                            .contentShape(Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .modifier(GlassCircleModifier())
-                    .accessibilityLabel("View Conversation")
-                }
-
-                Button {
-                    showUpdateOverlay = true
-                    updateError = nil
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.triangle.2.circlepath")
-                            .agentBuddyFont(size: 12, weight: .semibold)
-                        Text("Update")
-                            .agentBuddyFont(size: 13, weight: .semibold)
-                    }
-                    .foregroundColor(AgentBuddyTheme.accent)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .contentShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                .modifier(GlassCapsuleModifier(interactive: true))
-                .overlay(
-                    Capsule(style: .continuous)
-                        .stroke(AgentBuddyTheme.accent.opacity(0.45), lineWidth: 0.8)
-                        .allowsHitTesting(false)
-                )
-                .disabled(isUpdating)
-                .opacity(isUpdating ? 0.6 : 1)
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(AgentBuddyTheme.textPrimary)
+                    .frame(width: 38, height: 38)
+                    .background(AgentBuddyTheme.surface, in: Circle())
+                    .overlay { Circle().strokeBorder(AgentBuddyTheme.border, lineWidth: 1) }
+                    .shadow(color: AgentBuddyTheme.floatingShadow, radius: 12, y: 8)
+                    .frame(width: BuddySize.minHitTarget, height: BuddySize.minHitTarget)
+                    .contentShape(Rectangle())
             }
+            .accessibilityLabel("App options")
+
+            if let threadId = app.originThreadId, threadExists(threadId) {
+                BuddyIconButton(
+                    systemImage: "text.bubble",
+                    accessibilityLabel: "View Conversation",
+                    tone: .surface,
+                    diameter: 38,
+                    iconSize: 17
+                ) {
+                    SavedAppsNavigation.shared.requestConversation(threadId: threadId)
+                    dismiss()
+                }
+                .shadow(color: AgentBuddyTheme.floatingShadow, radius: 12, y: 8)
+            }
+
+            Button {
+                showUpdateOverlay = true
+                updateError = nil
+            } label: {
+                HStack(spacing: BuddySpacing.xxs) {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 13, weight: .semibold))
+                        .accessibilityHidden(true)
+                    Text("Update")
+                        .buddyText(.label, weight: .semibold)
+                }
+                .foregroundStyle(isUpdating ? AgentBuddyTheme.onDisabled : AgentBuddyTheme.onBrand)
+                .padding(.horizontal, BuddySpacing.md)
+                .frame(minHeight: 38)
+                .background(isUpdating ? AgentBuddyTheme.disabled : AgentBuddyTheme.brand, in: Capsule())
+                .shadow(color: AgentBuddyTheme.floatingShadow, radius: 12, y: 8)
+                .frame(minHeight: BuddySize.minHitTarget)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(isUpdating)
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 8)
+        .padding(.horizontal, BuddySpacing.sm)
+        .padding(.top, BuddySpacing.xxs)
     }
 
     private func threadExists(_ threadId: String) -> Bool {
@@ -254,11 +272,11 @@ struct SavedAppDetailView: View {
     }
 
     private var shimmerOverlay: some View {
-        // Subtle dim + shimmer over the running widget while the update is in
-        // flight. The widget itself stays interactive; the shimmer is purely
-        // a visual hint that a regeneration is happening in the background.
+        // Subtle veil + progress strip over the running widget while the
+        // update is in flight. The widget itself stays interactive; the strip
+        // is purely a visual hint that a regeneration is happening.
         ZStack {
-            Color.black.opacity(0.25)
+            AgentBuddyTheme.background.opacity(0.35)
                 .ignoresSafeArea()
             ShimmerStrip()
                 .frame(maxWidth: .infinity)
@@ -270,64 +288,18 @@ struct SavedAppDetailView: View {
     }
 
     private var brokenAppPlaceholder: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "exclamationmark.triangle")
-                .agentBuddyFont(.largeTitle)
-                .foregroundColor(AgentBuddyTheme.warning)
-            Text("This app's files are missing")
-                .agentBuddyFont(.title3, weight: .semibold)
-                .foregroundColor(.white)
-            Text("Delete it to clear the entry.")
-                .agentBuddyFont(.footnote)
-                .foregroundColor(.white.opacity(0.7))
-
-            Button(role: .destructive) {
-                try? store.delete(id: appId)
-                dismiss()
-            } label: {
-                Text("Delete App")
-                    .agentBuddyFont(.body, weight: .semibold)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(AgentBuddyTheme.danger.opacity(0.2))
-                    .clipShape(Capsule())
-                    .foregroundColor(AgentBuddyTheme.danger)
-            }
+        BuddyEmptyState(
+            systemImage: "exclamationmark.triangle",
+            title: "This app's files are missing",
+            message: "Delete it to clear the entry.",
+            actionTitle: "Delete App",
+            actionSystemImage: "trash",
+            actionKind: .destructive
+        ) {
+            try? store.delete(id: appId)
+            dismiss()
         }
-        .padding(32)
-    }
-
-    private var renameSheet: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Rename App")
-                .agentBuddyFont(.title3, weight: .semibold)
-                .foregroundColor(AgentBuddyTheme.textPrimary)
-
-            TextField("Title", text: $renameText)
-                .agentBuddyFont(size: 15)
-                .padding(10)
-                .background(AgentBuddyTheme.surfaceLight.opacity(0.6))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .foregroundColor(AgentBuddyTheme.textPrimary)
-
-            HStack {
-                Button("Cancel") { showRenameSheet = false }
-                    .foregroundColor(AgentBuddyTheme.textSecondary)
-                Spacer()
-                Button("Save") {
-                    let trimmed = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !trimmed.isEmpty else { showRenameSheet = false; return }
-                    _ = try? store.rename(id: appId, title: trimmed)
-                    showRenameSheet = false
-                    reloadPayload()
-                }
-                .foregroundColor(AgentBuddyTheme.accent)
-                .disabled(renameText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-            Spacer()
-        }
-        .padding(20)
-        .background(AgentBuddyTheme.surface.ignoresSafeArea())
+        .padding(.horizontal, BuddySpacing.xl)
     }
 
     // MARK: - Actions
@@ -416,30 +388,36 @@ struct SavedAppDetailView: View {
 
 /// Thin animated shimmer strip used at the top of the widget during an
 /// in-flight update. Repeats a gradient wipe indefinitely; the parent
-/// decides when to show/hide it.
+/// decides when to show/hide it. With Reduce Motion it stays a static bar.
 private struct ShimmerStrip: View {
     @State private var phase: CGFloat = -1
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         GeometryReader { geo in
-            LinearGradient(
-                colors: [
-                    AgentBuddyTheme.accent.opacity(0.0),
-                    AgentBuddyTheme.accent.opacity(0.9),
-                    AgentBuddyTheme.accent.opacity(0.0),
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-            .frame(width: geo.size.width)
-            .offset(x: phase * geo.size.width)
-            .onAppear {
-                withAnimation(
-                    .linear(duration: 1.2).repeatForever(autoreverses: false)
-                ) {
-                    phase = 1
+            if reduceMotion {
+                AgentBuddyTheme.link
+            } else {
+                LinearGradient(
+                    colors: [
+                        AgentBuddyTheme.link.opacity(0.0),
+                        AgentBuddyTheme.link.opacity(0.9),
+                        AgentBuddyTheme.link.opacity(0.0),
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(width: geo.size.width)
+                .offset(x: phase * geo.size.width)
+                .onAppear {
+                    withAnimation(
+                        .linear(duration: 1.2).repeatForever(autoreverses: false)
+                    ) {
+                        phase = 1
+                    }
                 }
             }
         }
+        .accessibilityHidden(true)
     }
 }

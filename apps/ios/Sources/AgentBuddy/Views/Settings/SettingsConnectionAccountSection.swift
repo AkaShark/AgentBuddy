@@ -13,43 +13,41 @@ struct SettingsConnectionAccountSection: View {
 
     var body: some View {
         Section {
-            HStack(spacing: 12) {
-                Circle()
-                    .fill(authColor)
-                    .frame(width: 10, height: 10)
+            HStack(spacing: BuddySpacing.sm) {
+                BuddyIconTile(
+                    content: .symbol(authIndicator.symbol),
+                    fill: authIndicator.fill,
+                    foreground: authIndicator.foreground,
+                    size: 40
+                )
                 VStack(alignment: .leading, spacing: 2) {
                     Text(authTitle)
-                        .agentBuddyFont(.subheadline)
-                        .foregroundColor(AgentBuddyTheme.textPrimary)
+                        .buddyText(.body, weight: .medium)
+                        .foregroundStyle(AgentBuddyTheme.textPrimary)
                     if let sub = authSubtitle {
                         Text(sub)
-                            .agentBuddyFont(.caption)
-                            .foregroundColor(AgentBuddyTheme.textSecondary)
+                            .buddyText(.caption)
+                            .foregroundStyle(AgentBuddyTheme.textSecondary)
                     }
                 }
-                Spacer()
+                Spacer(minLength: BuddySpacing.xs)
                 if server.isLocal, server.account != nil {
                     Button("Logout") {
                         Task { await logout() }
                     }
-                    .agentBuddyFont(.caption)
-                    .foregroundColor(AgentBuddyTheme.danger)
+                    .buttonStyle(BuddyButtonStyle(kind: .destructive, fullWidth: false))
                 }
             }
-            .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+            .padding(.vertical, BuddySpacing.xxs)
+            .accessibilityElement(children: .contain)
+            .settingsMintRow()
 
             if server.isLocal, hasStoredApiKey {
-                Text("Local OpenAI API key is saved.")
-                    .agentBuddyFont(.caption)
-                    .foregroundColor(AgentBuddyTheme.accent)
-                    .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+                savedNotice("Local OpenAI API key is saved.")
             }
 
             if server.isLocal, hasStoredBaseURL {
-                Text("OpenAI-compatible base URL is saved.")
-                    .agentBuddyFont(.caption)
-                    .foregroundColor(AgentBuddyTheme.accent)
-                    .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+                savedNotice("OpenAI-compatible base URL is saved.")
             }
 
             // [baozi-fork] ChatGPT OAuth login button removed: replaying a
@@ -57,23 +55,18 @@ struct SettingsConnectionAccountSection: View {
             // OpenAI's terms. Use a BYO API key (below) for the local environment.
 
             if server.isLocal, allowsLocalEnvApiKey {
-                HStack(spacing: 8) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        if hasStoredApiKey {
-                            Text("OpenAI API key saved in the local environment.")
-                                .agentBuddyFont(.caption)
-                                .foregroundColor(AgentBuddyTheme.textSecondary)
-                        } else if isChatGPTAccount {
-                            Text("Save an API key in the local Codex environment.")
-                                .agentBuddyFont(.caption)
-                                .foregroundColor(AgentBuddyTheme.textSecondary)
-                        }
-                        SecureField("sk-...", text: $apiKey)
-                            .agentBuddyFont(.footnote)
-                            .foregroundColor(AgentBuddyTheme.textPrimary)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
+                VStack(alignment: .leading, spacing: BuddySpacing.xs) {
+                    if hasStoredApiKey {
+                        Text("OpenAI API key saved in the local environment.")
+                            .settingsMintFooter()
+                    } else if isChatGPTAccount {
+                        Text("Save an API key in the local Codex environment.")
+                            .settingsMintFooter()
                     }
+                    SecureField("sk-...", text: $apiKey)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .settingsMintInputField()
                     Button {
                         let key = apiKey.trimmingCharacters(in: .whitespaces)
                         guard !key.isEmpty else { return }
@@ -85,29 +78,26 @@ struct SettingsConnectionAccountSection: View {
                     } label: {
                         Text(LocalizedStringKey(hasStoredApiKey ? "Update API Key" : "Save API Key"))
                     }
-                    .agentBuddyFont(.caption)
-                    .foregroundColor(AgentBuddyTheme.accent)
+                    .buttonStyle(BuddyButtonStyle(kind: .secondary, fullWidth: false))
                     .disabled(apiKey.trimmingCharacters(in: .whitespaces).isEmpty || isAuthWorking)
                 }
-                .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+                .padding(.vertical, BuddySpacing.xs)
+                .settingsMintRow()
 
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: BuddySpacing.xs) {
                     if hasStoredBaseURL {
                         Text("Custom OpenAI-compatible endpoint saved for the local Codex server.")
-                            .agentBuddyFont(.caption)
-                            .foregroundColor(AgentBuddyTheme.textSecondary)
+                            .settingsMintFooter()
                     } else {
                         Text("Optional OpenAI-compatible endpoint for local models.")
-                            .agentBuddyFont(.caption)
-                            .foregroundColor(AgentBuddyTheme.textSecondary)
+                            .settingsMintFooter()
                     }
-                    HStack(spacing: 8) {
-                        TextField("http://host:port/v1", text: $openAIBaseURL)
-                            .agentBuddyFont(.footnote)
-                            .foregroundColor(AgentBuddyTheme.textPrimary)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .keyboardType(.URL)
+                    TextField("http://host:port/v1", text: $openAIBaseURL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .keyboardType(.URL)
+                        .settingsMintInputField()
+                    HStack(spacing: BuddySpacing.xs) {
                         Button {
                             let baseURL = openAIBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
                             Task {
@@ -118,40 +108,59 @@ struct SettingsConnectionAccountSection: View {
                         } label: {
                             Text(LocalizedStringKey(hasStoredBaseURL ? "Update Base URL" : "Save Base URL"))
                         }
-                        .agentBuddyFont(.caption)
-                        .foregroundColor(AgentBuddyTheme.accent)
+                        .buttonStyle(BuddyButtonStyle(kind: .secondary, fullWidth: false))
                         .disabled(openAIBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isAuthWorking)
-                    }
-                    if hasStoredBaseURL {
-                        Button("Clear Base URL") {
-                            Task {
-                                isAuthWorking = true
-                                await clearBaseURL()
-                                isAuthWorking = false
+                        if hasStoredBaseURL {
+                            Button("Clear Base URL") {
+                                Task {
+                                    isAuthWorking = true
+                                    await clearBaseURL()
+                                    isAuthWorking = false
+                                }
                             }
+                            .buttonStyle(BuddyButtonStyle(kind: .destructive, fullWidth: false))
+                            .disabled(isAuthWorking)
                         }
-                        .agentBuddyFont(.caption)
-                        .foregroundColor(AgentBuddyTheme.danger)
-                        .disabled(isAuthWorking)
                     }
                 }
-                .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+                .padding(.vertical, BuddySpacing.xs)
+                .settingsMintRow()
             }
 
             if let authError {
-                Text(authError)
-                    .agentBuddyFont(.caption)
-                    .foregroundColor(AgentBuddyTheme.danger)
-                    .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+                HStack(alignment: .firstTextBaseline, spacing: BuddySpacing.xs) {
+                    Image(systemName: "exclamationmark.circle")
+                        .accessibilityHidden(true)
+                    Text(authError)
+                        .buddyText(.label, weight: .regular)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .foregroundStyle(AgentBuddyTheme.danger)
+                .padding(.vertical, BuddySpacing.xxs)
+                .settingsMintRow()
             }
         } header: {
             Text("Account")
-                .foregroundColor(AgentBuddyTheme.textSecondary)
+                .settingsMintHeader()
         }
         .task(id: server.serverId) {
             refreshStoredCredentialFlags()
             await refreshAuthStatusIfNeeded()
         }
+    }
+
+    private func savedNotice(_ message: LocalizedStringKey) -> some View {
+        Label {
+            Text(message)
+                .buddyText(.label, weight: .regular)
+                .foregroundStyle(AgentBuddyTheme.textPrimary)
+        } icon: {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(AgentBuddyTheme.success)
+                .accessibilityHidden(true)
+        }
+        .padding(.vertical, BuddySpacing.xxs)
+        .settingsMintRow()
     }
 
     private var allowsLocalEnvApiKey: Bool {
@@ -169,18 +178,18 @@ struct SettingsConnectionAccountSection: View {
         hasStoredApiKey || hasStoredChatGPTTokens
     }
 
-    private var authColor: Color {
+    /// Account state tile: the icon and the title text carry the state, the
+    /// colour only reinforces it.
+    private var authIndicator: (symbol: String, fill: Color, foreground: Color) {
         switch server.account {
         case .chatgpt?:
-            return AgentBuddyTheme.accent
+            return ("person.crop.circle.badge.checkmark", AgentBuddyTheme.successSurface, AgentBuddyTheme.success)
         case .apiKey?:
-            return Color(hex: "#00AAFF")
-        case nil where server.isLocal && hasStoredChatGPTTokens:
-            return AgentBuddyTheme.accent.opacity(0.7)
-        case nil where server.isLocal && hasStoredApiKey:
-            return Color(hex: "#00AAFF").opacity(0.7)
+            return ("key.fill", AgentBuddyTheme.successSurface, AgentBuddyTheme.success)
+        case nil where server.isLocal && (hasStoredChatGPTTokens || hasStoredApiKey):
+            return ("arrow.triangle.2.circlepath", AgentBuddyTheme.warningSurface, AgentBuddyTheme.warning)
         case nil:
-            return AgentBuddyTheme.textMuted
+            return ("person.crop.circle.badge.xmark", AgentBuddyTheme.surfaceSoft, AgentBuddyTheme.textSecondary)
         }
     }
 

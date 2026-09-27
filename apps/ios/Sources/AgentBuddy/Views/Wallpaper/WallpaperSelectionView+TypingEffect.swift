@@ -38,16 +38,17 @@ extension WallpaperSelectionView {
     }
 
     private var typingEffectSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: BuddySpacing.md) {
             Text("Typing Effect")
-                .agentBuddyFont(size: 16, weight: .semibold)
+                .buddyText(.heading)
                 .foregroundStyle(AgentBuddyTheme.textPrimary)
-                .padding(.horizontal, 16)
+                .accessibilityAddTraits(.isHeader)
+                .padding(.horizontal, BuddySpacing.md)
 
             // Effect picker
             HStack {
                 Text("Effect")
-                    .agentBuddyFont(size: 13, weight: .medium)
+                    .buddyText(.label)
                     .foregroundStyle(AgentBuddyTheme.textSecondary)
                 Spacer()
                 Picker("Effect", selection: Binding(
@@ -66,20 +67,22 @@ extension WallpaperSelectionView {
                     }
                 }
                 .pickerStyle(.menu)
-                .tint(AgentBuddyTheme.accent)
+                .tint(AgentBuddyTheme.link)
+                .frame(minHeight: BuddySize.minHitTarget)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, BuddySpacing.md)
 
             // Speed slider
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: BuddySpacing.xxs) {
                 Text("Reveal Speed")
-                    .agentBuddyFont(size: 13, weight: .medium)
+                    .buddyText(.label)
                     .foregroundStyle(AgentBuddyTheme.textSecondary)
 
-                HStack(spacing: 10) {
+                HStack(spacing: BuddySpacing.sm) {
                     Image(systemName: "hare")
-                        .font(.system(size: 11))
-                        .foregroundStyle(AgentBuddyTheme.textMuted)
+                        .font(.system(size: 15))
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
+                        .accessibilityHidden(true)
 
                     Slider(
                         value: Binding(
@@ -92,58 +95,76 @@ extension WallpaperSelectionView {
                         in: 0.03...1.2,
                         step: 0.01
                     )
-                    .tint(AgentBuddyTheme.accent)
+                    .tint(AgentBuddyTheme.action)
+                    .accessibilityLabel(Text("Reveal Speed"))
 
                     Image(systemName: "tortoise")
-                        .font(.system(size: 11))
-                        .foregroundStyle(AgentBuddyTheme.textMuted)
+                        .font(.system(size: 15))
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
+                        .accessibilityHidden(true)
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, BuddySpacing.md)
 
             // Granularity
-            HStack(spacing: 0) {
-                ForEach(GranularityKind.allCases) { kind in
-                    Button {
-                        typingEffectConfig.granularity = kind.rawValue
-                        persistTypingEffect()
-                    } label: {
-                        Text(kind.shortLabel)
-                            .agentBuddyFont(size: 12, weight: selectedGranularity == kind ? .semibold : .regular)
-                            .foregroundStyle(selectedGranularity == kind ? AgentBuddyTheme.textOnAccent : AgentBuddyTheme.textSecondary)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 6)
-                            .background(selectedGranularity == kind ? AgentBuddyTheme.accent : .clear)
-                    }
-                    .buttonStyle(.plain)
-                }
+            segmentedControl(
+                GranularityKind.allCases,
+                isSelected: { selectedGranularity == $0 },
+                title: { Text($0.shortLabel) }
+            ) { kind in
+                typingEffectConfig.granularity = kind.rawValue
+                persistTypingEffect()
             }
-            .background(AgentBuddyTheme.surfaceLight.opacity(0.8))
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(AgentBuddyTheme.border.opacity(0.6), lineWidth: 1))
-            .padding(.horizontal, 16)
 
             // Reveal mode
-            HStack(spacing: 0) {
-                ForEach(["Linear", "Continuous"], id: \.self) { mode in
-                    Button {
-                        typingEffectConfig.revealMode = mode
-                        persistTypingEffect()
-                    } label: {
-                        Text(mode)
-                            .agentBuddyFont(size: 12, weight: typingEffectConfig.revealMode == mode ? .semibold : .regular)
-                            .foregroundStyle(typingEffectConfig.revealMode == mode ? AgentBuddyTheme.textOnAccent : AgentBuddyTheme.textSecondary)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 6)
-                            .background(typingEffectConfig.revealMode == mode ? AgentBuddyTheme.accent : .clear)
-                    }
-                    .buttonStyle(.plain)
-                }
+            segmentedControl(
+                ["Linear", "Continuous"],
+                isSelected: { typingEffectConfig.revealMode == $0 },
+                title: { Text($0) }
+            ) { mode in
+                typingEffectConfig.revealMode = mode
+                persistTypingEffect()
             }
-            .background(AgentBuddyTheme.surfaceLight.opacity(0.8))
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(AgentBuddyTheme.border.opacity(0.6), lineWidth: 1))
-            .padding(.horizontal, 16)
         }
+    }
+
+    /// Mint segmented control: surfaceSoft track, the selected segment on the
+    /// action fill with semibold text; every segment is at least 44pt tall.
+    private func segmentedControl<Option: Hashable>(
+        _ options: [Option],
+        isSelected: @escaping (Option) -> Bool,
+        title: @escaping (Option) -> Text,
+        onSelect: @escaping (Option) -> Void
+    ) -> some View {
+        HStack(spacing: 0) {
+            ForEach(options, id: \.self) { option in
+                let selected = isSelected(option)
+                Button {
+                    onSelect(option)
+                } label: {
+                    title(option)
+                        .buddyText(.label, weight: selected ? .semibold : .regular)
+                        .foregroundStyle(selected ? AgentBuddyTheme.onAction : AgentBuddyTheme.textSecondary)
+                        .lineLimit(1)
+                        .padding(.horizontal, BuddySpacing.xxs)
+                        .frame(maxWidth: .infinity, minHeight: BuddySize.minHitTarget)
+                        .background {
+                            if selected {
+                                RoundedRectangle(cornerRadius: BuddyRadius.control - 3, style: .continuous)
+                                    .fill(AgentBuddyTheme.action)
+                                    .padding(3)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+        }
+        .background(
+            AgentBuddyTheme.surfaceSoft,
+            in: RoundedRectangle(cornerRadius: BuddyRadius.control, style: .continuous)
+        )
+        .padding(.horizontal, BuddySpacing.md)
     }
 }

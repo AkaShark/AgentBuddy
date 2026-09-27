@@ -19,128 +19,99 @@ struct PetSettingsView: View {
                     get: { controller.visible },
                     set: { controller.setVisible($0) }
                 )) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Show Pet")
-                            .agentBuddyFont(.subheadline)
-                            .foregroundColor(AgentBuddyTheme.textPrimary)
-                        Text(controller.selectedPet?.displayName ?? "No pet selected")
-                            .agentBuddyFont(.caption)
-                            .foregroundColor(AgentBuddyTheme.textSecondary)
-                    }
+                    SettingsMintRowLabel(
+                        title: Text("Show Pet"),
+                        subtitle: controller.selectedPet.map { Text(verbatim: $0.displayName) } ?? Text("No pet selected"),
+                        systemImage: "pawprint.fill"
+                    )
                 }
-                .tint(AgentBuddyTheme.accent)
-                .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+                .tint(AgentBuddyTheme.action)
+                .settingsMintRow()
             } header: {
                 Text("Wake")
-                    .foregroundColor(AgentBuddyTheme.textSecondary)
+                    .settingsMintHeader()
             }
 
             Section {
                 if connectedServers.isEmpty {
-                    Text("Connect to a server first")
-                        .agentBuddyFont(.footnote)
-                        .foregroundColor(AgentBuddyTheme.textMuted)
+                    placeholder(Text("Connect to a server first"))
                 } else {
                     ForEach(connectedServers, id: \.serverId) { server in
+                        let isSelected = server.serverId == selectedServerId
                         Button {
                             selectedServerId = server.serverId
                             Task { await refreshPets() }
                         } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(server.displayName)
-                                        .agentBuddyFont(.subheadline)
-                                        .foregroundColor(AgentBuddyTheme.textPrimary)
-                                    Text(server.connectionModeLabel)
-                                        .agentBuddyFont(.caption)
-                                        .foregroundColor(AgentBuddyTheme.textSecondary)
-                                }
-                                Spacer()
-                                if server.serverId == selectedServerId {
-                                    Image(systemName: "checkmark")
-                                        .foregroundColor(AgentBuddyTheme.accentStrong)
+                            HStack(spacing: BuddySpacing.sm) {
+                                SettingsMintRowLabel(
+                                    title: Text(verbatim: server.displayName),
+                                    subtitle: Text(verbatim: server.connectionModeLabel),
+                                    systemImage: "laptopcomputer"
+                                )
+                                Spacer(minLength: BuddySpacing.xs)
+                                if isSelected {
+                                    SettingsMintCheckmark()
                                 }
                             }
+                            .contentShape(Rectangle())
                         }
+                        .settingsMintSelected(isSelected)
+                        .settingsMintRow()
                     }
                 }
             } header: {
                 Text("Server")
-                    .foregroundColor(AgentBuddyTheme.textSecondary)
+                    .settingsMintHeader()
             }
 
             Section {
                 if selectedServerId.isEmpty {
-                    Text("No server selected")
-                        .foregroundColor(AgentBuddyTheme.textMuted)
+                    placeholder(Text("No server selected"))
                 } else if isLoading {
-                    HStack {
-                        ProgressView().tint(AgentBuddyTheme.accent)
+                    HStack(spacing: BuddySpacing.sm) {
+                        ProgressView().tint(AgentBuddyTheme.textSecondary)
                         Text("Loading pets")
-                            .foregroundColor(AgentBuddyTheme.textSecondary)
+                            .buddyText(.label, weight: .regular)
+                            .foregroundStyle(AgentBuddyTheme.textSecondary)
                     }
+                    .frame(minHeight: BuddySize.minHitTarget)
+                    .settingsMintRow()
                 } else if let errorMessage {
-                    Text(errorMessage)
-                        .foregroundColor(AgentBuddyTheme.danger)
+                    errorRow(errorMessage)
                 } else if pets.isEmpty {
-                    Text("~/.codex/pets has no hatch-pet packages")
-                        .foregroundColor(AgentBuddyTheme.textMuted)
+                    placeholder(Text("~/.codex/pets has no hatch-pet packages"))
                 } else {
                     ForEach(pets, id: \.id) { pet in
-                        Button {
-                            guard pet.hasValidSpritesheet else { return }
-                            Task {
-                                await controller.selectPet(
-                                    appModel: appModel,
-                                    serverId: selectedServerId,
-                                    pet: pet
-                                )
-                            }
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(pet.displayName)
-                                        .agentBuddyFont(.subheadline)
-                                        .foregroundColor(pet.hasValidSpritesheet ? AgentBuddyTheme.textPrimary : AgentBuddyTheme.textMuted)
-                                    Text(pet.validationError ?? pet.description ?? pet.sourcePath)
-                                        .agentBuddyFont(.caption)
-                                        .foregroundColor(AgentBuddyTheme.textSecondary)
-                                        .lineLimit(2)
-                                }
-                                Spacer()
-                                if controller.isLoading,
-                                   controller.selectedPet?.id == pet.id,
-                                   controller.selectedPet?.serverId == selectedServerId {
-                                    ProgressView().tint(AgentBuddyTheme.accent)
-                                } else if controller.selectedPet?.id == pet.id,
-                                          controller.selectedPet?.serverId == selectedServerId {
-                                    Image(systemName: "checkmark")
-                                        .foregroundColor(AgentBuddyTheme.accentStrong)
-                                }
-                            }
-                        }
-                        .disabled(!pet.hasValidSpritesheet)
+                        petRow(pet)
                     }
                 }
 
                 if let message = controller.errorMessage {
-                    Text(message)
-                        .foregroundColor(AgentBuddyTheme.danger)
+                    errorRow(message)
                 }
             } header: {
                 HStack {
                     Text("Pets")
+                        .settingsMintHeader()
                     Spacer()
-                    Button("Refresh") {
+                    Button {
                         Task { await refreshPets() }
+                    } label: {
+                        Text("Refresh")
+                            .buddyText(.label, weight: .semibold)
+                            .foregroundStyle(
+                                selectedServerId.isEmpty || isLoading ? AgentBuddyTheme.onDisabled : AgentBuddyTheme.link
+                            )
+                            .frame(minWidth: BuddySize.minHitTarget, minHeight: BuddySize.minHitTarget)
+                            .contentShape(Rectangle())
                     }
+                    .buttonStyle(.borderless)
+                    .textCase(nil)
                     .disabled(selectedServerId.isEmpty || isLoading)
                 }
-                .foregroundColor(AgentBuddyTheme.textSecondary)
             }
         }
-        .scrollContentBackground(.hidden)
-        .background(AgentBuddyTheme.backgroundGradient.ignoresSafeArea())
+        .settingsMintList()
         .navigationTitle("Pet")
         .navigationBarTitleDisplayMode(.inline)
         .task {
@@ -152,6 +123,72 @@ struct PetSettingsView: View {
             }
             await refreshPets()
         }
+    }
+
+    private func petRow(_ pet: AppPetSummary) -> some View {
+        let isChosen = controller.selectedPet?.id == pet.id
+            && controller.selectedPet?.serverId == selectedServerId
+        return Button {
+            guard pet.hasValidSpritesheet else { return }
+            Task {
+                await controller.selectPet(
+                    appModel: appModel,
+                    serverId: selectedServerId,
+                    pet: pet
+                )
+            }
+        } label: {
+            HStack(spacing: BuddySpacing.sm) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: pet.displayName)
+                        .buddyText(.body, weight: isChosen ? .semibold : .regular)
+                        .foregroundStyle(pet.hasValidSpritesheet ? AgentBuddyTheme.textPrimary : AgentBuddyTheme.onDisabled)
+                    HStack(alignment: .firstTextBaseline, spacing: BuddySpacing.xxs) {
+                        if pet.validationError != nil {
+                            Image(systemName: "exclamationmark.triangle")
+                                .foregroundStyle(AgentBuddyTheme.warning)
+                                .accessibilityHidden(true)
+                        }
+                        Text(verbatim: pet.validationError ?? pet.description ?? pet.sourcePath)
+                            .foregroundStyle(AgentBuddyTheme.textSecondary)
+                            .lineLimit(2)
+                    }
+                    .buddyText(.caption)
+                }
+                Spacer(minLength: BuddySpacing.xs)
+                if controller.isLoading, isChosen {
+                    ProgressView().tint(AgentBuddyTheme.textSecondary)
+                } else if isChosen {
+                    SettingsMintCheckmark()
+                }
+            }
+            .padding(.vertical, BuddySpacing.xxs)
+            .contentShape(Rectangle())
+        }
+        .disabled(!pet.hasValidSpritesheet)
+        .settingsMintSelected(isChosen)
+        .settingsMintRow()
+    }
+
+    private func placeholder(_ text: Text) -> some View {
+        text
+            .buddyText(.label, weight: .regular)
+            .foregroundStyle(AgentBuddyTheme.textSecondary)
+            .frame(minHeight: BuddySize.minHitTarget, alignment: .leading)
+            .settingsMintRow()
+    }
+
+    private func errorRow(_ message: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: BuddySpacing.xs) {
+            Image(systemName: "exclamationmark.circle")
+                .accessibilityHidden(true)
+            Text(verbatim: message)
+                .buddyText(.label, weight: .regular)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .foregroundStyle(AgentBuddyTheme.danger)
+        .padding(.vertical, BuddySpacing.xxs)
+        .settingsMintRow()
     }
 
     @MainActor

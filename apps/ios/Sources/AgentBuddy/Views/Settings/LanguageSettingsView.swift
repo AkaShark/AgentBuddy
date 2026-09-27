@@ -6,34 +6,34 @@ struct LanguageSettingsView: View {
     @State private var languageManager = LanguageManager.shared
 
     var body: some View {
-        ZStack {
-            AgentBuddyTheme.backgroundGradient.ignoresSafeArea()
-            Form {
-                Section {
-                    ForEach(AppLanguage.allCases) { lang in
-                        Button {
-                            languageManager.set(lang)
-                        } label: {
-                            HStack(spacing: 10) {
-                                Text(lang.displayName)
-                                    .agentBuddyFont(.subheadline)
-                                    .foregroundColor(AgentBuddyTheme.textPrimary)
-                                Spacer()
-                                if lang == languageManager.language {
-                                    Image(systemName: "checkmark")
-                                        .foregroundColor(AgentBuddyTheme.accent)
-                                }
+        Form {
+            Section {
+                ForEach(AppLanguage.allCases) { lang in
+                    let isSelected = lang == languageManager.language
+                    Button {
+                        languageManager.set(lang)
+                    } label: {
+                        HStack(spacing: BuddySpacing.sm) {
+                            Text(lang.displayName)
+                                .buddyText(.body, weight: isSelected ? .semibold : .regular)
+                                .foregroundStyle(AgentBuddyTheme.textPrimary)
+                            Spacer()
+                            if isSelected {
+                                SettingsMintCheckmark()
                             }
                         }
-                        .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+                        .frame(minHeight: BuddySize.minHitTarget)
+                        .contentShape(Rectangle())
                     }
-                } footer: {
-                    Text("Switching language updates the app immediately.")
-                        .foregroundColor(AgentBuddyTheme.textSecondary)
+                    .settingsMintSelected(isSelected)
+                    .settingsMintRow()
                 }
+            } footer: {
+                Text("Switching language updates the app immediately.")
+                    .settingsMintFooter()
             }
-            .scrollContentBackground(.hidden)
         }
+        .settingsMintList()
         .navigationTitle("Language")
     }
 }

@@ -34,25 +34,23 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                AgentBuddyTheme.backgroundGradient.ignoresSafeArea()
-                Form {
-                    appearanceSection
-                    fontSection
-                    conversationSection
-                    petSection
-                    experimentalSection
-                    accountSection
-                    serversSection
-                }
-                .scrollContentBackground(.hidden)
+            Form {
+                appearanceSection
+                fontSection
+                conversationSection
+                petSection
+                experimentalSection
+                accountSection
+                serversSection
             }
+            .settingsMintList()
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
-                        .foregroundColor(AgentBuddyTheme.accent)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(AgentBuddyTheme.link)
                 }
             }
             .sheet(item: $activeServerSheet) { sheet in
@@ -66,6 +64,7 @@ struct SettingsView: View {
                     .environment(appModel)
                     .environment(appState)
                     .environment(\.textScale, textScale)
+                    .buddySheetStyle()
                 case .edit(let server):
                     SettingsServerConnectionEditor(
                         server: server,
@@ -79,6 +78,7 @@ struct SettingsView: View {
                         }
                     )
                     .environment(\.textScale, textScale)
+                    .buddySheetStyle()
                 case .sshReconnect(let server):
                     SSHLoginSheet(server: server) { target in
                         activeServerSheet = nil
@@ -86,6 +86,7 @@ struct SettingsView: View {
                             Task { await reconnectViaSSH(server: server, host: host, credentials: credentials) }
                         }
                     }
+                    .buddySheetStyle()
                 }
             }
             .onChange(of: appModel.snapshot) { _, snapshot in
@@ -101,6 +102,8 @@ struct SettingsView: View {
                 Text(serverEditError ?? "Unable to update this server.")
             }
         }
+        .tint(AgentBuddyTheme.link)
+        .buddySheetStyle()
     }
 }
 
