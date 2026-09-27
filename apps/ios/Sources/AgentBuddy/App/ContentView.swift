@@ -21,6 +21,22 @@ struct ContentView: View {
         ConversationTextSize.clamped(rawValue: textSizeStep).scale
     }
 
+    /// The stored appearance, except that the DEBUG state gallery can force
+    /// light or dark for on-device screenshots without touching preferences.
+    private var effectiveColorScheme: ColorScheme? {
+        #if DEBUG
+        if MintGalleryView.isEnabled { return MintGalleryView.prefersDark ? .dark : .light }
+        #endif
+        return themeManager.appearanceMode.preferredColorScheme
+    }
+
+    private var effectiveInterfaceStyle: UIUserInterfaceStyle {
+        #if DEBUG
+        if MintGalleryView.isEnabled { return MintGalleryView.prefersDark ? .dark : .light }
+        #endif
+        return themeManager.appearanceMode.userInterfaceStyle
+    }
+
     var body: some View {
         @Bindable var bindableAppState = appState
 
@@ -78,9 +94,9 @@ struct ContentView: View {
         .onChange(of: appModel.snapshot?.pendingApprovals ?? []) { _, pending in
             approvalCoordinator.reconcile(pending: pending)
         }
-        .preferredColorScheme(themeManager.appearanceMode.preferredColorScheme)
+        .preferredColorScheme(effectiveColorScheme)
         .background {
-            InterfaceStyleSynchronizer(style: themeManager.appearanceMode.userInterfaceStyle)
+            InterfaceStyleSynchronizer(style: effectiveInterfaceStyle)
                 .frame(width: 0, height: 0)
         }
         #if targetEnvironment(macCatalyst)

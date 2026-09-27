@@ -287,7 +287,12 @@ private struct ScaledContentMarkdownModifier: ViewModifier {
         let scaledBody = baseBodySize * textScale
         let scaledCode = baseCodeSize * textScale
         let _ = syncHighlighterTheme(for: colorScheme)
+        // Hairball's code blocks are Equatable on (language, text) and keep the
+        // colours from the pass that first highlighted them. The first pass can
+        // still carry the system scheme before the app's appearance override
+        // lands, so rebuild the markdown subtree when the scheme changes.
         let themed = content
+            .id(colorScheme)
             .markdownTheme(agentBuddyContentTheme(bodySize: scaledBody, codeSize: scaledCode))
             .lineSpacing(markdownLineSpacing(bodySize: scaledBody))
             .codeSyntaxHighlighter(sharedHighlighter)
@@ -311,7 +316,12 @@ private struct ScaledSystemMarkdownModifier: ViewModifier {
         let scaledBody = baseBodySize * textScale
         let scaledCode = baseCodeSize * textScale
         let _ = syncHighlighterTheme(for: colorScheme)
+        // Hairball's code blocks are Equatable on (language, text) and keep the
+        // colours from the pass that first highlighted them. The first pass can
+        // still carry the system scheme before the app's appearance override
+        // lands, so rebuild the markdown subtree when the scheme changes.
         let themed = content
+            .id(colorScheme)
             .markdownTheme(agentBuddySystemTheme(bodySize: scaledBody, codeSize: scaledCode))
             .lineSpacing(markdownLineSpacing(bodySize: scaledBody))
             .codeSyntaxHighlighter(sharedHighlighter)
