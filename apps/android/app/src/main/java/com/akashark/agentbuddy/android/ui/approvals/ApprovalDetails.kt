@@ -84,7 +84,8 @@ internal fun ApprovalDetails(
             ApprovalDetailRow(
                 label = "文件",
                 value = if (extra > 0) "$shown\n还有 $extra 个文件" else shown,
-                maxLines = MAX_LISTED_FILES + 1,
+                // Already capped at MAX_LISTED_FILES paths; let long paths wrap.
+                maxLines = Int.MAX_VALUE,
             )
         }
         approval.grantRoot.nonBlank()?.let { root ->
