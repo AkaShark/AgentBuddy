@@ -5,6 +5,9 @@ struct ConversationToolbarControls: View {
     enum Control {
         case reload
         case info
+        /// Single "…" menu (refresh, task info, model & permissions) used by
+        /// the Mint conversation header.
+        case menu
     }
 
     @Environment(AppState.self) private var appState
@@ -26,9 +29,11 @@ struct ConversationToolbarControls: View {
                 reloadButton
             case .info:
                 infoButton
+            case .menu:
+                overflowMenu
             }
         }
-        .frame(width: 28, height: 28)
+        .frame(width: control == .menu ? BuddySize.minHitTarget : 28, height: control == .menu ? BuddySize.minHitTarget : 28)
         .contentShape(Rectangle())
         .buttonStyle(.plain)
         .hoverEffect(.highlight)
@@ -43,27 +48,64 @@ struct ConversationToolbarControls: View {
         }
     }
 
-    private var reloadButton: some View {
-        Button {
-            Task {
-                isReloading = true
-                defer { isReloading = false }
-                if await handleRemoteLoginIfNeeded() {
-                    return
-                }
-                if server?.account == nil {
-                    appState.showSettings = true
-                } else {
-                    do {
-                        let nextKey = try await appModel.refreshThreadIncludingTurns(key: thread.key)
-                        appModel.store.setActiveThread(
-                            key: nextKey
-                        )
-                    } catch {
-                        // `AppModel` records the failure; keep the toolbar interaction quiet.
-                    }
+    private func performReload() async {
+        isReloading = true
+        defer { isReloading = false }
+        if await handleRemoteLoginIfNeeded() {
+            return
+        }
+        if server?.account == nil {
+            appState.showSettings = true
+        } else {
+            do {
+                let nextKey = try await appModel.refreshThreadIncludingTurns(key: thread.key)
+                appModel.store.setActiveThread(
+                    key: nextKey
+                )
+            } catch {
+                // `AppModel` records the failure; keep the toolbar interaction quiet.
+            }
+        }
+    }
+
+    private var overflowMenu: some View {
+        Menu {
+            Button {
+                Task { await performReload() }
+            } label: {
+                Label("Refresh conversation", systemImage: "arrow.clockwise")
+            }
+            .disabled(isReloading || server?.isConnected != true)
+            Button {
+                appState.showModelSelector = true
+            } label: {
+                Label("Partner, model & permissions", systemImage: "slider.horizontal.3")
+            }
+            if let onInfo {
+                Button(action: onInfo) {
+                    Label("Task info", systemImage: "info.circle")
                 }
             }
+        } label: {
+            Group {
+                if isReloading {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(AgentBuddyTheme.textPrimary)
+                }
+            }
+            .frame(width: BuddySize.minHitTarget, height: BuddySize.minHitTarget)
+            .contentShape(Rectangle())
+        }
+        .accessibilityIdentifier("header.moreMenu")
+        .accessibilityLabel(Text("More"))
+    }
+
+    private var reloadButton: some View {
+        Button {
+            Task { await performReload() }
         } label: {
             reloadButtonLabel
         }

@@ -95,7 +95,7 @@ struct HostsHomeView: View {
                 removeTarget = nil
             }
         } message: {
-            Text("The host forgets this phone's saved connection. Tasks already running on the computer are not stopped.")
+            Text("This phone forgets the saved connection. Tasks already running on the computer are not stopped.")
         }
         .sheet(isPresented: $showsMountedFolders) {
             MountedFoldersView()

@@ -69,6 +69,8 @@ struct BuddyWordmark: View {
             Text("AgentBuddy")
                 .buddyText(.title)
                 .foregroundStyle(AgentBuddyTheme.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
         }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)

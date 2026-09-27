@@ -63,6 +63,7 @@ struct BuddyPageHeader<Trailing: View>: View {
                     .buddyText(titleStyle)
                     .foregroundStyle(AgentBuddyTheme.textPrimary)
                     .lineLimit(2)
+                    .minimumScaleFactor(0.7)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
                 if let subtitle {

@@ -52,8 +52,7 @@ struct TasksHomeView: View {
                     servers: model.connectedServers,
                     selectedServerId: model.selectedServerId,
                     actions: actions,
-                    onManageHosts: onManageHosts,
-                    zoomLevel: $zoomLevel
+                    onManageHosts: onManageHosts
                 )
                 .padding(.top, BuddySpacing.xs)
 

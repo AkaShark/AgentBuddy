@@ -6,6 +6,8 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.textScale) private var textScale
     @AppStorage("fontFamily") var fontFamily = FontFamilyOption.defaultOption.rawValue
+    /// Home card density (1–4); 3+ shows step details. Shared with the home list.
+    @AppStorage("homeZoomLevel") var homeZoomLevel = 2
     @AppStorage("collapseTurns") var collapseTurns = false
     @AppStorage(ConversationDisplayPreferenceKey.reasoning) var reasoningDisplayMode = ConversationDetailDisplayMode.collapsed.rawValue
     @AppStorage(ConversationDisplayPreferenceKey.commands) var commandDisplayMode = ConversationDetailDisplayMode.collapsed.rawValue

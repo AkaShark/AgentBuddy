@@ -33,7 +33,7 @@ struct HeaderView: View {
             expandedHeaderLabel
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
-            .frame(maxWidth: isRegularSurface ? 320 : 240, alignment: .center)
+            .frame(maxWidth: isRegularSurface ? 420 : 260, alignment: .center)
         }
         .layoutPriority(-1)
         .buttonStyle(.plain)
@@ -57,64 +57,73 @@ struct HeaderView: View {
         }
     }
 
+    /// Mint header: task title, then "partner · host" with the connection
+    /// dot. Tapping still opens the partner / model / permission panel, which
+    /// returns to this conversation when dismissed.
     private var expandedHeaderLabel: some View {
-        VStack(spacing: 2) {
+        VStack(spacing: 1) {
             primaryHeaderRow
             secondaryHeaderRow
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityHint(Text("Shows partner, model and permission options"))
     }
 
     private var primaryHeaderRow: some View {
-        HStack(spacing: 6) {
+        Text(verbatim: thread.displayTitle)
+            .buddyText(.heading)
+            .foregroundStyle(AgentBuddyTheme.textPrimary)
+            .lineLimit(1)
+            .truncationMode(.tail)
+    }
+
+    private var secondaryHeaderRow: some View {
+        HStack(spacing: 5) {
             statusDot
 
             if fastMode {
                 Image(systemName: "bolt.fill")
-                    .font(AgentBuddyFont.styled(size: 10, weight: .semibold))
-                    .foregroundColor(AgentBuddyTheme.warning)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(AgentBuddyTheme.warning)
+                    .accessibilityLabel(Text("Fast mode"))
             }
 
-            Text(sessionModelLabel)
-                .foregroundColor(AgentBuddyTheme.textPrimary)
-                .allowsTightening(true)
-            Text(sessionReasoningLabel)
-                .foregroundColor(AgentBuddyTheme.textSecondary)
-                .allowsTightening(true)
-            Image(systemName: "chevron.down")
-                .font(AgentBuddyFont.styled(size: 10, weight: .semibold))
-                .foregroundColor(AgentBuddyTheme.textSecondary)
-                .rotationEffect(.degrees(appState.showModelSelector ? 180 : 0))
-        }
-        .font(AgentBuddyFont.styled(size: 14, weight: .semibold))
-        .lineLimit(1)
-        .minimumScaleFactor(isRegularSurface ? 1.0 : 0.75)
-    }
-
-    private var secondaryHeaderRow: some View {
-        HStack(spacing: 6) {
-            Text(sessionDirectoryLabel)
-                .font(AgentBuddyFont.styled(size: 11, weight: .semibold))
-                .foregroundColor(AgentBuddyTheme.textSecondary)
+            Text(verbatim: partnerAndHostLabel)
+                .buddyText(.caption, weight: .medium)
+                .foregroundStyle(AgentBuddyTheme.textSecondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
 
             if thread.collaborationMode == .plan {
-                Text("plan")
-                    .font(AgentBuddyFont.styled(size: 11, weight: .bold))
-                    .foregroundColor(.black)
+                Text("Plan")
+                    .buddyText(.caption, weight: .semibold)
+                    .foregroundStyle(AgentBuddyTheme.onBrand)
                     .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(AgentBuddyTheme.accent)
-                    .clipShape(Capsule())
+                    .background(AgentBuddyTheme.brand, in: Capsule())
             }
 
             if headerPermissionPreset == .fullAccess {
                 Image(systemName: "lock.open.fill")
-                    .font(AgentBuddyFont.styled(size: 10, weight: .semibold))
-                    .foregroundColor(AgentBuddyTheme.danger)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(AgentBuddyTheme.danger)
+                    .accessibilityLabel(Text("Full access"))
             }
 
+            Image(systemName: "chevron.down")
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(AgentBuddyTheme.textSecondary)
+                .rotationEffect(.degrees(appState.showModelSelector ? 180 : 0))
+                .accessibilityHidden(true)
         }
+    }
+
+    /// "Codex · MacBook Pro".
+    private var partnerAndHostLabel: String {
+        let partner = thread.agentRuntimeKind.displayLabel
+        guard let host = server?.displayName.trimmingCharacters(in: .whitespacesAndNewlines), !host.isEmpty else {
+            return partner
+        }
+        return "\(partner) · \(host)"
     }
 
     private var statusDot: some View {
@@ -158,61 +167,6 @@ struct HeaderView: View {
         case .unknown:
             return AgentBuddyTheme.textMuted
         }
-    }
-
-    private var sessionModelLabel: String {
-        let pendingModel = appState.selectedModel.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !pendingModel.isEmpty {
-            if let model = availableModels.first(where: {
-                modelMatchesSelection(
-                    $0,
-                    pendingModel,
-                    runtime: appState.selectedAgentRuntimeKind
-                )
-            }) {
-                return modelPickerDisplayName(model)
-            }
-            return pendingModel
-        }
-
-        let threadModel = thread.displayModelLabel.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !threadModel.isEmpty { return threadModel }
-
-        return "AgentBuddy"
-    }
-
-    private var sessionReasoningLabel: String {
-        let pendingReasoning = appState.reasoningEffort.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !pendingReasoning.isEmpty { return pendingReasoning }
-
-        let threadReasoning = thread.reasoningEffort?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        if !threadReasoning.isEmpty { return threadReasoning }
-
-        // Fall back to the model's default reasoning effort from the loaded model list.
-        let currentModel = (thread.model ?? thread.info.model ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        if let model = availableModels.first(where: {
-            modelMatchesSelection(
-                $0,
-                currentModel,
-                runtime: thread.agentRuntimeKind
-            )
-        }),
-           !model.supportedReasoningEfforts.isEmpty,
-           !model.defaultReasoningEffort.wireValue.isEmpty {
-            return model.defaultReasoningEffort.wireValue
-        }
-
-        return "default"
-    }
-
-    private var sessionDirectoryLabel: String {
-        let currentDirectory = (thread.info.cwd ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        if !currentDirectory.isEmpty {
-            let isLocal = appModel.isLocalServer(serverId: thread.key.serverId)
-            return PathDisplay.display(currentDirectory, isLocal: isLocal)
-        }
-
-        return "~"
     }
 
     private var selectedModelBinding: Binding<String> {

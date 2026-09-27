@@ -7,7 +7,6 @@ struct TasksHomeHeader: View {
     let selectedServerId: String?
     let actions: HomeShellActions
     let onManageHosts: () -> Void
-    @Binding var zoomLevel: Int
 
     private var connectedCount: Int {
         servers.filter { $0.health == .connected }.count
@@ -16,9 +15,13 @@ struct TasksHomeHeader: View {
     var body: some View {
         HStack(spacing: BuddySpacing.xs) {
             BuddyWordmark(markSize: 36)
+                .layoutPriority(0)
             Spacer(minLength: BuddySpacing.xs)
             hostChip
-            moreMenu
+                .layoutPriority(1)
+            if actions.showApps != nil || actions.showTerminal != nil {
+                moreMenu
+            }
             BuddyIconButton(
                 systemImage: "gearshape",
                 accessibilityLabel: "Settings",
@@ -78,6 +81,7 @@ struct TasksHomeHeader: View {
                 chipTitle
                     .buddyText(.label, weight: .medium)
                     .lineLimit(1)
+                    .fixedSize()
                 Image(systemName: "chevron.down")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(AgentBuddyTheme.textSecondary)
@@ -125,14 +129,6 @@ struct TasksHomeHeader: View {
                 Button(action: showTerminal) {
                     Label("Terminal", systemImage: "terminal")
                 }
-            }
-            // Keeps the existing `homeZoomLevel` preference (1–4): 3 and 4
-            // show step details on cards, 1 and 2 stay compact.
-            Toggle(isOn: Binding(
-                get: { zoomLevel >= 3 },
-                set: { zoomLevel = $0 ? 4 : 2 }
-            )) {
-                Label("Show task details", systemImage: "list.bullet.rectangle")
             }
         } label: {
             Image(systemName: "ellipsis.circle")

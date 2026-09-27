@@ -23,6 +23,27 @@ extension SettingsView {
             .tint(AgentBuddyTheme.accent)
             .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
 
+            Toggle(isOn: Binding(
+                get: { homeZoomLevel >= 3 },
+                set: { homeZoomLevel = $0 ? 4 : 2 }
+            )) {
+                HStack(spacing: 10) {
+                    Image(systemName: "list.bullet.rectangle")
+                        .foregroundColor(AgentBuddyTheme.accent)
+                        .frame(width: 20)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Show task details on Home")
+                            .agentBuddyFont(.subheadline)
+                            .foregroundColor(AgentBuddyTheme.textPrimary)
+                        Text("Show the latest step under each task")
+                            .agentBuddyFont(.caption)
+                            .foregroundColor(AgentBuddyTheme.textSecondary)
+                    }
+                }
+            }
+            .tint(AgentBuddyTheme.accent)
+            .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+
             transcriptDisplayPicker(
                 title: "Internal Thinking",
                 subtitle: "Reasoning and analysis blocks",

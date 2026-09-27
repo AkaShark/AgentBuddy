@@ -115,17 +115,9 @@ struct ConversationDestinationScreen: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     ConversationToolbarControls(
                         thread: conversationThread,
-                        control: .reload
+                        control: .menu,
+                        onInfo: onInfo
                     )
-                }
-                if onInfo != nil {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        ConversationToolbarControls(
-                            thread: conversationThread,
-                            control: .info,
-                            onInfo: onInfo
-                        )
-                    }
                 }
             }
         }
