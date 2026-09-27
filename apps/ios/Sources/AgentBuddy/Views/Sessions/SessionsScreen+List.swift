@@ -1,6 +1,8 @@
 import SwiftUI
 
 extension SessionsScreen {
+    /// Collapsible workspace header in the `BuddySectionHeader` style:
+    /// heading + task count, then host and path on a quieter second line.
     private func workspaceGroupHeader(_ group: WorkspaceSessionGroup) -> some View {
         let isCollapsed = collapsedWorkspaceGroupIDs.contains(group.id)
 
@@ -11,135 +13,164 @@ extension SessionsScreen {
                 collapsedWorkspaceGroupIDs.insert(group.id)
             }
         } label: {
-            HStack(alignment: .center, spacing: 8) {
-                Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
-                    .agentBuddyFont(size: 10, weight: .semibold)
-                    .foregroundColor(AgentBuddyTheme.textSecondary)
-                    .frame(width: 12)
-
-                Image(systemName: "folder")
-                    .agentBuddyFont(size: 11, weight: .semibold)
-                    .foregroundColor(AgentBuddyTheme.accent)
-
+            HStack(alignment: .center, spacing: BuddySpacing.sm) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(group.workspaceTitle)
-                        .agentBuddyFont(.caption)
-                        .foregroundColor(AgentBuddyTheme.textPrimary)
-                        .lineLimit(1)
+                    HStack(alignment: .firstTextBaseline, spacing: BuddySpacing.xs) {
+                        Text(verbatim: group.workspaceTitle)
+                            .buddyText(.heading)
+                            .foregroundStyle(AgentBuddyTheme.textPrimary)
+                            .lineLimit(1)
+                        Text(verbatim: String(format: "%02d", group.threads.count))
+                            .buddyText(.caption)
+                            .monospacedDigit()
+                            .foregroundStyle(AgentBuddyTheme.textSecondary)
+                            .accessibilityHidden(true)
+                    }
 
-                    Text(group.serverHost)
-                        .agentBuddyFont(.caption2)
-                        .foregroundColor(AgentBuddyTheme.textMuted)
-                        .lineLimit(1)
-
-                    Text(abbreviateHomePath(group.workspacePath))
-                        .agentBuddyFont(.caption2)
-                        .foregroundColor(AgentBuddyTheme.textMuted)
-                        .lineLimit(1)
+                    HStack(spacing: BuddySpacing.xxs) {
+                        Text(verbatim: group.serverHost)
+                            .buddyText(.label, weight: .regular)
+                            .lineLimit(1)
+                            .layoutPriority(1)
+                        Text(verbatim: "·")
+                            .buddyText(.label, weight: .regular)
+                            .accessibilityHidden(true)
+                        Text(verbatim: abbreviateHomePath(group.workspacePath))
+                            .buddyText(.code)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
                 }
 
                 Spacer(minLength: 0)
+
+                Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
+                    .frame(width: BuddySize.minHitTarget, height: BuddySize.minHitTarget)
+                    .accessibilityHidden(true)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .overlay(alignment: .bottom) {
-                Rectangle()
-                    .fill(AgentBuddyTheme.border.opacity(0.75))
-                    .frame(height: 1)
-            }
+            .frame(minHeight: BuddySize.minHitTarget)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(.isHeader)
+        .accessibilityValue(Text(isCollapsed ? "Collapsed" : "Expanded"))
+        .accessibilityHint(Text(isCollapsed ? "Expand" : "Collapse"))
     }
 
-    func sessionList(derived: SessionsDerivedData) -> some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 3) {
-                    ForEach(derived.workspaceSections) { section in
-                        if let title = section.title {
-                            Text(title)
-                                .agentBuddyFont(.caption2)
-                                .foregroundColor(AgentBuddyTheme.textMuted)
-                                .padding(.horizontal, 2)
-                        }
+    /// The whole screen is one plain `List` so rows get native swipe actions
+    /// and the page scrolls as a unit, like the Tasks tab. `header` supplies
+    /// the rows above the task groups.
+    func sessionList<Header: View>(
+        derived: SessionsDerivedData,
+        @ViewBuilder header: () -> Header
+    ) -> some View {
+        let headerRows = header()
+        return ScrollViewReader { proxy in
+            List {
+                headerRows
 
-                        ForEach(section.groups) { group in
-                            workspaceGroupHeader(group)
+                ForEach(derived.workspaceSections) { section in
+                    if let title = section.title {
+                        Text(LocalizedStringKey(title))
+                            .buddyText(.caption, weight: .medium)
+                            .foregroundStyle(AgentBuddyTheme.textSecondary)
+                            .accessibilityAddTraits(.isHeader)
+                            .padding(.top, BuddySpacing.md)
+                            .sessionsListRow()
+                    }
 
-                            if !collapsedWorkspaceGroupIDs.contains(group.id) {
-                                ForEach(visibleSessionRows(for: group)) { row in
-                                    let thread = row.thread
-                                    let isCollapsed = collapsedSessionNodeKeys.contains(thread.key)
+                    ForEach(section.groups) { group in
+                        workspaceGroupHeader(group)
+                            .padding(.top, BuddySpacing.sm)
+                            .sessionsListRow()
 
-                                    sessionRow(
-                                        thread,
-                                        isActive: thread.key == activeThreadKey,
-                                        derived: derived,
-                                        ephemeralState: ephemeralStateByThreadKey[thread.key],
-                                        depth: row.depth,
-                                        hasChildren: row.hasChildren,
-                                        isCollapsed: isCollapsed,
-                                        onToggleNode: {
-                                            guard row.hasChildren else { return }
-                                            if isCollapsed {
-                                                collapsedSessionNodeKeys.remove(thread.key)
-                                            } else {
-                                                collapsedSessionNodeKeys.insert(thread.key)
-                                            }
-                                        },
-                                        onSelectSession: {
-                                            guard resumingKey == nil else { return }
-                                            Task { await resumeSession(thread) }
+                        if !collapsedWorkspaceGroupIDs.contains(group.id) {
+                            ForEach(visibleSessionRows(for: group)) { row in
+                                let thread = row.thread
+                                let isCollapsed = collapsedSessionNodeKeys.contains(thread.key)
+
+                                sessionRow(
+                                    thread,
+                                    isActive: thread.key == activeThreadKey,
+                                    derived: derived,
+                                    ephemeralState: ephemeralStateByThreadKey[thread.key],
+                                    depth: row.depth,
+                                    hasChildren: row.hasChildren,
+                                    isCollapsed: isCollapsed,
+                                    onToggleNode: {
+                                        guard row.hasChildren else { return }
+                                        if isCollapsed {
+                                            collapsedSessionNodeKeys.remove(thread.key)
+                                        } else {
+                                            collapsedSessionNodeKeys.insert(thread.key)
                                         }
-                                    )
-                                    .id(thread.key)
-                                    .contextMenu {
-                                        sessionRowContextMenu(thread)
+                                    },
+                                    onSelectSession: {
+                                        guard resumingKey == nil else { return }
+                                        Task { await resumeSession(thread) }
                                     }
-                                    .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                                        Button {
-                                            Task { await forkThread(thread) }
-                                        } label: {
-                                            Label("Fork", systemImage: "arrow.triangle.branch")
-                                        }
-                                        .tint(AgentBuddyTheme.accent)
-                                    }
-                                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                        Button(role: .destructive) {
-                                            archiveTargetKey = thread.key
-                                        } label: {
-                                            Label("Delete", systemImage: "trash")
-                                        }
-                                    }
+                                )
+                                .id(thread.key)
+                                .contextMenu {
+                                    sessionRowContextMenu(thread)
                                 }
+                                .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                                    Button {
+                                        Task { await forkThread(thread) }
+                                    } label: {
+                                        Label("Fork", systemImage: "arrow.triangle.branch")
+                                    }
+                                    .tint(AgentBuddyTheme.link)
+                                }
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    // No `.destructive` role: that role makes the list
+                                    // drop the row before the confirmation is answered.
+                                    Button {
+                                        archiveTargetKey = thread.key
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                    .tint(AgentBuddyTheme.danger)
+                                }
+                                .sessionsListRow(horizontal: BuddySpacing.sm, vertical: 1)
                             }
                         }
                     }
                 }
-                .padding(.leading, 4)
-                .padding(.trailing, 8)
-                .padding(.vertical, 4)
+
+                Color.clear
+                    .frame(height: BuddySpacing.xl)
+                    .sessionsListRow()
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .environment(\.defaultMinListRowHeight, 1)
+            .scrollDismissesKeyboard(.interactively)
+            // Task rows only exist once filtered threads do; until then keep
+            // the pending scroll so it runs when they arrive.
             .onAppear {
-                scrollToActiveSessionIfNeeded(derived: derived, proxy: proxy)
+                scrollToActiveSessionIfListed(derived: derived, proxy: proxy)
             }
             .onChange(of: pendingActiveSessionScroll) { _, _ in
-                scrollToActiveSessionIfNeeded(derived: derived, proxy: proxy)
+                scrollToActiveSessionIfListed(derived: derived, proxy: proxy)
             }
             .onChange(of: derived.filteredThreadKeys) { _, _ in
-                scrollToActiveSessionIfNeeded(derived: derived, proxy: proxy)
+                scrollToActiveSessionIfListed(derived: derived, proxy: proxy)
             }
             .onChange(of: collapsedWorkspaceGroupIDs) { _, _ in
-                scrollToActiveSessionIfNeeded(derived: derived, proxy: proxy)
+                scrollToActiveSessionIfListed(derived: derived, proxy: proxy)
             }
             .onChange(of: collapsedSessionNodeKeys) { _, _ in
-                scrollToActiveSessionIfNeeded(derived: derived, proxy: proxy)
+                scrollToActiveSessionIfListed(derived: derived, proxy: proxy)
             }
         }
     }
 
     @ViewBuilder
-    private func sessionRowContextMenu(_ thread: AppSessionSummary) -> some View {
+    func sessionRowContextMenu(_ thread: AppSessionSummary) -> some View {
         Button {
             renamingThreadKey = thread.key
             renameCurrentTitle = thread.sessionTitle
@@ -188,6 +219,11 @@ extension SessionsScreen {
     func scheduleActiveSessionScrollIfNeeded() {
         guard activeThreadKey != nil else { return }
         pendingActiveSessionScroll = true
+    }
+
+    private func scrollToActiveSessionIfListed(derived: SessionsDerivedData, proxy: ScrollViewProxy) {
+        guard !derived.filteredThreads.isEmpty else { return }
+        scrollToActiveSessionIfNeeded(derived: derived, proxy: proxy)
     }
 
     private func scrollToActiveSessionIfNeeded(derived: SessionsDerivedData, proxy: ScrollViewProxy) {

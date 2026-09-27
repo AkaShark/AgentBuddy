@@ -14,24 +14,16 @@ extension SessionsScreen {
                 appState.showServerPicker = true
             }
         } label: {
-            HStack {
-                if isStartingNewSession {
-                    ProgressView()
-                        .controlSize(.small)
-                        .tint(AgentBuddyTheme.textOnAccent)
-                } else {
+            HStack(spacing: BuddySpacing.xs) {
+                if !isStartingNewSession {
                     Image(systemName: "plus")
-                        .agentBuddyFont(.subheadline, weight: .medium)
-                    Text("New Session")
-                        .agentBuddyFont(.subheadline)
+                        .imageScale(.medium)
+                        .accessibilityHidden(true)
                 }
+                Text("New task")
             }
-            .foregroundColor(AgentBuddyTheme.textOnAccent)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(AgentBuddyTheme.accent)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
         }
+        .buttonStyle(BuddyButtonStyle(kind: .primary, isLoading: isStartingNewSession))
         .disabled(isStartingNewSession)
         // Mac builds (Catalyst + iOS-on-Mac) bind Cmd+N at the menu
         // level via `MacCommands`; the in-view shortcut would either
@@ -39,11 +31,6 @@ extension SessionsScreen {
         // doesn't get menus, so we keep it on then).
         .keyboardShortcut(AgentBuddyPlatform.isCatalyst ? nil : KeyboardShortcut("n", modifiers: [.command]))
         .accessibilityIdentifier("sessions.newSessionButton")
-        .padding(isRegularSurface ? 12 : 16)
-    }
-
-    private var isRegularSurface: Bool {
-        AgentBuddyPlatform.isRegularSurface(horizontalSizeClass: horizontalSizeClass)
     }
 
     var refreshToolbarButton: some View {
@@ -52,11 +39,11 @@ extension SessionsScreen {
                 if isLoading && hasLoadedInitialSessions {
                     ProgressView()
                         .controlSize(.small)
-                        .tint(AgentBuddyTheme.accent)
+                        .tint(AgentBuddyTheme.textSecondary)
                 } else {
                     Image(systemName: "arrow.clockwise")
-                        .agentBuddyFont(.subheadline, weight: .semibold)
-                        .foregroundColor(connectedServers.isEmpty ? AgentBuddyTheme.textMuted : AgentBuddyTheme.accent)
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(connectedServers.isEmpty ? AgentBuddyTheme.onDisabled : AgentBuddyTheme.textPrimary)
                 }
             }
         }
@@ -65,89 +52,99 @@ extension SessionsScreen {
         .accessibilityIdentifier("sessions.refreshButton")
     }
 
+    /// Host summary: a connection pill (dot + text) with quiet text actions to
+    /// add a host or fork the task that is open right now.
     var serversRow: some View {
         let connected = connectedServers
         let activeThread = sessionsModel.derivedData.allThreads.first(where: { $0.key == activeThreadKey })
         let activeThreadEphemeralState = activeThread.flatMap { ephemeralStateByThreadKey[$0.key] }
 
         return ViewThatFits(in: .horizontal) {
-            serversRowContent(
-                connected: connected,
-                activeThread: activeThread,
-                activeThreadEphemeralState: activeThreadEphemeralState,
-                useSpacer: true
-            )
-            ScrollView(.horizontal, showsIndicators: false) {
-                serversRowContent(
+            HStack(spacing: BuddySpacing.xs) {
+                connectionPill(connected: connected)
+                Spacer(minLength: BuddySpacing.xs)
+                serversRowActions(
                     connected: connected,
                     activeThread: activeThread,
-                    activeThreadEphemeralState: activeThreadEphemeralState,
-                    useSpacer: false
+                    activeThreadEphemeralState: activeThreadEphemeralState
                 )
             }
+            VStack(alignment: .leading, spacing: 0) {
+                connectionPill(connected: connected)
+                    .padding(.vertical, BuddySpacing.xxs)
+                HStack(spacing: BuddySpacing.md) {
+                    serversRowActions(
+                        connected: connected,
+                        activeThread: activeThread,
+                        activeThreadEphemeralState: activeThreadEphemeralState
+                    )
+                }
+            }
         }
-        .padding(.horizontal, isRegularSurface ? 12 : 16)
-        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func connectionPill(connected: [HomeDashboardServer]) -> some View {
+        BuddyConnectionPill(
+            state: connected.isEmpty ? .disconnected : .connected,
+            title: connected.isEmpty ? Text("Not connected") : Text("\(connected.count) hosts online")
+        )
+        .fixedSize()
     }
 
     @ViewBuilder
-    private func serversRowContent(
+    private func serversRowActions(
         connected: [HomeDashboardServer],
         activeThread: AppSessionSummary?,
-        activeThreadEphemeralState: SessionsModel.ThreadEphemeralState?,
-        useSpacer: Bool
+        activeThreadEphemeralState: SessionsModel.ThreadEphemeralState?
     ) -> some View {
-        HStack(spacing: 10) {
-            if connected.isEmpty {
-                Image(systemName: "xmark.circle")
-                    .foregroundColor(AgentBuddyTheme.textMuted)
-                    .frame(width: 20)
-                Text("Not connected")
-                    .agentBuddyFont(.footnote)
-                    .foregroundColor(AgentBuddyTheme.textMuted)
-                    .fixedSize(horizontal: true, vertical: false)
-                if useSpacer { Spacer() }
-                Button("Connect") {
-                    appState.showServerPicker = true
-                }
-                .accessibilityIdentifier("sessions.connectButton")
-                .agentBuddyFont(.caption)
-                .foregroundColor(AgentBuddyTheme.accent)
-                .hoverEffect(.highlight)
-            } else {
-                Image(systemName: "server.rack")
-                    .foregroundColor(AgentBuddyTheme.accent)
-                    .frame(width: 20)
-                Text("\(connected.count) server\(connected.count == 1 ? "" : "s")")
-                    .agentBuddyFont(.footnote)
-                    .foregroundColor(AgentBuddyTheme.textPrimary)
-                    .fixedSize(horizontal: true, vertical: false)
-                if useSpacer { Spacer() }
-                Button("Add") {
-                    appState.showServerPicker = true
-                }
-                .accessibilityIdentifier("sessions.addServerButton")
-                .agentBuddyFont(.caption)
-                .foregroundColor(AgentBuddyTheme.accent)
-                .hoverEffect(.highlight)
-                if let activeThread {
-                    Button {
-                        Task { await forkThread(activeThread) }
-                    } label: {
+        if connected.isEmpty {
+            Button {
+                appState.showServerPicker = true
+            } label: {
+                quietActionLabel(Text("Connect"), isEnabled: true)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("sessions.connectButton")
+            .hoverEffect(.highlight)
+        } else {
+            Button {
+                appState.showServerPicker = true
+            } label: {
+                quietActionLabel(Text("Add a host"), isEnabled: true)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("sessions.addServerButton")
+            .hoverEffect(.highlight)
+
+            if let activeThread {
+                let isTurnActive = activeThreadEphemeralState?.hasTurnActive ?? activeThread.hasActiveTurn
+                Button {
+                    Task { await forkThread(activeThread) }
+                } label: {
+                    HStack(spacing: BuddySpacing.xxs) {
                         if isForkingActiveThread {
                             ProgressView()
                                 .controlSize(.small)
-                                .tint(AgentBuddyTheme.accent)
-                        } else {
-                            Text("Fork")
+                                .tint(AgentBuddyTheme.link)
                         }
+                        quietActionLabel(Text("Fork current task"), isEnabled: !isTurnActive)
                     }
-                    .disabled(isForkingActiveThread || (activeThreadEphemeralState?.hasTurnActive ?? activeThread.hasActiveTurn))
-                    .agentBuddyFont(.caption)
-                    .foregroundColor((activeThreadEphemeralState?.hasTurnActive ?? activeThread.hasActiveTurn) ? AgentBuddyTheme.textMuted : AgentBuddyTheme.accent)
-                    .hoverEffect(.highlight)
                 }
+                .buttonStyle(.plain)
+                .disabled(isForkingActiveThread || isTurnActive)
+                .hoverEffect(.highlight)
             }
         }
+    }
+
+    private func quietActionLabel(_ title: Text, isEnabled: Bool) -> some View {
+        title
+            .buddyText(.label, weight: .semibold)
+            .foregroundStyle(isEnabled ? AgentBuddyTheme.link : AgentBuddyTheme.onDisabled)
+            .lineLimit(1)
+            .fixedSize()
+            .frame(minWidth: BuddySize.minHitTarget, minHeight: BuddySize.minHitTarget)
+            .contentShape(Rectangle())
     }
 }

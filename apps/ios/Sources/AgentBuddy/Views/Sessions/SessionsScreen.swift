@@ -56,17 +56,16 @@ struct SessionsScreen: View {
         let base = screenLayout(derived: derived)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 4) {
-                        if let onInfo {
-                            Button(action: onInfo) {
-                                Image(systemName: "info.circle")
-                                    .font(.system(size: 15, weight: .medium))
-                                    .foregroundStyle(AgentBuddyTheme.accent)
-                            }
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    if let onInfo {
+                        Button(action: onInfo) {
+                            Image(systemName: "info.circle")
+                                .font(.system(size: 17, weight: .medium))
+                                .foregroundStyle(AgentBuddyTheme.textPrimary)
                         }
-                        refreshToolbarButton
+                        .accessibilityLabel(Text("Host details"))
                     }
+                    refreshToolbarButton
                 }
             }
 
@@ -214,57 +213,36 @@ struct SessionsScreen: View {
             }
     }
 
+    /// One Mint list: host summary and "New task" first, then search and
+    /// filter chips, then tasks grouped by workspace.
     private func screenLayout(derived: SessionsDerivedData) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            newSessionButton
-            Divider().background(AgentBuddyTheme.separator)
-            serversRow
-            Divider().background(AgentBuddyTheme.separator)
+        sessionList(derived: derived) {
+            Group {
+                serversRow
+                newSessionButton
+                    .padding(.bottom, BuddySpacing.xs)
+            }
+            .sessionsListRow(vertical: BuddySpacing.xxs)
 
             if derived.allThreads.isEmpty {
-                Spacer()
-                if isLoading {
-                    ProgressView().tint(AgentBuddyTheme.accent).frame(maxWidth: .infinity)
-                } else {
-                    Text("No sessions yet")
-                        .agentBuddyFont(.footnote)
-                        .foregroundColor(AgentBuddyTheme.textMuted)
-                        .frame(maxWidth: .infinity)
-                }
-                Spacer()
+                emptySessionsState
+                    .sessionsListRow(vertical: BuddySpacing.xs)
             } else {
                 if isLoading {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                            .controlSize(.small)
-                            .tint(AgentBuddyTheme.accent)
-                        Text("Loading more sessions...")
-                            .agentBuddyFont(.caption)
-                            .foregroundColor(AgentBuddyTheme.textMuted)
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    Divider().background(AgentBuddyTheme.separator)
+                    loadingMoreSessionsRow
+                        .sessionsListRow()
                 }
-                runtimeKindPillRow
                 sessionSearchBar
+                    .sessionsListRow(vertical: BuddySpacing.xs)
+                runtimeKindPillRow
                 sessionFilterRow
-                Divider().background(AgentBuddyTheme.separator)
                 if derived.filteredThreads.isEmpty {
-                    Spacer()
-                    Text("No matches for \"\(trimmedSessionSearchQuery)\"")
-                        .agentBuddyFont(.footnote)
-                        .foregroundColor(AgentBuddyTheme.textMuted)
-                        .frame(maxWidth: .infinity)
-                    Spacer()
-                } else {
-                    sessionList(derived: derived)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    noMatchingSessionsState(query: trimmedSessionSearchQuery)
+                        .sessionsListRow(vertical: BuddySpacing.xs)
                 }
             }
-
         }
+        .buddyPageBackground()
         .accessibilityIdentifier("sessions.container")
     }
 
