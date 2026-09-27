@@ -186,7 +186,7 @@ Incremental policy:
 
 ### Ghostty (terminal renderer)
 - libghostty builds from the pinned `AkaShark/ghostty` fork in `shared/third_party/ghostty` with zig 0.15.2: `make ghostty-ios` / `make ghostty-android`.
-- `GHOSTTY_KEEP_ZIG_CACHE=1` keeps a pre-seeded zig package cache instead of wiping it — useful behind networks where zig's package fetcher stalls (prefetch the deps once, then build).
+- `GHOSTTY_KEEP_ZIG_CACHE=1` keeps a pre-seeded zig package cache instead of wiping it (iOS and Android Ghostty scripts) — useful behind networks where zig's package fetcher stalls, or when endpoint security deletes files from fetched packages and zig reports `hash mismatch` (prefetch the deps once, then build).
 - Xcode 26 needs `xcodebuild -downloadComponent MetalToolchain` for Ghostty's Metal renderer.
 
 ### Hot Reload
