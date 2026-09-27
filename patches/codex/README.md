@@ -1,10 +1,15 @@
-# Codex submodule patches
+# Archived Codex patches
 
-Patches applied to `shared/third_party/codex` by `apps/ios/scripts/sync-codex.sh` during build, in the order listed in [`series`](series). `series` is the single source of truth: `build-rust.sh` (EXIT-trap rollback) and `make unpatch` read the same file and revert in reverse order. Add new patches there.
+These patches are historical provenance only. Their complete resulting source tree
+was committed to [AkaShark/codex](https://github.com/AkaShark/codex/tree/codex/agentbuddy)
+in `ee458c9e74a40838e75dc289b0c90bc65050e163`, based on upstream
+`13595c36e218fcbd13df118eeadf00d4eb0e6d31` (rust-v0.132.0).
 
-The patches are tightly coupled to the upstream codex source tree, so each codex tag bump tends to require a refresh. This README captures *intent* — what each patch does and which downstream code in this repo depends on it — so the next bump doesn't have to re-derive that from a 900-line diff.
+Builds no longer apply or reverse these patches. Do not update them for new work;
+commit changes in the fork and update the parent gitlink instead. `series` records
+the original import order only. See [the fork workflow](../../docs/DEVELOPMENT.md#maintained-codex-and-ghostty-forks).
 
-When a patch fails to apply, prefer `git apply --3way` first (handles line-number drift). If that conflicts on real semantic changes, refresh the affected hunks against the new upstream by editing the file directly, regenerating the patch with `git diff HEAD -- <file>`, and verifying with `git -C shared/third_party/codex apply --reverse --check`.
+The descriptions below document the original adaptations and their consumers.
 
 ---
 

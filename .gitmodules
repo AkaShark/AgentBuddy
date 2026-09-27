@@ -1,8 +1,10 @@
 [submodule "shared/third_party/codex"]
 	path = shared/third_party/codex
-	url = https://github.com/openai/codex
+	url = https://github.com/AkaShark/codex.git
+	branch = codex/agentbuddy
 	shallow = true
 [submodule "shared/third_party/ghostty"]
 	path = shared/third_party/ghostty
-	url = https://github.com/ghostty-org/ghostty.git
+	url = https://github.com/AkaShark/ghostty.git
+	branch = codex/agentbuddy
 	shallow = true

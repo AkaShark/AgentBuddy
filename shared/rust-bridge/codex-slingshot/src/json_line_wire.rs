@@ -3,7 +3,7 @@
 //! Upstream's `RemoteAppServerClient` only ships WebSocket transports (`connect`,
 //! `connect_websocket_stream`). Pi/non-Codex servers and the SSH-bridge bootstrap path
 //! talk plain JSON-RPC over a raw byte stream (one JSON object per line). The patch in
-//! `patches/codex/remote-app-server-websocket-cap.patch` exposes a [`JsonRpcWire`] trait
+//! The AgentBuddy Codex fork exposes a [`JsonRpcWire`] trait
 //! and a public `RemoteAppServerClient::connect_with_wire` constructor so we can drive
 //! the same dispatch loop over any wire. This module implements that wire for raw
 //! line-delimited JSON-RPC and exposes a `connect_json_line_stream` helper to mirror

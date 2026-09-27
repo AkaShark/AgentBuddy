@@ -42,7 +42,6 @@ ANDROID_DIR := $(ROOT)/apps/android
 ANDROID_JNI := $(ANDROID_DIR)/core/bridge/src/main/jniLibs
 ANDROID_APP_JNI := $(ANDROID_DIR)/app/src/main/jniLibs
 GENERATED_DIR := $(RUST_DIR)/generated
-PATCHES_DIR := $(ROOT)/patches/codex
 
 IOS_DEPLOYMENT_TARGET ?= 18.0
 IOS_SIM_DEVICE ?= iPhone 17 Pro
@@ -153,13 +152,8 @@ endif
 KITTYLITTER_ARGS := $(strip $(KITTYLITTER_GOAL_ARGS) $(ARGS))
 UPDATE_ALLEYCAT_MAIN := $(ROOT)/tools/scripts/update-alleycat-main.sh
 
-# Ordered codex patch list: patches/codex/series is the single source of truth
-# shared with sync-codex.sh (apply) and build-rust.sh (rollback). `#` starts a
-# comment there; HASH keeps the sed pattern portable across GNU make 3.81/4.3+.
-PATCH_SERIES := $(PATCHES_DIR)/series
-HASH := \#
-PATCH_FILES := $(addprefix $(PATCHES_DIR)/,$(shell sed -e 's/$(HASH).*//' -e '/^[[:space:]]*$$/d' '$(PATCH_SERIES)'))
-reverse = $(if $(1),$(call reverse,$(wordlist 2,$(words $(1)),$(1))) $(firstword $(1)))
+# Fork revisions invalidate dependency preparation and downstream build stamps.
+CODEX_COMMIT := $(shell git -C $(SUBMODULE_DIR) rev-parse --short=12 HEAD 2>/dev/null || echo missing)
 
 BOUNDARY_SOURCES := \
 	$(RUST_DIR)/codex-mobile-client/Cargo.toml \
@@ -169,7 +163,7 @@ BOUNDARY_SOURCES := \
 
 BOUNDARY_SOURCES += $(shell find $(RUST_DIR)/codex-mobile-client/src -type f -name '*.rs' 2>/dev/null)
 
-STAMP_SYNC := $(STAMPS)/sync
+STAMP_SYNC := $(STAMPS)/sync-codex-$(CODEX_COMMIT)
 STAMP_BINDINGS_S := $(STAMPS)/bindings-swift
 STAMP_BINDINGS_K := $(STAMPS)/bindings-kotlin
 STAMP_XCGEN := $(STAMPS)/xcgen
@@ -185,16 +179,14 @@ TALLOC_VERSION := 2.4.3
 STAMP_PROOT_ANDROID = $(STAMPS)/proot-android-$(PROOT_COMMIT)-talloc-$(TALLOC_VERSION)-$(ANDROID_ABIS_SAFE)
 GHOSTTY_DIR := $(ROOT)/shared/third_party/ghostty
 GHOSTTY_COMMIT := $(shell git -C $(GHOSTTY_DIR) rev-parse --short=12 HEAD 2>/dev/null || echo missing)
-GHOSTTY_PATCH_FILES := $(wildcard $(ROOT)/patches/ghostty/*.patch)
-GHOSTTY_PATCH_FINGERPRINT := $(shell cat $(GHOSTTY_PATCH_FILES) 2>/dev/null | shasum -a 256 | cut -c1-12)
-STAMP_SYNC_GHOSTTY := $(STAMPS)/sync-ghostty-$(GHOSTTY_COMMIT)-$(GHOSTTY_PATCH_FINGERPRINT)
-STAMP_GHOSTTY_IOS := $(STAMPS)/ghostty-ios-$(GHOSTTY_COMMIT)-$(GHOSTTY_PATCH_FINGERPRINT)
+STAMP_SYNC_GHOSTTY := $(STAMPS)/sync-ghostty-$(GHOSTTY_COMMIT)
+STAMP_GHOSTTY_IOS := $(STAMPS)/ghostty-ios-$(GHOSTTY_COMMIT)
 
 empty :=
 space := $(empty) $(empty)
 ANDROID_ABIS_SAFE := $(subst $(space),_,$(subst /,_,$(ANDROID_ABIS)))
 ANDROID_RUST_PROFILE_SAFE := $(subst /,_,$(ANDROID_RUST_PROFILE))
-STAMP_GHOSTTY_ANDROID := $(STAMPS)/ghostty-android-$(GHOSTTY_COMMIT)-$(GHOSTTY_PATCH_FINGERPRINT)-$(ANDROID_ABIS_SAFE)
+STAMP_GHOSTTY_ANDROID := $(STAMPS)/ghostty-android-$(GHOSTTY_COMMIT)-$(ANDROID_ABIS_SAFE)
 STAMP_RUST_ANDROID := $(STAMPS)/rust-android-$(ANDROID_RUST_PROFILE_SAFE)-$(ANDROID_ABIS_SAFE)
 ANDROID_RUST_SOURCES := $(shell find $(RUST_DIR) \
 	-path '*/target' -prune -o \
@@ -486,8 +478,8 @@ $(STAMP_RUST_ANDROID): $(STAMP_SYNC) $(STAMP_BINDINGS_K) $(STAMP_GHOSTTY_ANDROID
 	@touch $@
 
 sync-ghostty: $(STAMP_SYNC_GHOSTTY)
-$(STAMP_SYNC_GHOSTTY): $(GHOSTTY_PATCH_FILES) apps/ios/scripts/sync-ghostty.sh Makefile
-	@echo "==> Syncing ghostty submodule + applying AgentBuddy patches..."
+$(STAMP_SYNC_GHOSTTY): .gitmodules apps/ios/scripts/sync-ghostty.sh Makefile
+	@echo "==> Syncing AgentBuddy ghostty fork..."
 	@$(IOS_SCRIPTS)/sync-ghostty.sh --preserve-current
 	@touch $@
 
@@ -550,32 +542,19 @@ help:
 		'make rust-test          host cargo test for shared crates'
 
 sync: $(STAMP_SYNC)
-$(STAMP_SYNC):
+$(STAMP_SYNC): .gitmodules apps/ios/scripts/sync-codex.sh Makefile
 	@echo "==> Syncing codex submodule..."
 	@$(IOS_SCRIPTS)/sync-codex.sh --preserve-current
 	@touch $@
 
-patch: $(STAMP_SYNC)
-	@echo "==> Verifying codex patch set..."
-	@$(IOS_SCRIPTS)/sync-codex.sh --preserve-current
+# Compatibility aliases: downstream changes now live in fork commits.
+patch: sync
+	@echo "==> Codex adaptations are committed in the fork; no patches to apply."
 
-unpatch:
-	@echo "==> Reverting codex patches..."
-	@for pf in $(call reverse,$(PATCH_FILES)); do \
-		if git -C $(SUBMODULE_DIR) apply --reverse --check "$$pf" >/dev/null 2>&1; then \
-			git -C $(SUBMODULE_DIR) apply --reverse "$$pf"; \
-		fi; \
-	done
-	@rm -f $(STAMP_SYNC)
-
-unpatch-ghostty:
-	@echo "==> Reverting ghostty patches..."
-	@for pf in $(GHOSTTY_PATCH_FILES); do \
-		if git -C $(GHOSTTY_DIR) apply --reverse --check "$$pf" >/dev/null 2>&1; then \
-			git -C $(GHOSTTY_DIR) apply --reverse "$$pf"; \
-		fi; \
-	done
-	@rm -f $(STAMPS)/sync-ghostty-* $(STAMPS)/ghostty-ios-* $(STAMPS)/ghostty-android-*
+unpatch unpatch-ghostty:
+	@echo "error: fork adaptations are committed source; patch rollback is disabled." >&2
+	@echo "Use a reviewed fork commit and update the submodule pointer instead." >&2
+	@exit 1
 
 bindings: bindings-swift bindings-kotlin
 

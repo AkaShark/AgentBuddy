@@ -15,7 +15,7 @@
 - `shared/rust-bridge/codex-bridge/` is legacy C-FFI support that should not be used for new mobile runtime features.
 - `apps/ios/Sources/AgentBuddy/Bridge/` — generated `UniFFICodexClient.generated.swift` (local-only) plus hand-written glue. The only hand-written `Rust*.swift` helpers are `RustAlleycatBridge.swift` and `RustVoiceHandoff.swift`; the rest is Ghostty renderer, Swift SSH credential/trust providers, dynamic tools, and message-content glue.
 - Android has no hand-written `Rust*.kt` helpers: app code calls the generated `uniffi.codex_mobile_client` package directly. UniFFI Kotlin sources are generated into `shared/rust-bridge/generated/kotlin/` and compiled straight into `:app` via `java.srcDir` in `apps/android/app/build.gradle.kts`; do not maintain copied binding files under Android source roots.
-- `shared/third_party/codex/` is the upstream Codex submodule.
+- `shared/third_party/codex/` and `shared/third_party/ghostty/` pin the AkaShark forks on the `codex/agentbuddy` maintenance branch. Mobile adaptations are committed there; builds do not apply patches.
 - `apps/ios/GeneratedRust/` contains local generated Rust artifacts for iOS builds: UniFFI headers/modulemap plus raw device/simulator staticlibs. These artifacts are not committed.
 - `apps/ios/Frameworks/` contains downloaded/package-lane iOS XCFrameworks (`codex_mobile_client.xcframework` in package builds). These artifacts are not committed.
 - `apps/ios/project.yml` is the source of truth for project generation; regenerate `apps/ios/AgentBuddy.xcodeproj` instead of hand-editing project files.
@@ -85,7 +85,7 @@
 - Before adding a new `AppStore` method, ask: is this a real composite/store action, or should it live on `AppClient` instead?
 - Before adding a new platform cache, ask: is this canonical runtime data that should live in the Rust store instead?
 - When in doubt, prefer one shared Rust implementation plus a thin platform projection over two parallel native implementations.
-- Do not push `shared/third_party/codex` as part of normal repo work. Keep submodule edits local-only unless the user explicitly asks for a separate submodule commit/push, and do not assume a top-level `git push` captures dirty submodule contents.
+- For Codex/Ghostty changes, commit on a fork branch and push to the corresponding AkaShark fork before committing the parent gitlink. Never push to the official upstream or assume a top-level push includes submodule edits. Use `codex/agentbuddy` as the maintenance branch; do not rewrite published history. See `docs/DEVELOPMENT.md` for the workflow.
 
 ## Dependencies
 ### iOS (SPM via `apps/ios/project.yml`)
@@ -122,7 +122,7 @@ Before building on a new machine, verify:
 - Do not recreate simulator caches. If `apps/ios/GeneratedRust/ios-sim` or `Debug-iphonesimulator` build products show up, delete them.
 
 ## Build System
-The root `Makefile` is the primary build interface. It orchestrates submodule sync, patching, UniFFI binding generation, Rust cross-compilation, raw staticlib generation, optional xcframework packaging, Xcode project generation, and platform builds — with stamp-file caching in `.build-stamps/` so repeated runs skip completed steps. If `sccache` is installed, package/CI builds use it via `RUSTC_WRAPPER=sccache` with a local disk cache; the remote S3/R2 backend is opt-in (R2: `SCCACHE_BUCKET` + `SCCACHE_ENDPOINT` + `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`; plain AWS S3: `SCCACHE_BUCKET` + AWS credentials or `AWS_PROFILE`/`SCCACHE_AWS_PROFILE`, optional `SCCACHE_REGION`/`AWS_REGION`; a bucket with neither endpoint nor credentials falls back to the local cache — see `tools/scripts/load-sccache-aws-creds.sh`).
+The root `Makefile` is the primary build interface. It orchestrates fork submodule sync, UniFFI binding generation, Rust cross-compilation, raw staticlib generation, optional xcframework packaging, Xcode project generation, and platform builds — with stamp-file caching in `.build-stamps/` so repeated runs skip completed steps. If `sccache` is installed, package/CI builds use it via `RUSTC_WRAPPER=sccache` with a local disk cache; the remote S3/R2 backend is opt-in (R2: `SCCACHE_BUCKET` + `SCCACHE_ENDPOINT` + `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`; plain AWS S3: `SCCACHE_BUCKET` + AWS credentials or `AWS_PROFILE`/`SCCACHE_AWS_PROFILE`, optional `SCCACHE_REGION`/`AWS_REGION`; a bucket with neither endpoint nor credentials falls back to the local cache — see `tools/scripts/load-sccache-aws-creds.sh`).
 
 There are two distinct iOS Rust lanes:
 - Fast dev lane: raw staticlib + generated headers in `apps/ios/GeneratedRust/`, used by Debug/device builds (`make rust-ios-device-fast`, `make ios-device-fast`).
@@ -136,7 +136,7 @@ Incremental policy:
 ### Common targets
 | Target | Description |
 |---|---|
-| `make ios` | Full iOS package lane: sync → patch → Ghostty → bindings → rust (device+sim) → xcframework → xcgen → simulator build (does not run `alpine-fs`) |
+| `make ios` | Full iOS package lane: sync → Ghostty → bindings → rust (device+sim) → xcframework → xcgen → simulator build (does not run `alpine-fs`) |
 | `make alpine-fs` | Download the pinned Alpine rootfs from `dnakov/litter-ish`; bump `ALPINE_FS_VERSION` in `Makefile` to upgrade. Not bundled into the iOS app while local iSH is disabled (see Fork Notes). |
 | `make ios-sim` | Full iOS package lane + simulator build (not used locally; see iOS Build & Run Policy) |
 | `make ios-sim-fast` | Fast iOS simulator lane using raw simulator staticlib outputs in `GeneratedRust/ios-sim` (not used locally) |
@@ -175,7 +175,7 @@ Incremental policy:
 ### Individual scripts (called by Make, can also be run standalone)
 - `./apps/ios/scripts/build-rust.sh` — cross-compile Rust for iOS; in fast mode it emits raw staticlibs + headers to `apps/ios/GeneratedRust/`, and in package mode it also creates `codex_mobile_client.xcframework`
 - `./apps/ios/scripts/download-alpine-fs.sh` — fetch the pinned `dnakov/litter-ish` rootfs, verify its checksum, and extract it into `apps/ios/Resources/fs/`. Reads `ALPINE_FS_VERSION` from env (set by `make alpine-fs`).
-- `./apps/ios/scripts/sync-codex.sh` — sync codex submodule + apply the patches listed, in order, in `patches/codex/series` (the single list also used by `build-rust.sh` rollback and `make unpatch`)
+- `./apps/ios/scripts/sync-codex.sh` / `sync-ghostty.sh` — initialize the pinned fork or preserve the current development checkout; `--recorded-gitlink` checks out the recorded commit. Never apply or reverse patches. `patches/` is historical provenance only.
 - `./apps/ios/scripts/regenerate-project.sh` — regenerate Xcode project via xcodegen; this is the safe path because it removes any accidental nested `apps/ios/AgentBuddy.xcodeproj/AgentBuddy.xcodeproj` before regenerating
 - `./apps/ios/scripts/testflight-upload.sh` — archive, export IPA, upload to TestFlight
 - `./shared/rust-bridge/generate-bindings.sh` — generate UniFFI Swift/Kotlin bindings
@@ -185,7 +185,7 @@ Incremental policy:
 - `./tools/scripts/triage-mobile-feedback.py` — rerunnable GitHub + TestFlight + Play triage ledger. It wraps `fetch-mobile-store-artifacts.py`, fetches GitHub issues/PRs, stores raw per-run snapshots under `artifacts/mobile-triage/runs/`, and preserves per-item status/notes in `artifacts/mobile-triage/triage-state.json`. Use `mark '<item-id>' --status done --note ...` after an item is handled, or `--status pr-open --note 'Fix PR #...'` when a fix PR has been opened, so later runs do not put the same item back in the unhandled queue.
 
 ### Ghostty (terminal renderer)
-- libghostty builds from `shared/third_party/ghostty` (patches in `patches/ghostty/`) with zig 0.15.2: `make ghostty-ios` / `make ghostty-android`.
+- libghostty builds from the pinned `AkaShark/ghostty` fork in `shared/third_party/ghostty` with zig 0.15.2: `make ghostty-ios` / `make ghostty-android`.
 - `GHOSTTY_KEEP_ZIG_CACHE=1` keeps a pre-seeded zig package cache instead of wiping it — useful behind networks where zig's package fetcher stalls (prefetch the deps once, then build).
 - Xcode 26 needs `xcodebuild -downloadComponent MetalToolchain` for Ghostty's Metal renderer.
 

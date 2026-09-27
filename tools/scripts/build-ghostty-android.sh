@@ -17,10 +17,8 @@ if [ ! -f "$GHOSTTY_DIR/build.zig" ]; then
     exit 1
 fi
 
-# Apply Litter's mobile-embed patches if not already applied. Idempotent;
-# safe to call on every build. Required when this script is invoked
-# directly (CI, build-android-rust.sh fallback) without going through the
-# Makefile's STAMP_SYNC_GHOSTTY dep chain.
+# Initialize the pinned fork for direct invocations (CI and build-android-rust.sh).
+# Mobile embedding support is committed in the fork.
 "$REPO_DIR/apps/ios/scripts/sync-ghostty.sh" --preserve-current
 
 if ! command -v zig >/dev/null 2>&1; then
@@ -44,7 +42,7 @@ error: vendored Ghostty does not expose an Android platform surface yet.
 
 The external-PTY API is present, but the current Ghostty embedding header has
 macOS/iOS platform structs only. Add the planned ghostty_platform_android_s /
-GHOSTTY_PLATFORM_ANDROID patch before building Android renderer artifacts.
+GHOSTTY_PLATFORM_ANDROID support in the fork before building Android renderer artifacts.
 EOF
     exit 2
 fi
