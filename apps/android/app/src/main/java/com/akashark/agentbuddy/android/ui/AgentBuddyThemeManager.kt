@@ -164,8 +164,25 @@ object AgentBuddyThemeManager {
         }
     }
 
+    /** DEBUG gallery: forced appearance that is never written to preferences. */
+    private var previewDark: Boolean? = null
+
+    /**
+     * Renders the Mint themes in a fixed appearance for the DEBUG state
+     * gallery without touching the user's stored theme, font or mode.
+     * Call after [initialize].
+     */
+    fun applyPreviewOverride(dark: Boolean) {
+        previewDark = dark
+        lightTheme = loadAndResolve(DEFAULT_LIGHT_THEME) ?: AgentBuddyResolvedTheme.defaultLight
+        darkTheme = loadAndResolve(DEFAULT_DARK_THEME) ?: AgentBuddyResolvedTheme.defaultDark
+        monoFontEnabled = false
+        activeTheme = if (dark) darkTheme else lightTheme
+        themeVersion += 1
+    }
+
     private fun usesDarkTheme(mode: AgentBuddyAppearanceMode = appearanceMode): Boolean =
-        mode.resolvesDarkTheme(systemIsDark)
+        previewDark ?: mode.resolvesDarkTheme(systemIsDark)
 
     private fun themeForMode(mode: AgentBuddyAppearanceMode): AgentBuddyResolvedTheme =
         if (usesDarkTheme(mode)) {
