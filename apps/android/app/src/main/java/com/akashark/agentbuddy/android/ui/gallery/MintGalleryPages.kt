@@ -38,4 +38,6 @@ val mintGalleryPages: List<MintGalleryPage> =
         MintGalleryPage("voice-connecting", "实时语音（连接中）") { GalleryVoiceConnectingPage() },
         MintGalleryPage("terminal-chrome", "终端") { GalleryTerminalChromePage() },
         MintGalleryPage("terminal-config", "终端设置") { GalleryTerminalConfigPage() },
+        MintGalleryPage("conversation", "会话时间线") { GalleryConversationPage() },
+        MintGalleryPage("conversation-long", "会话长内容") { GalleryConversationLongPage() },
     )
