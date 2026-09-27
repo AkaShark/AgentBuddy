@@ -843,9 +843,6 @@ fun HomeDashboardScreen(
                             HomeModelChip(
                                 serverId = serverForModels,
                                 disabled = serverForModels.isNullOrBlank(),
-                                onSheetStateChange = { open ->
-                                    suppressComposerCollapse = open
-                                },
                             )
                             ProjectChip(
                                 project = selectedProject,
@@ -876,13 +873,6 @@ fun HomeDashboardScreen(
                                 onThreadCreated(key)
                             },
                             onLoginRequired = onOpenAccount,
-                            onActiveChange = { active ->
-                                if (active) {
-                                    isComposerActive = true
-                                } else if (!suppressComposerCollapse) {
-                                    isComposerActive = false
-                                }
-                            },
                         )
                     }
                     else -> {
