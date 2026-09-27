@@ -86,7 +86,7 @@ shared/rust-bridge/
   uniffi-bindgen/              绑定生成工具
 shared/third_party/codex/      上游 Codex 子模块
 shared/third_party/ghostty/    上游 Ghostty 子模块（终端渲染）
-patches/codex/, patches/ghostty/  构建时应用的本地补丁
+patches/codex/, patches/ghostty/  已迁入 fork 的历史补丁（构建不再应用）
 services/kittylitter/          Mac 守护进程二进制 agentbuddy（alleycat 封装，作为桌面 App 的 sidecar）
 services/push-proxy/           APNs / FCM 推送代理（Cloudflare Worker）
 tools/scripts/                 跨平台辅助脚本

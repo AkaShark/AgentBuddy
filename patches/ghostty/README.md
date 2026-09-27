@@ -1,8 +1,13 @@
-# Ghostty dependency patches
+# Archived Ghostty patches
 
-`sync-ghostty.sh` applies these patches on both mobile build paths. Keep fixes
-here instead of committing changes inside the Ghostty submodule. The Makefile
-fingerprints `*.patch`, so changing a patch invalidates Ghostty build stamps.
+`litter-mobile-embed.patch` is historical provenance only. Its complete resulting
+source tree was committed to [AkaShark/ghostty](https://github.com/AkaShark/ghostty/tree/codex/agentbuddy)
+in `e337be2262fc13c978f5b0edab49ab449485ac6a`, based on upstream
+`a968e120dd084bd886239d1cac938f0177f019d9`.
+
+Builds consume the pinned fork directly and never apply or reverse this patch.
+Commit new changes in the fork and update the parent gitlink. Makefile build stamps
+include the fork commit. See [the fork workflow](../../docs/DEVELOPMENT.md#maintained-codex-and-ghostty-forks).
 
 ## Wuffs package hash: no patch needed
 
@@ -23,5 +28,5 @@ port-7897 proxy. Git/submodule sync and the invoking shell retain their settings
 Use `GHOSTTY_USE_PROXY=1 make ghostty-ios` (or `make ghostty-android`) to retain
 proxy variables on networks that require them.
 
-To apply and rebuild: `make ghostty-ios`. Use Zig 0.15.2 for this pinned checkout.
-When upgrading Ghostty, recheck whether each patch is still needed.
+To rebuild: `make ghostty-ios`. Use Zig 0.15.2 for this pinned checkout.
+When upgrading Ghostty, review the fork adaptations against upstream changes.

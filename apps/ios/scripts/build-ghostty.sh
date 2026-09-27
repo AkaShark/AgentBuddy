@@ -20,10 +20,8 @@ if ! command -v zig >/dev/null 2>&1; then
     exit 1
 fi
 
-# Apply Litter's mobile-embed patches if not already applied. Idempotent;
-# safe to call on every build. Required when this script is invoked
-# directly (CI, build-rust.sh fallback) without going through the
-# Makefile's STAMP_SYNC_GHOSTTY dep chain.
+# Initialize the pinned fork for direct invocations (CI and build-rust.sh).
+# Mobile embedding support is committed in the fork.
 "$REPO_DIR/apps/ios/scripts/sync-ghostty.sh" --preserve-current
 
 if ! grep -q 'ghostty_surface_write' "$GHOSTTY_DIR/include/ghostty.h"; then

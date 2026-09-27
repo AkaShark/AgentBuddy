@@ -66,40 +66,73 @@ Use this flow to make Codex sessions from your Mac visible in the iOS/Android ap
 
 5. Thread/session listing is `cwd`-scoped. If expected sessions are missing, choose the same working directory used when those sessions were created.
 
-## Codex Submodule + Patches
+## Maintained Codex and Ghostty forks
 
-Upstream Codex is vendored as a submodule at `shared/third_party/codex`.
+AgentBuddy pins exact commits from its own forks:
 
-Current local patch set, applied in this order by `sync-codex.sh` from
-`patches/codex/series` (see `patches/codex/README.md` for what each patch does and which
-mobile code depends on it):
+| Submodule | Fork | Maintenance branch | Upstream base at migration |
+| --- | --- | --- | --- |
+| `shared/third_party/codex` | [AkaShark/codex](https://github.com/AkaShark/codex) | `codex/agentbuddy` | `13595c36e` (rust-v0.132.0) |
+| `shared/third_party/ghostty` | [AkaShark/ghostty](https://github.com/AkaShark/ghostty) | `codex/agentbuddy` | `a968e120d` |
 
-- `patches/codex/ios-exec-hook.patch`
-- `patches/codex/mobile-code-mode-stub.patch`
-- `patches/codex/thread-read-permissions.patch`
-- `patches/codex/mobile-shell-snapshot-timeout.patch`
-- `patches/codex/remote-app-server-websocket-cap.patch`
-- `patches/codex/absolute-path-cross-platform.patch`
-- `patches/codex/android-installation-id-lock.patch`
-- `patches/codex/dynamic-tool-call-arguments-delta.patch`
-- `patches/codex/approval-timestamps-serde-default.patch`
-- `patches/codex/realtime-webrtc-env-apikey.patch`
-- `patches/codex/realtime-handoff-server-hint.patch` — must come before the next two; it adds the `realtime_v2_session_tools` helper they reuse
-- `patches/codex/realtime-dynamic-tools.patch`
-- `patches/codex/realtime-client-controlled-handoff.patch`
+The initial fork commits preserve exactly the previous upstream-plus-patches source
+trees, including Codex's two new stub files. The old `patches/codex/` and
+`patches/ghostty/` files are archives, not build inputs. Do not regenerate them.
+There is no build-time patch application or EXIT-trap rollback. `make patch` is a
+compatibility alias for sync; `make unpatch` and `make unpatch-ghostty` fail safely.
 
-The last three together replace the former monolithic `client-controlled-handoff.patch`.
-`patches/codex/series` is the single ordered list: `sync-codex.sh` applies it,
-`build-rust.sh` (EXIT-trap rollback) and `make unpatch` revert it in reverse order.
-A `.patch` file not listed there is not applied.
-
-Sync/apply (idempotent):
+### Clone or update a checkout
 
 ```bash
-./apps/ios/scripts/sync-codex.sh
+git submodule sync --recursive
+git submodule update --init --recursive
 ```
 
-Pass `--recorded-gitlink` to reset the submodule to the commit recorded in the superproject.
+This checks out the parent repository's exact gitlinks, normally in detached HEAD.
+The `.gitmodules` branch setting documents the maintenance branch; it does not make
+normal submodule updates follow the branch tip. Avoid `update --remote` for builds.
+
+The `sync-codex.sh` and `sync-ghostty.sh` scripts initialize missing submodules and
+preserve an existing development checkout by default. Pass `--recorded-gitlink` to
+check out the recorded gitlink without forcing away local changes.
+
+### Change a dependency
+
+For Codex (use `ghostty` in the same commands for Ghostty):
+
+```bash
+cd shared/third_party/codex
+git fetch origin
+git switch codex/agentbuddy  # first checkout: git switch --track origin/codex/agentbuddy
+git pull --ff-only
+# Edit, review, and run the relevant validation.
+git add <changed-files>
+git commit -m "mobile: describe the change"
+git push origin codex/agentbuddy
+cd ../../..
+git add shared/third_party/codex
+git commit -m "deps: update AgentBuddy Codex fork"
+```
+
+Push the parent commit through the normal AgentBuddy review workflow after the fork
+commit is available remotely. For larger changes, use a topic branch and a PR into
+the fork's `codex/agentbuddy` branch. Fork `main` is not the mobile maintenance branch.
+
+### Incorporate upstream updates
+
+Each local submodule uses `origin` for the AkaShark fork and `upstream` for the
+official repository. New clones need the upstream remote added once:
+
+```bash
+git -C shared/third_party/codex remote add upstream https://github.com/openai/codex.git
+git -C shared/third_party/ghostty remote add upstream https://github.com/ghostty-org/ghostty.git
+```
+
+Fetch a deliberately chosen upstream tag or commit, merge it on a topic branch
+based on `codex/agentbuddy`, resolve conflicts, and verify both mobile platforms.
+Deepen shallow history if Git needs older ancestors. Merge through review, push the
+fork first, then update the parent gitlink. Do not rebase or force-push the published
+maintenance branch. Do not combine a dependency upgrade with routine app edits.
 
 ## Build the Rust Bridge
 
