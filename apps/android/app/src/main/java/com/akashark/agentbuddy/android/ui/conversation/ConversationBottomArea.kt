@@ -175,6 +175,13 @@ internal fun ConversationBottomArea(
                 }
             }
 
+            // This thread's approvals, one card at a time, above the composer.
+            com.akashark.agentbuddy.android.ui.approvals.ConversationApprovalStack(
+                appModel = appModel,
+                threadKey = threadKey,
+                items = items,
+            )
+
             // Composer bar
             ComposerBar(
                 threadKey = threadKey,

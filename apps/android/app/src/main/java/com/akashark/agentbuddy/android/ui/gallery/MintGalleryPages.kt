@@ -22,4 +22,6 @@ val mintGalleryPages: List<MintGalleryPage> =
         MintGalleryPage("projects", "项目") { GalleryProjectsPage() },
         MintGalleryPage("hosts", "主机") { GalleryHostsPage() },
         MintGalleryPage("newtask", "新建任务") { GalleryNewTaskPage() },
+        MintGalleryPage("approvals", "审批") { GalleryApprovalsPage() },
+        MintGalleryPage("approval-banner", "审批横幅") { GalleryApprovalBannerPage() },
     )

@@ -33,7 +33,12 @@ internal fun ApprovalSessionConfirmDialog(
     onDismiss: () -> Unit,
 ) {
     Dialog(onDismissRequest = onDismiss) {
-        ApprovalSessionConfirmPanel(kind = kind, onConfirm = onConfirm, onCancel = onDismiss)
+        ApprovalSessionConfirmPanel(
+            kind = kind,
+            onConfirm = onConfirm,
+            onCancel = onDismiss,
+            modifier = Modifier.verticalScroll(rememberScrollState()),
+        )
     }
 }
 
@@ -49,9 +54,7 @@ fun ApprovalSessionConfirmPanel(
         modifier = modifier
             .widthIn(max = 480.dp)
             .fillMaxWidth()
-            .buddyCard(BuddySurfaceTone.SURFACE, shape = BuddyShapes.confirmCard, padding = null)
-            .verticalScroll(rememberScrollState())
-            .padding(BuddySpacing.xl),
+            .buddyCard(BuddySurfaceTone.SURFACE, shape = BuddyShapes.confirmCard, padding = BuddySpacing.xl),
         verticalArrangement = Arrangement.spacedBy(BuddySpacing.md),
     ) {
         Text(
