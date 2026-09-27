@@ -16,12 +16,14 @@ internal fun ConversationRenderPrewarm(
     appModel: AppModel,
     context: Context,
 ) {
-    // Pre-warm Markwon and MessageParser on conversation open
-    val warmMarkwon = remember(context) {
+    // Pre-warm Markwon and MessageParser on conversation open. The highlight
+    // theme follows the App's theme mode, like the conversation renderer.
+    val isDark = com.akashark.agentbuddy.android.ui.AgentBuddyTheme.isDark
+    val warmMarkwon = remember(context, isDark) {
         try {
             val prism4j = io.noties.prism4j.Prism4j(com.akashark.agentbuddy.android.ui.Prism4jGrammarLocator())
             io.noties.markwon.Markwon.builder(context)
-                .usePlugin(io.noties.markwon.syntax.SyntaxHighlightPlugin.create(prism4j, io.noties.markwon.syntax.Prism4jThemeDarkula.create()))
+                .usePlugin(io.noties.markwon.syntax.SyntaxHighlightPlugin.create(prism4j, conversationPrismTheme(isDark)))
                 .build()
         } catch (_: Exception) {
             io.noties.markwon.Markwon.create(context)

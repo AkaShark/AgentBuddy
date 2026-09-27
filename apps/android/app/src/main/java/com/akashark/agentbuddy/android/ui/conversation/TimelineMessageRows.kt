@@ -245,6 +245,8 @@ internal fun AssistantMessageRow(
                 text = renderedText,
                 itemId = itemId,
                 onRendered = onStreamingSnapshotRendered,
+                bodySize = BuddyTextStyle.BODY.size,
+                mintTypography = true,
             )
         } else {
             AssistantRenderBlocks(

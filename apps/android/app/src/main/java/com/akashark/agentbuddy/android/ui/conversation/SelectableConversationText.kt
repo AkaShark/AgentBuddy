@@ -60,6 +60,7 @@ internal fun SelectableMarkdownText(
     val resolvedTextSize = bodySize * textScale
     val textColor = AgentBuddyTheme.textBody.toArgb()
     val palette = MarkdownPalette(
+        isDark = AgentBuddyTheme.isDark,
         link = AgentBuddyTheme.link.toArgb(),
         secondary = AgentBuddyTheme.textSecondary.toArgb(),
         codeText = AgentBuddyTheme.textPrimary.toArgb(),
@@ -215,6 +216,8 @@ private class RunInTerminalSelectionMenu(
 
 /** Mint colours applied to the Markwon theme (ARGB ints so they key `remember`). */
 private data class MarkdownPalette(
+    /** App theme mode (not the system's): picks the Prism highlight theme. */
+    val isDark: Boolean,
     val link: Int,
     val secondary: Int,
     val codeText: Int,
@@ -233,12 +236,7 @@ private fun rememberConversationMarkwon(
     try {
         val prism4j = Prism4j(com.akashark.agentbuddy.android.ui.Prism4jGrammarLocator())
         Markwon.builder(context)
-            .usePlugin(
-                SyntaxHighlightPlugin.create(
-                    prism4j,
-                    io.noties.markwon.syntax.Prism4jThemeDarkula.create(),
-                ),
-            )
+            .usePlugin(SyntaxHighlightPlugin.create(prism4j, conversationPrismTheme(palette.isDark)))
             .usePlugin(MarkwonInlineParserPlugin.create())
             .usePlugin(
                 JLatexMathPlugin.create(markdownTextSizePx, markdownTextSizePx * 1.12f) { builder ->
@@ -293,6 +291,14 @@ private class MintMarkdownThemePlugin(
         const val CODE_TO_BODY_RATIO = 14f / 16f
     }
 }
+
+/** Prism highlight theme for the App's theme mode (not the system setting). */
+internal fun conversationPrismTheme(isDark: Boolean): io.noties.markwon.syntax.Prism4jTheme =
+    if (isDark) {
+        io.noties.markwon.syntax.Prism4jThemeDarkula.create()
+    } else {
+        io.noties.markwon.syntax.Prism4jThemeDefault.create()
+    }
 
 private fun Float.toTextSizePx(
     context: android.content.Context,
