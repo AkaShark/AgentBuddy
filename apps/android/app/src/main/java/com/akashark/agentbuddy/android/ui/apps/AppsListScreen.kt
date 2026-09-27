@@ -28,6 +28,7 @@ import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyChevron
 import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyEmptyState
 import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyIconTile
 import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyTileContent
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyChromeTypeLimit
 import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySize
 import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySpacing
 import com.akashark.agentbuddy.android.ui.settings.SettingsFooter
@@ -137,7 +138,12 @@ internal fun AppsListContent(
                             title = app.title.ifBlank { "未命名应用" },
                             subtitle = "${relativeTime(app.updatedAtMs)}更新",
                             onClick = { onOpenApp(app.id) },
-                            leading = { BuddyIconTile(BuddyTileContent.Initial(monogramInitials(app.title))) },
+                            // The tile is fixed-size, so its letters stop growing at the chrome cap.
+                            leading = {
+                                BuddyChromeTypeLimit {
+                                    BuddyIconTile(BuddyTileContent.Initial(monogramInitials(app.title)))
+                                }
+                            },
                             trailing = { BuddyChevron() },
                             modifier = Modifier.background(AgentBuddyTheme.surface),
                         )

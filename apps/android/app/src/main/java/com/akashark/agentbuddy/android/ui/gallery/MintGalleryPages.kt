@@ -30,4 +30,12 @@ val mintGalleryPages: List<MintGalleryPage> =
         MintGalleryPage("info-server", "服务器信息") { GalleryServerInfoPage() },
         MintGalleryPage("models", "模型面板") { GalleryModelsPage() },
         MintGalleryPage("models-locked", "模型面板（锁定）") { GalleryModelsLockedPage() },
+        MintGalleryPage("apps", "应用") { GalleryAppsPage() },
+        MintGalleryPage("apps-empty", "应用（空）") { GalleryAppsEmptyPage() },
+        MintGalleryPage("app-update", "更新应用") { GalleryAppUpdatePage() },
+        MintGalleryPage("app-broken", "应用文件丢失") { GalleryAppBrokenPage() },
+        MintGalleryPage("voice", "实时语音") { GalleryVoicePage() },
+        MintGalleryPage("voice-connecting", "实时语音（连接中）") { GalleryVoiceConnectingPage() },
+        MintGalleryPage("terminal-chrome", "终端") { GalleryTerminalChromePage() },
+        MintGalleryPage("terminal-config", "终端设置") { GalleryTerminalConfigPage() },
     )

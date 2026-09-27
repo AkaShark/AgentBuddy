@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
 import com.akashark.agentbuddy.android.ui.designsystem.components.BuddySurfaceTone
 import com.akashark.agentbuddy.android.ui.designsystem.components.buddyCard
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyChromeTypeLimit
 import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySpacing
 import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyTextStyle
 import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyReduceMotion
@@ -308,11 +309,14 @@ private fun RateLimitRing(label: String, window: RateLimitWindow) {
                 drawArc(track, 0f, 360f, false, topLeft, arcSize, style = Stroke(stroke))
                 drawArc(levelColor, -90f, 360f * percent / 100f * progress, false, topLeft, arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
             }
-            Text(
-                text = "$percent%",
-                style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.SemiBold).copy(fontFeatureSettings = "tnum"),
-                color = AgentBuddyTheme.textPrimary,
-            )
+            // Fixed 72dp ring: the percentage stops growing at the chrome cap so it stays inside.
+            BuddyChromeTypeLimit {
+                Text(
+                    text = "$percent%",
+                    style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.SemiBold).copy(fontFeatureSettings = "tnum"),
+                    color = AgentBuddyTheme.textPrimary,
+                )
+            }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(BuddySpacing.xxs), verticalAlignment = Alignment.CenterVertically) {
             level.icon?.let { Icon(it, contentDescription = null, tint = level.color, modifier = Modifier.size(14.dp)) }
