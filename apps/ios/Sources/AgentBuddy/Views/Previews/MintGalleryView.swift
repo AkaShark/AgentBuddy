@@ -4,11 +4,11 @@ import SwiftUI
 /// DEBUG-only state gallery for verifying the Mint UI on a physical device
 /// without a connected host. Launch with `--mint-gallery=<page>` where page is
 /// `home`, `projects`, `hosts`, `newtask`, `conversation`, `approvals` or
-/// `composer`, `accessories` or `prompts`; add `--mint-dark` for
+/// `composer`, `accessories`, `prompts`, `addhost` or `pair`; add `--mint-dark` for
 /// the dark palette. Nothing here writes user preferences.
 struct MintGalleryView: View {
     enum Page: String {
-        case home, conversation, approvals, composer, accessories, prompts, newtask, projects, hosts
+        case home, conversation, approvals, composer, accessories, prompts, addhost, pair, newtask, projects, hosts
     }
 
     static var requestedPage: Page? {
@@ -107,6 +107,12 @@ struct MintGalleryView: View {
             MintGalleryAccessoriesPage()
         case .prompts:
             MintGalleryAccessoriesPage(showsPrompts: true)
+        case .addhost:
+            NavigationStack {
+                DiscoveryView(entryPoint: .chooser, autoStartDiscovery: false)
+            }
+        case .pair:
+            AlleycatAddServerSheet(appModel: appModel, startScanningOnAppear: false, onConnected: { _ in })
         }
     }
 }
