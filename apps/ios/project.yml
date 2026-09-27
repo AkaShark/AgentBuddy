@@ -167,26 +167,26 @@ targets:
           - AgentBuddy.entitlements
           - AgentBuddy-Catalyst.entitlements
           - AgentBuddy-Catalyst-DeveloperID.entitlements
-          - Models/AppLifecycleController.swift
-          - Models/AppRuntimeController.swift
-          - Models/CodexTurnAttributes.swift
-          - Models/CodexVoiceCallAttributes.swift
-          - Models/OrientationResponder.swift
-          - Models/RealtimeWebRtcSession.swift
-          - Models/StableSafeAreaInsets.swift
-          - Models/TurnLiveActivityController.swift
-          - Models/VoiceRuntimeController.swift
-          - Models/VoiceSessionControl.swift
-          - Models/VoiceSessionModels.swift
-          - Models/WatchCompanionBridge.swift
-          - Models/WatchProjection.swift
-          - Views/HomeVoiceOrbButton.swift
-          - Views/InlineVoiceButton.swift
-          - Views/InlineVoiceStatusStrip.swift
-          - Views/LiveActivityPreview.swift
-          - Views/LockScreenCardView.swift
-          - Views/RealtimeVoiceScreen.swift
-          - Views/VoiceCallView.swift
+          - "Models/AppLifecycleController*.swift"
+          - "Models/AppRuntimeController*.swift"
+          - "Models/CodexTurnAttributes*.swift"
+          - "Models/CodexVoiceCallAttributes*.swift"
+          - "Models/OrientationResponder*.swift"
+          - "Models/RealtimeWebRtcSession*.swift"
+          - "Models/StableSafeAreaInsets*.swift"
+          - "Models/TurnLiveActivityController*.swift"
+          - "Models/VoiceRuntimeController*.swift"
+          - "Models/VoiceSessionControl*.swift"
+          - "Models/VoiceSessionModels*.swift"
+          - "Models/WatchCompanionBridge*.swift"
+          - "Models/WatchProjection*.swift"
+          - "Views/HomeVoiceOrbButton*.swift"
+          - "Views/InlineVoiceButton*.swift"
+          - "Views/InlineVoiceStatusStrip*.swift"
+          - "Views/LiveActivityPreview*.swift"
+          - "Views/LockScreenCardView*.swift"
+          - "Views/RealtimeVoiceScreen*.swift"
+          - "Views/VoiceCallView*.swift"
           - "**/*.h"
       - path: Sources/AgentBuddy/Bridge/UniFFICodexClient.generated.swift
     resources:
