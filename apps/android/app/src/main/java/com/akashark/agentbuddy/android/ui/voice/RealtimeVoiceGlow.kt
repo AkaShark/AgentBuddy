@@ -62,21 +62,22 @@ private fun GlowStrokeLayer(
     }
 }
 
+/** Status text for every phase, shown next to the dot so the phase never relies on colour. */
 internal fun voicePhaseLabel(phase: AppVoiceSessionPhase): String =
     when (phase) {
-        AppVoiceSessionPhase.CONNECTING -> "连接中"
-        AppVoiceSessionPhase.LISTENING -> "聆听中"
-        AppVoiceSessionPhase.SPEAKING -> "讲话中"
+        AppVoiceSessionPhase.CONNECTING -> "正在连接"
+        AppVoiceSessionPhase.LISTENING -> "正在聆听"
+        AppVoiceSessionPhase.SPEAKING -> "搭子正在说话"
         AppVoiceSessionPhase.THINKING -> "思考中"
-        AppVoiceSessionPhase.HANDOFF -> "交接中"
-        AppVoiceSessionPhase.ERROR -> "错误"
+        AppVoiceSessionPhase.HANDOFF -> "正在执行工具"
+        AppVoiceSessionPhase.ERROR -> "出错了"
     }
 
 internal fun voicePhaseColor(phase: AppVoiceSessionPhase): Color =
     when (phase) {
-        AppVoiceSessionPhase.CONNECTING -> AgentBuddyTheme.accent
-        AppVoiceSessionPhase.LISTENING -> AgentBuddyTheme.accentStrong
-        AppVoiceSessionPhase.SPEAKING,
+        AppVoiceSessionPhase.CONNECTING -> AgentBuddyTheme.textSecondary
+        AppVoiceSessionPhase.LISTENING -> AgentBuddyTheme.success
+        AppVoiceSessionPhase.SPEAKING -> AgentBuddyTheme.link
         AppVoiceSessionPhase.THINKING,
         AppVoiceSessionPhase.HANDOFF,
         -> AgentBuddyTheme.warning
@@ -98,55 +99,17 @@ internal fun voiceGlowIntensity(
         AppVoiceSessionPhase.ERROR -> 0.1f
     }
 
+/** Sweep colours for the edge glow: the phase colour blended with the brand surface. */
 private fun voicePhaseGlowColors(phase: AppVoiceSessionPhase): List<Color> {
-    val accent = AgentBuddyTheme.accent
-    val accentStrong = AgentBuddyTheme.accentStrong
-    val warning = AgentBuddyTheme.warning
-    val success = AgentBuddyTheme.success
-    val danger = AgentBuddyTheme.danger
-
-    return when (phase) {
-        AppVoiceSessionPhase.LISTENING -> listOf(
-            accentStrong,
-            accentStrong.copy(alpha = 0.7f),
-            accent,
-            success,
-            accentStrong.copy(alpha = 0.5f),
-            accent.copy(alpha = 0.8f),
-        )
-        AppVoiceSessionPhase.SPEAKING -> listOf(
-            warning,
-            warning.copy(alpha = 0.7f),
-            warning.copy(alpha = 0.9f),
-            warning.copy(alpha = 0.5f),
-            warning.copy(alpha = 0.8f),
-            warning.copy(alpha = 0.6f),
-        )
-        AppVoiceSessionPhase.THINKING,
-        AppVoiceSessionPhase.HANDOFF,
-        -> listOf(
-            warning.copy(alpha = 0.6f),
-            accent.copy(alpha = 0.4f),
-            warning.copy(alpha = 0.4f),
-            accentStrong.copy(alpha = 0.3f),
-            warning.copy(alpha = 0.5f),
-            accent.copy(alpha = 0.3f),
-        )
-        AppVoiceSessionPhase.CONNECTING -> listOf(
-            accent.copy(alpha = 0.4f),
-            accentStrong.copy(alpha = 0.3f),
-            accent.copy(alpha = 0.2f),
-            Color.Gray.copy(alpha = 0.2f),
-            accent.copy(alpha = 0.3f),
-            accentStrong.copy(alpha = 0.2f),
-        )
-        AppVoiceSessionPhase.ERROR -> listOf(
-            danger,
-            danger.copy(alpha = 0.6f),
-            danger.copy(alpha = 0.5f),
-            danger.copy(alpha = 0.4f),
-            danger.copy(alpha = 0.3f),
-            danger.copy(alpha = 0.5f),
-        )
-    }
+    val tone = voicePhaseColor(phase)
+    val brand = AgentBuddyTheme.brand
+    return listOf(
+        tone,
+        brand.copy(alpha = 0.8f),
+        tone.copy(alpha = 0.6f),
+        brand,
+        tone.copy(alpha = 0.85f),
+        brand.copy(alpha = 0.6f),
+        tone,
+    )
 }

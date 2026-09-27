@@ -4,17 +4,10 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -26,14 +19,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import com.akashark.agentbuddy.android.state.OpenAIApiKeyStore
 import com.akashark.agentbuddy.android.state.VoiceRuntimeController
-import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
 import com.akashark.agentbuddy.android.ui.LocalAppModel
 import com.akashark.agentbuddy.android.ui.rememberStickyFollowTail
 import kotlinx.coroutines.delay
@@ -95,7 +84,6 @@ fun RealtimeVoiceScreen(
         snapshot?.servers?.firstOrNull { it.serverId == threadKey.serverId }
     }
     val needsApiKey = hasCheckedAuth && server?.isLocal == true && !hasStoredApiKey
-    val phaseColor = voicePhaseColor(phase)
     val transcriptTailSignature = remember(transcriptEntries) {
         var hash = 17
         transcriptEntries.takeLast(4).forEach { entry ->
@@ -147,81 +135,35 @@ fun RealtimeVoiceScreen(
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(AgentBuddyTheme.background),
-    ) {
-        VoiceEdgeGlow(
-            intensity = voiceGlowIntensity(
+    Box(modifier = Modifier.fillMaxSize()) {
+        RealtimeVoiceContent(
+            state = RealtimeVoiceUiState(
                 phase = phase,
+                transcript = transcriptEntries,
                 inputLevel = inputLevel,
                 outputLevel = outputLevel,
-            ),
-            phase = phase,
-        )
-
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Spacer(Modifier.weight(1f))
-
-            TranscriptContent(
-                entries = transcriptEntries,
-                phase = phase,
-                phaseColor = phaseColor,
-                inputLevel = inputLevel,
-                outputLevel = outputLevel,
-                listState = transcriptListState,
-                modifier = Modifier
-                    .weight(1.15f)
-                    .fillMaxWidth()
-                    .padding(horizontal = 32.dp),
-            )
-
-            voiceSession?.handoffThreadKey?.let { handoffKey ->
-                InlineHandoffView(
-                    threadKey = handoffKey,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 220.dp)
-                        .padding(horizontal = 18.dp, vertical = 18.dp),
-                )
-            }
-
-            Spacer(Modifier.weight(1f))
-
-            val footerError = voiceSession?.lastError ?: if (!hasMicPermission) "需要麦克风权限" else null
-            if (!footerError.isNullOrBlank()) {
-                Text(
-                    text = footerError,
-                    color = AgentBuddyTheme.danger,
-                    fontSize = 12.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp),
-                )
-                Spacer(Modifier.height(12.dp))
-            }
-
-            BottomControls(
+                errorMessage = voiceSession?.lastError
+                    ?: if (!hasMicPermission) "需要麦克风权限才能进行实时语音。" else null,
+                needsMicPermission = !hasMicPermission && voiceSession?.lastError.isNullOrBlank(),
                 isSpeakerOn = isSpeakerOn,
-                onToggleSpeaker = {
-                    val next = !isSpeakerOn
-                    isSpeakerOn = next
-                    voiceController.setSpeakerEnabled(next)
-                },
-                onEnd = {
-                    scope.launch {
-                        voiceController.stopActiveVoiceSession(appModel)
-                        onBack()
-                    }
-                },
-                modifier = Modifier.padding(bottom = 40.dp),
-            )
-        }
+            ),
+            listState = transcriptListState,
+            onToggleSpeaker = {
+                val next = !isSpeakerOn
+                isSpeakerOn = next
+                voiceController.setSpeakerEnabled(next)
+            },
+            onEnd = {
+                scope.launch {
+                    voiceController.stopActiveVoiceSession(appModel)
+                    onBack()
+                }
+            },
+            onRequestMicPermission = { micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO) },
+            handoff = voiceSession?.handoffThreadKey?.let { handoffKey ->
+                { InlineHandoffView(threadKey = handoffKey, modifier = Modifier.fillMaxWidth()) }
+            },
+        )
 
         if (needsApiKey) {
             RealtimeApiKeyPrompt(
