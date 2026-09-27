@@ -3,23 +3,22 @@ package com.akashark.agentbuddy.android.ui.conversation
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Chat
-import androidx.compose.material.icons.filled.Dns
-import androidx.compose.material.icons.filled.PhoneAndroid
-import androidx.compose.material3.Icon
+import androidx.compose.material.icons.automirrored.outlined.Chat
+import androidx.compose.material.icons.outlined.Dns
+import androidx.compose.material.icons.outlined.Extension
+import androidx.compose.material.icons.outlined.Mouse
+import androidx.compose.material.icons.outlined.PhoneAndroid
+import androidx.compose.material.icons.outlined.TravelExplore
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -31,14 +30,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.akashark.agentbuddy.android.ui.BerkeleyMono
-import com.akashark.agentbuddy.android.ui.AgentBuddyTextStyle
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
-import com.akashark.agentbuddy.android.ui.scaled
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyIconTile
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyTileContent
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySize
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySpacing
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyTextStyle
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyTextStyle
 import org.json.JSONArray
 import org.json.JSONObject
 import uniffi.codex_mobile_client.AppOperationStatus
@@ -52,9 +56,9 @@ internal fun McpToolCallRow(
     val summary = if (data.server.isBlank()) data.tool else "${data.server}.${data.tool}"
     ToolCardShell(
         summary = summary,
-        accent = AgentBuddyTheme.toolCallMcpCall,
         status = data.status,
         durationMs = data.durationMs,
+        fallbackIcon = Icons.Outlined.Extension,
     ) {
         data.argumentsJson?.takeIf { it.isNotBlank() }?.let { CodeSection("参数", it) }
         data.contentSummary?.takeIf { it.isNotBlank() }?.let { InlineTextSection("结果", it) }
@@ -76,9 +80,9 @@ internal fun ComputerUseToolCallRow(
 ) {
     ToolCardShell(
         summary = view.summary,
-        accent = AgentBuddyTheme.toolCallMcpCall,
         status = data.status,
         durationMs = data.durationMs,
+        fallbackIcon = Icons.Outlined.Mouse,
     ) {
         view.screenshotPng?.let { bytes ->
             ScreenshotPreview(bytes)
@@ -95,14 +99,8 @@ internal fun ComputerUseToolCallRow(
 @Composable
 private fun ScreenshotPreview(bytes: ByteArray) {
     val context = LocalContext.current
-    Column {
-        Text(
-            text = "截图",
-            color = AgentBuddyTheme.textSecondary,
-            fontSize = 10f.scaled,
-            fontWeight = FontWeight.Bold,
-        )
-        Spacer(Modifier.height(4.dp))
+    Column(verticalArrangement = Arrangement.spacedBy(BuddySpacing.xs)) {
+        SectionLabel("截图")
         AsyncImage(
             model = ImageRequest.Builder(context)
                 .data(bytes)
@@ -112,8 +110,8 @@ private fun ScreenshotPreview(bytes: ByteArray) {
             contentScale = ContentScale.Fit,
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
-                .background(AgentBuddyTheme.codeBackground),
+                .clip(TimelineImageShape)
+                .background(timelineCodeFill(nested = true)),
         )
     }
 }
@@ -129,36 +127,25 @@ private fun AccessibilityTreeSection(text: String) {
         lines.take(previewLineCount).joinToString("\n") + "\n…（还有 ${lines.size - previewLineCount} 行）"
     }
 
-    Column {
+    Column(verticalArrangement = Arrangement.spacedBy(BuddySpacing.xs)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = "辅助功能树",
-                color = AgentBuddyTheme.textSecondary,
-                fontSize = 10f.scaled,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f),
-            )
+            Box(Modifier.weight(1f)) { SectionLabel("辅助功能树") }
             if (lines.size > previewLineCount) {
-                Text(
+                TimelineLinkButton(
                     text = if (expanded) "收起" else "展开",
-                    color = AgentBuddyTheme.accent,
-                    fontSize = 10f.scaled,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.clickable { expanded = !expanded },
+                    onClick = { expanded = !expanded },
                 )
             }
         }
-        Spacer(Modifier.height(4.dp))
         Text(
             text = display,
+            style = buddyTextStyle(BuddyTextStyle.CAPTION).copy(fontFamily = BerkeleyMono),
             color = AgentBuddyTheme.textSecondary,
-            fontSize = AgentBuddyTextStyle.caption2.scaled,
-            fontFamily = BerkeleyMono,
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(AgentBuddyTheme.codeBackground)
-                .padding(10.dp),
+                .clip(timelineCodeShape(nested = true))
+                .background(timelineCodeFill(nested = true))
+                .padding(BuddySpacing.sm),
         )
     }
 }
@@ -190,9 +177,9 @@ internal fun DynamicToolCallRow(
     }
     ToolCardShell(
         summary = summary,
-        accent = AgentBuddyTheme.toolCallMcpCall,
         status = data.status,
         durationMs = data.durationMs,
+        fallbackIcon = Icons.Outlined.Extension,
     ) {
         if (metadata.isNotEmpty()) {
             KeyValueSection(label = "元数据", entries = metadata)
@@ -210,8 +197,8 @@ internal fun WebSearchRow(
 ) {
     ToolCardShell(
         summary = if (data.query.isBlank()) "网页搜索" else "网页搜索：${data.query}",
-        accent = AgentBuddyTheme.toolCallWebSearch,
         status = if (data.isInProgress) AppOperationStatus.IN_PROGRESS else AppOperationStatus.COMPLETED,
+        fallbackIcon = Icons.Outlined.TravelExplore,
     ) {
         if (data.query.isNotBlank()) {
             InlineTextSection("查询", data.query)
@@ -226,17 +213,10 @@ private fun RichDynamicToolResult(
 ) {
     when (payload) {
         is RichDynamicToolPayload.Servers -> {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(BuddySpacing.xs)) {
                 payload.items.forEach { item ->
                     SessionServerCard(
-                        icon = {
-                            Icon(
-                                if (item.isLocal) Icons.Default.PhoneAndroid else Icons.Default.Dns,
-                                contentDescription = null,
-                                tint = AgentBuddyTheme.accent,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        },
+                        icon = if (item.isLocal) Icons.Outlined.PhoneAndroid else Icons.Outlined.Dns,
                         title = item.name,
                         subtitle = item.hostname,
                         trailing = if (item.isConnected) "已连接" else "离线",
@@ -246,21 +226,14 @@ private fun RichDynamicToolResult(
             }
         }
         is RichDynamicToolPayload.Sessions -> {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(BuddySpacing.xs)) {
                 payload.items.forEach { item ->
                     val subtitle = listOfNotNull(
                         item.serverName?.takeIf { it.isNotBlank() },
                         item.model?.takeIf { it.isNotBlank() },
                     ).joinToString(" \u00b7 ")
                     SessionServerCard(
-                        icon = {
-                            Icon(
-                                Icons.Default.Chat,
-                                contentDescription = null,
-                                tint = AgentBuddyTheme.accent,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        },
+                        icon = Icons.AutoMirrored.Outlined.Chat,
                         title = item.title.ifBlank { "未命名会话" },
                         subtitle = subtitle,
                         trailing = null,
@@ -274,7 +247,7 @@ private fun RichDynamicToolResult(
 
 @Composable
 private fun SessionServerCard(
-    icon: @Composable () -> Unit,
+    icon: ImageVector,
     title: String,
     subtitle: String,
     trailing: String?,
@@ -283,32 +256,27 @@ private fun SessionServerCard(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(AgentBuddyTheme.surface.copy(alpha = 0.6f), RoundedCornerShape(14.dp))
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .heightIn(min = BuddySize.listRow)
+            .timelineDetailCard()
+            .semantics(mergeDescendants = true) {}
+            .padding(horizontal = BuddySpacing.md, vertical = BuddySpacing.sm),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(BuddySpacing.sm),
     ) {
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .background(AgentBuddyTheme.accent.copy(alpha = 0.12f), RoundedCornerShape(8.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            icon()
-        }
+        BuddyIconTile(BuddyTileContent.Symbol(icon), size = 36.dp)
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
+                style = buddyTextStyle(BuddyTextStyle.LABEL),
                 color = AgentBuddyTheme.textPrimary,
-                fontSize = AgentBuddyTextStyle.subheadline.scaled,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             if (subtitle.isNotBlank()) {
                 Text(
                     text = subtitle,
-                    color = AgentBuddyTheme.textMuted,
-                    fontSize = AgentBuddyTextStyle.caption.scaled,
+                    style = buddyTextStyle(BuddyTextStyle.CAPTION),
+                    color = AgentBuddyTheme.textSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -330,8 +298,8 @@ private fun SessionServerCard(
                 trailing?.let {
                     Text(
                         text = it,
-                        color = AgentBuddyTheme.textMuted,
-                        fontSize = AgentBuddyTextStyle.caption.scaled,
+                        style = buddyTextStyle(BuddyTextStyle.CAPTION),
+                        color = AgentBuddyTheme.textSecondary,
                     )
                 }
             }

@@ -10,22 +10,21 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.HourglassEmpty
+import androidx.compose.material.icons.outlined.BrokenImage
+import androidx.compose.material.icons.outlined.HourglassEmpty
+import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -41,15 +40,21 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.akashark.agentbuddy.android.ui.LocalAppModel
-import com.akashark.agentbuddy.android.ui.AgentBuddyTextStyle
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
-import com.akashark.agentbuddy.android.ui.scaled
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyShapes
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySize
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySpacing
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyTextStyle
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyReduceMotion
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyTextStyle
 import com.akashark.agentbuddy.android.state.AppModel
 import uniffi.codex_mobile_client.AppOperationStatus
 import kotlinx.coroutines.Dispatchers
@@ -62,9 +67,9 @@ internal fun ImageViewRow(
 ) {
     ToolCardShell(
         summary = toolCardWorkspaceTitle(data.path),
-        accent = AgentBuddyTheme.warning,
         status = AppOperationStatus.COMPLETED,
         defaultExpanded = true,
+        fallbackIcon = Icons.Outlined.Image,
     ) {
         ImageResultSection(path = data.path, serverId = serverId)
         KeyValueSection("元数据", listOf("路径" to data.path))
@@ -82,9 +87,9 @@ internal fun ImageGenerationRow(
     }
     ToolCardShell(
         summary = summary,
-        accent = AgentBuddyTheme.accent,
         status = data.status,
         defaultExpanded = true,
+        fallbackIcon = Icons.Outlined.Image,
     ) {
         GeneratedImageSection(data = data)
         data.revisedPrompt?.takeIf { it.isNotBlank() }?.let { prompt ->
@@ -103,13 +108,10 @@ private fun GeneratedImageSection(
     val context = LocalContext.current
     val pngBytes = data.imagePng
 
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(BuddySpacing.xs)) {
         SectionLabel("图片")
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(AgentBuddyTheme.codeBackground, RoundedCornerShape(10.dp))
-                .padding(horizontal = 10.dp, vertical = 8.dp),
+            modifier = Modifier.timelineImageFrame(),
             contentAlignment = Alignment.Center,
         ) {
             when {
@@ -124,7 +126,7 @@ private fun GeneratedImageSection(
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(max = 360.dp)
-                            .clip(RoundedCornerShape(8.dp)),
+                            .clip(TimelineImageShape),
                     )
                 }
                 data.status == AppOperationStatus.IN_PROGRESS ||
@@ -132,11 +134,10 @@ private fun GeneratedImageSection(
                     GeneratedImageLoadingTile()
                 }
                 else -> {
-                    Text(
+                    TimelineImagePlaceholder(
+                        icon = Icons.Outlined.BrokenImage,
                         text = "图片不可用",
-                        color = AgentBuddyTheme.textMuted,
-                        fontSize = AgentBuddyTextStyle.caption.scaled,
-                        modifier = Modifier.padding(vertical = 20.dp),
+                        tint = AgentBuddyTheme.textSecondary,
                     )
                 }
             }
@@ -146,23 +147,15 @@ private fun GeneratedImageSection(
 
 @Composable
 private fun GeneratedImageLoadingTile() {
-    val transition = rememberInfiniteTransition(label = "image-generation-loading")
-    val pulse by transition.animateFloat(
-        initialValue = 0.35f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 900),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "image-generation-pulse",
-    )
+    // Reduced motion: a static tile instead of the pulse loop.
+    val pulse = if (buddyReduceMotion) 0.6f else rememberImageGenerationPulse()
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(BuddySpacing.sm),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 20.dp),
+            .padding(vertical = BuddySpacing.lg),
     ) {
         Box(
             contentAlignment = Alignment.Center,
@@ -170,33 +163,22 @@ private fun GeneratedImageLoadingTile() {
                 .size(48.dp)
                 .scale(0.98f + pulse * 0.05f)
                 .background(
-                    Brush.linearGradient(
-                        colors = listOf(
-                            AgentBuddyTheme.accent.copy(alpha = 0.16f + pulse * 0.08f),
-                            AgentBuddyTheme.warning.copy(alpha = 0.10f),
-                        ),
-                    ),
-                    RoundedCornerShape(12.dp),
-                )
-                .border(
-                    0.5.dp,
-                    AgentBuddyTheme.accent.copy(alpha = 0.28f + pulse * 0.12f),
-                    RoundedCornerShape(12.dp),
+                    AgentBuddyTheme.brand.copy(alpha = 0.55f + pulse * 0.45f),
+                    BuddyShapes.control,
                 ),
         ) {
             Icon(
-                imageVector = Icons.Filled.HourglassEmpty,
+                imageVector = Icons.Outlined.HourglassEmpty,
                 contentDescription = null,
-                tint = AgentBuddyTheme.accent,
-                modifier = Modifier.size(22.dp),
+                tint = AgentBuddyTheme.onBrand,
+                modifier = Modifier.size(BuddySize.iconLarge),
             )
         }
 
         Text(
             text = "正在生成图片",
+            style = buddyTextStyle(BuddyTextStyle.LABEL),
             color = AgentBuddyTheme.textPrimary,
-            fontSize = AgentBuddyTextStyle.caption.scaled,
-            fontWeight = FontWeight.SemiBold,
         )
 
         Row(
@@ -209,10 +191,7 @@ private fun GeneratedImageLoadingTile() {
                         .width(width)
                         .height(4.dp)
                         .alpha((0.38f + pulse * 0.62f - index * 0.14f).coerceIn(0.24f, 1f))
-                        .background(
-                            AgentBuddyTheme.accent.copy(alpha = 0.42f),
-                            RoundedCornerShape(999.dp),
-                        ),
+                        .background(AgentBuddyTheme.textSecondary, CircleShape),
                 )
             }
         }
@@ -220,33 +199,79 @@ private fun GeneratedImageLoadingTile() {
 }
 
 @Composable
+private fun rememberImageGenerationPulse(): Float {
+    val transition = rememberInfiniteTransition(label = "image-generation-loading")
+    val pulse by transition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 900),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "image-generation-pulse",
+    )
+    return pulse
+}
+
+/** Placeholder / failure state inside an image frame: icon plus text. */
+@Composable
+internal fun TimelineImagePlaceholder(
+    icon: ImageVector,
+    text: String,
+    tint: Color,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = BuddySpacing.lg)
+            .semantics(mergeDescendants = true) {},
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(BuddySpacing.xs),
+    ) {
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(BuddySize.iconLarge))
+        Text(
+            text = text,
+            style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.Normal),
+            color = tint,
+        )
+    }
+}
+
+/** Images in the timeline: radius 16. */
+internal val TimelineImageShape = BuddyShapes.detailCard
+
+/** Frame behind an image inside a detail card. */
+private fun Modifier.timelineImageFrame(): Modifier =
+    fillMaxWidth()
+        .clip(TimelineImageShape)
+        .background(timelineCodeFill(nested = true))
+        .padding(BuddySpacing.xs)
+
+@Composable
 private fun RevisedPromptSection(prompt: String) {
     var expanded by remember(prompt) { mutableStateOf(false) }
     val isLong = prompt.length > 220 || prompt.count { it == '\n' } >= 4
     val display = if (expanded || !isLong) prompt else prompt.take(220).trimEnd() + "…"
 
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(BuddySpacing.xs)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            SectionLabel("修订后的提示词")
-            Spacer(Modifier.weight(1f))
+            Box(Modifier.weight(1f)) { SectionLabel("修订后的提示词") }
             if (isLong) {
-                Text(
+                TimelineLinkButton(
                     text = if (expanded) "收起" else "展开",
-                    color = AgentBuddyTheme.accent,
-                    fontSize = AgentBuddyTextStyle.caption2.scaled,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.clickable { expanded = !expanded },
+                    onClick = { expanded = !expanded },
                 )
             }
         }
         Text(
             text = display,
+            style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.Normal),
             color = AgentBuddyTheme.textSecondary,
-            fontSize = AgentBuddyTextStyle.body.scaled,
             modifier = Modifier
                 .fillMaxWidth()
-                .background(AgentBuddyTheme.codeBackground, RoundedCornerShape(8.dp))
-                .padding(10.dp),
+                .clip(timelineCodeShape(nested = true))
+                .background(timelineCodeFill(nested = true))
+                .padding(BuddySpacing.sm),
         )
     }
 }
@@ -272,22 +297,32 @@ private fun ImageResultSection(
         value = loadToolImage(appModel, path, serverId)
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(BuddySpacing.xs)) {
         SectionLabel("图片")
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(AgentBuddyTheme.codeBackground, RoundedCornerShape(10.dp))
-                .padding(horizontal = 10.dp, vertical = 8.dp),
+            modifier = Modifier.timelineImageFrame(),
             contentAlignment = Alignment.Center,
         ) {
             when (val state = loadState) {
                 ToolImageLoadState.Loading -> {
-                    CircularProgressIndicator(
-                        color = AgentBuddyTheme.accent,
-                        strokeWidth = 2.dp,
-                        modifier = Modifier.padding(vertical = 24.dp),
-                    )
+                    Row(
+                        modifier = Modifier.padding(vertical = BuddySpacing.lg),
+                        horizontalArrangement = Arrangement.spacedBy(BuddySpacing.xs),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (!buddyReduceMotion) {
+                            CircularProgressIndicator(
+                                color = AgentBuddyTheme.textSecondary,
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+                        Text(
+                            text = "正在加载图片…",
+                            style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.Normal),
+                            color = AgentBuddyTheme.textSecondary,
+                        )
+                    }
                 }
 
                 is ToolImageLoadState.Loaded -> {
@@ -298,16 +333,15 @@ private fun ImageResultSection(
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(max = 320.dp)
-                            .clip(RoundedCornerShape(8.dp)),
+                            .clip(TimelineImageShape),
                     )
                 }
 
                 is ToolImageLoadState.Failed -> {
-                    Text(
+                    TimelineImagePlaceholder(
+                        icon = Icons.Outlined.BrokenImage,
                         text = state.message,
-                        color = AgentBuddyTheme.danger,
-                        fontSize = AgentBuddyTextStyle.caption.scaled,
-                        modifier = Modifier.padding(vertical = 20.dp),
+                        tint = AgentBuddyTheme.danger,
                     )
                 }
             }

@@ -7,19 +7,14 @@ import android.net.Uri
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material3.Icon
+import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -32,12 +27,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.akashark.agentbuddy.android.state.SavedAppsStore
-import com.akashark.agentbuddy.android.ui.AgentBuddyTextStyle
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
-import com.akashark.agentbuddy.android.ui.scaled
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyContextChip
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySpacing
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyTextStyle
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyTextStyle
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import uniffi.codex_mobile_client.AppOperationStatus
@@ -74,32 +71,35 @@ internal fun WidgetRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(AgentBuddyTheme.surface, RoundedCornerShape(12.dp))
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+            .timelineDetailCard()
+            .padding(BuddySpacing.sm),
+        verticalArrangement = Arrangement.spacedBy(BuddySpacing.xs),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = BuddySpacing.xxs),
+            horizontalArrangement = Arrangement.spacedBy(BuddySpacing.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = data.title.ifBlank { "小组件" },
+                style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.SemiBold),
                 color = AgentBuddyTheme.textPrimary,
-                fontSize = AgentBuddyTextStyle.footnote.scaled,
-                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
             )
+            val widgetStatus = when (data.status.lowercase()) {
+                "completed" -> AppOperationStatus.COMPLETED
+                "failed" -> AppOperationStatus.FAILED
+                else -> AppOperationStatus.IN_PROGRESS
+            }
             Text(
-                text = data.status,
-                color = statusTint(
-                    when (data.status.lowercase()) {
-                        "completed" -> AppOperationStatus.COMPLETED
-                        "failed" -> AppOperationStatus.FAILED
-                        else -> AppOperationStatus.IN_PROGRESS
-                    }
-                ),
-                fontSize = AgentBuddyTextStyle.caption2.scaled,
-                fontWeight = FontWeight.Medium,
+                text = operationStatusLabel(widgetStatus) ?: data.status,
+                style = buddyTextStyle(BuddyTextStyle.CAPTION, FontWeight.Medium),
+                color = statusTint(widgetStatus),
+                maxLines = 1,
             )
         }
 
@@ -182,7 +182,7 @@ internal fun WidgetRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(widgetHeight)
-                .clip(RoundedCornerShape(10.dp)),
+                .clip(timelineCodeShape(nested = true)),
             update = { webView ->
                 val html = data.widgetHtml
                 val lastEscaped = webView.getTag(R.id.widget_webview_last_escaped) as? String
@@ -228,35 +228,10 @@ private fun SavedAsAppChip(
     slug: String,
     onClick: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .background(
-                AgentBuddyTheme.surfaceLight.copy(alpha = 0.5f),
-                RoundedCornerShape(6.dp),
-            )
-            .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 5.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Icon(
-            imageVector = Icons.Filled.GridView,
-            contentDescription = null,
-            tint = AgentBuddyTheme.accent,
-            modifier = Modifier.size(10.dp),
-        )
-        Text(
-            text = "已保存为",
-            color = AgentBuddyTheme.accent,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Medium,
-        )
-        Text(
-            text = slug,
-            color = AgentBuddyTheme.accent,
-            fontSize = 11.sp,
-            fontFamily = AgentBuddyTheme.monoFont,
-            fontWeight = FontWeight.SemiBold,
-        )
-    }
+    BuddyContextChip(
+        text = "已保存为 $slug",
+        onClick = onClick,
+        icon = Icons.Outlined.GridView,
+        onClickLabel = "打开应用",
+    )
 }

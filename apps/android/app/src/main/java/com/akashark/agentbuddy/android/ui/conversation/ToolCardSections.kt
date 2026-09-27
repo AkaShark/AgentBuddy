@@ -9,54 +9,58 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.akashark.agentbuddy.android.ui.AgentBuddyTextStyle
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
-import com.akashark.agentbuddy.android.ui.scaled
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySpacing
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyTextStyle
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyTextStyle
 
 private const val ToolCallTextPreviewLimit = 2_000
 
+/** Small caption heading inside expanded detail content ("参数", "结果"). */
 @Composable
 internal fun SectionLabel(text: String) {
     Text(
-        text = text.uppercase(),
+        text = text,
+        style = buddyTextStyle(BuddyTextStyle.CAPTION, FontWeight.Medium),
         color = AgentBuddyTheme.textSecondary,
-        fontSize = AgentBuddyTextStyle.caption2.scaled,
-        fontWeight = FontWeight.Bold,
     )
 }
+
+/** Nested code surface inside a detail card (surfaceSoft, radius 12). */
+private fun Modifier.nestedCodeSurface(): Modifier =
+    fillMaxWidth()
+        .clip(timelineCodeShape(nested = true))
+        .background(timelineCodeFill(nested = true))
 
 @Composable
 internal fun CodeSection(
     label: String,
     content: String,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(BuddySpacing.xs)) {
         SectionLabel(label)
         LimitedToolTextBlock(content) { display ->
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .background(AgentBuddyTheme.codeBackground, RoundedCornerShape(8.dp))
-                    .padding(10.dp),
+                    .nestedCodeSurface()
+                    .padding(BuddySpacing.sm),
             ) {
+                // Only the code area scrolls sideways; the page never does.
                 Text(
                     text = display,
+                    style = buddyTextStyle(BuddyTextStyle.CODE),
                     color = AgentBuddyTheme.textBody,
-                    fontFamily = AgentBuddyTheme.monoFont,
-                    fontSize = AgentBuddyTextStyle.body.scaled,
                     modifier = Modifier.horizontalScroll(rememberScrollState()),
                 )
             }
@@ -70,18 +74,16 @@ internal fun InlineTextSection(
     content: String,
     tone: Color = AgentBuddyTheme.textBody,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(BuddySpacing.xs)) {
         SectionLabel(label)
         LimitedToolTextBlock(content) { display ->
             Text(
                 text = display,
+                style = buddyTextStyle(BuddyTextStyle.CODE),
                 color = tone,
-                fontFamily = AgentBuddyTheme.monoFont,
-                fontSize = AgentBuddyTextStyle.body.scaled,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .background(AgentBuddyTheme.codeBackground, RoundedCornerShape(8.dp))
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                    .nestedCodeSurface()
+                    .padding(horizontal = BuddySpacing.sm, vertical = BuddySpacing.xs),
             )
         }
     }
@@ -93,29 +95,27 @@ internal fun KeyValueSection(
     entries: List<Pair<String, String>>,
 ) {
     if (entries.isEmpty()) return
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(BuddySpacing.xs)) {
         SectionLabel(label)
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .background(AgentBuddyTheme.surface.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
-                .padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+                .nestedCodeSurface()
+                .padding(BuddySpacing.sm),
+            verticalArrangement = Arrangement.spacedBy(BuddySpacing.xxs),
         ) {
             entries.forEach { (key, value) ->
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(BuddySpacing.xs)) {
                     Text(
-                        text = "$key:",
+                        text = "$key：",
+                        style = buddyTextStyle(BuddyTextStyle.LABEL),
                         color = AgentBuddyTheme.textSecondary,
-                        fontSize = AgentBuddyTextStyle.body.scaled,
-                        fontWeight = FontWeight.SemiBold,
                     )
                     Column(modifier = Modifier.weight(1f)) {
                         LimitedToolTextBlock(value) { display ->
                             Text(
                                 text = display,
-                                color = AgentBuddyTheme.textSystem,
-                                fontSize = AgentBuddyTextStyle.body.scaled,
+                                style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.Normal),
+                                color = AgentBuddyTheme.textPrimary,
                             )
                         }
                     }
@@ -131,24 +131,27 @@ internal fun ListSection(
     items: List<String>,
 ) {
     if (items.isEmpty()) return
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(BuddySpacing.xs)) {
         SectionLabel(label)
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .background(AgentBuddyTheme.surface.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
-                .padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+                .nestedCodeSurface()
+                .padding(BuddySpacing.sm),
+            verticalArrangement = Arrangement.spacedBy(BuddySpacing.xxs),
         ) {
             items.forEach { item ->
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("•", color = AgentBuddyTheme.textSecondary, fontSize = AgentBuddyTextStyle.body.scaled)
+                Row(horizontalArrangement = Arrangement.spacedBy(BuddySpacing.xs)) {
+                    Text(
+                        text = "•",
+                        style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.Normal),
+                        color = AgentBuddyTheme.textSecondary,
+                    )
                     Column(modifier = Modifier.weight(1f)) {
                         LimitedToolTextBlock(item) { display ->
                             Text(
                                 text = display,
-                                color = AgentBuddyTheme.textSystem,
-                                fontSize = AgentBuddyTextStyle.body.scaled,
+                                style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.Normal),
+                                color = AgentBuddyTheme.textPrimary,
                             )
                         }
                     }
@@ -164,28 +167,27 @@ internal fun ProgressSection(
     items: List<String>,
 ) {
     if (items.isEmpty()) return
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(BuddySpacing.xs)) {
         SectionLabel(label)
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .background(AgentBuddyTheme.surface.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
-                .padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+                .nestedCodeSurface()
+                .padding(BuddySpacing.sm),
+            verticalArrangement = Arrangement.spacedBy(BuddySpacing.xs),
         ) {
             items.forEachIndexed { index, item ->
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(BuddySpacing.xs)) {
                     Text(
                         text = "•",
-                        color = if (index == items.lastIndex) AgentBuddyTheme.accentStrong else AgentBuddyTheme.textMuted,
-                        fontSize = AgentBuddyTextStyle.body.scaled,
+                        style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.Normal),
+                        color = if (index == items.lastIndex) AgentBuddyTheme.warning else AgentBuddyTheme.textSecondary,
                     )
                     Column(modifier = Modifier.weight(1f)) {
                         LimitedToolTextBlock(item) { display ->
                             Text(
                                 text = display,
-                                color = AgentBuddyTheme.textSystem,
-                                fontSize = AgentBuddyTextStyle.body.scaled,
+                                style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.Normal),
+                                color = AgentBuddyTheme.textPrimary,
                             )
                         }
                     }
@@ -200,7 +202,7 @@ internal fun DiffSection(
     label: String,
     content: String,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(BuddySpacing.xs)) {
         if (label.isNotEmpty()) {
             SectionLabel(label)
         }
@@ -208,11 +210,10 @@ internal fun DiffSection(
             SyntaxHighlightedDiffBlock(
                 diff = display,
                 titleHint = label.ifEmpty { null },
-                fontSize = AgentBuddyTextStyle.caption.sp,
+                fontSize = BuddyTextStyle.CODE.size.sp,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .background(AgentBuddyTheme.codeBackground, RoundedCornerShape(8.dp))
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                    .nestedCodeSurface()
+                    .padding(horizontal = BuddySpacing.sm, vertical = BuddySpacing.xs),
             )
         }
     }
@@ -237,13 +238,9 @@ internal fun LimitedToolTextBlock(
     body(display)
 
     if (isLong) {
-        TextButton(onClick = { expanded = !expanded }) {
-            Text(
-                text = if (expanded) "收起" else "展开",
-                color = AgentBuddyTheme.accent,
-                fontSize = AgentBuddyTextStyle.caption2.scaled,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
+        TimelineLinkButton(
+            text = if (expanded) "收起" else "展开",
+            onClick = { expanded = !expanded },
+        )
     }
 }

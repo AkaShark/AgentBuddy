@@ -1,20 +1,18 @@
 package com.akashark.agentbuddy.android.ui.conversation
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -22,8 +20,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -31,9 +31,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import com.akashark.agentbuddy.android.ui.AgentBuddyTextStyle
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
-import com.akashark.agentbuddy.android.ui.scaled
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySpacing
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyTextStyle
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyTextStyle
 import uniffi.codex_mobile_client.AppOperationStatus
 
 // ── Command Execution ────────────────────────────────────────────────────────
@@ -68,68 +69,71 @@ internal fun CommandExecutionRow(
         outputScrollState.animateScrollTo(outputScrollState.maxValue)
     }
 
+    val codeStyle = buddyTextStyle(BuddyTextStyle.CODE)
+    // Output viewport: five code lines tall, growing with the text size.
+    val outputMaxHeight = with(LocalDensity.current) {
+        (codeStyle.fontSize.toPx() * CodeLineHeightRatio * OutputViewportLines).toDp()
+    } + BuddySpacing.xs * 2
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(AgentBuddyTheme.surface, RoundedCornerShape(12.dp))
-            .border(0.5.dp, AgentBuddyTheme.border, RoundedCornerShape(12.dp))
-            .clickable { expanded = !expanded }
-            .padding(horizontal = 12.dp, vertical = 9.dp),
+            .timelineDetailCard(),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
+        TimelineCardHeader(
+            expanded = expanded,
+            onToggle = { expanded = !expanded },
+            leading = { TimelineStatusGlyph(data.status, fallbackIcon = Icons.Outlined.Terminal) },
+            durationMs = data.durationMs,
         ) {
-            Text(
-                text = "$",
-                color = AgentBuddyTheme.warning,
-                fontFamily = AgentBuddyTheme.monoFont,
-                fontSize = AgentBuddyTextStyle.caption.scaled,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(Modifier.width(6.dp))
-            Text(
-                text = if (expanded) displayedCommand else collapsedCommand,
-                color = AgentBuddyTheme.textSystem,
-                fontFamily = AgentBuddyTheme.monoFont,
-                fontSize = AgentBuddyTextStyle.body.scaled,
-                maxLines = if (expanded) Int.MAX_VALUE else 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            data.durationMs?.takeIf { it > 0 }?.let { ms ->
-                Spacer(Modifier.width(6.dp))
-                DurationChip(toolCardFormatDuration(ms), statusTint(data.status))
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(vertical = if (expanded) BuddySpacing.xs else 0.dp),
+                horizontalArrangement = Arrangement.spacedBy(BuddySpacing.xs),
+            ) {
+                Text(
+                    text = "$",
+                    style = buddyTextStyle(BuddyTextStyle.CODE, FontWeight.SemiBold),
+                    color = AgentBuddyTheme.textSecondary,
+                    modifier = Modifier.clearAndSetSemantics {},
+                )
+                Text(
+                    text = if (expanded) displayedCommand else collapsedCommand,
+                    style = codeStyle,
+                    color = AgentBuddyTheme.textPrimary,
+                    maxLines = if (expanded) Int.MAX_VALUE else 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
             }
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = if (expanded) "▲" else "▼",
-                color = AgentBuddyTheme.warning,
-                fontSize = AgentBuddyTextStyle.caption2.scaled,
-                fontWeight = FontWeight.Bold,
-            )
         }
 
         if (expanded) {
-            Spacer(Modifier.height(6.dp))
-            LimitedToolTextBlock(outputText, previewFromTail = isRunning) { display ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 116.dp)
-                        .background(AgentBuddyTheme.codeBackground, RoundedCornerShape(10.dp))
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
-                ) {
-                    SelectableConversationText {
-                        Text(
-                            text = display,
-                            color = AgentBuddyTheme.textSecondary,
-                            fontFamily = AgentBuddyTheme.monoFont,
-                            fontSize = AgentBuddyTextStyle.body.scaled,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .verticalScroll(outputScrollState),
-                        )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = BuddySpacing.md, end = BuddySpacing.md, bottom = BuddySpacing.sm),
+            ) {
+                LimitedToolTextBlock(outputText, previewFromTail = isRunning) { display ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = outputMaxHeight)
+                            .clip(timelineCodeShape(nested = true))
+                            .background(timelineCodeFill(nested = true))
+                            .padding(horizontal = BuddySpacing.sm, vertical = BuddySpacing.xs),
+                    ) {
+                        SelectableConversationText {
+                            Text(
+                                text = display,
+                                style = codeStyle,
+                                color = AgentBuddyTheme.textBody,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .verticalScroll(outputScrollState),
+                            )
+                        }
                     }
                 }
             }
@@ -153,8 +157,8 @@ internal fun FileChangeRow(
     ToolCardShell(
         summary = summary.plainText,
         summaryAnnotated = summary.annotatedText,
-        accent = AgentBuddyTheme.toolCallFileChange,
         status = data.status,
+        fallbackIcon = Icons.Outlined.Description,
     ) {
         if (diffChanges.isEmpty() && data.changes.isNotEmpty()) {
             ListSection("文件", data.changes.map { toolCardWorkspaceTitle(it.path) })
@@ -197,19 +201,19 @@ private fun buildFileChangeSummary(
                 annotatedText = AnnotatedString("$verb $filename"),
             )
         }
-        val plainText = "$verb $filename +$additions -$deletions"
+        val plainText = "$verb $filename +$additions −$deletions"
         val annotatedText = buildAnnotatedString {
             withStyle(SpanStyle(color = AgentBuddyTheme.textSecondary)) {
                 append("$verb ")
             }
-            withStyle(SpanStyle(color = AgentBuddyTheme.accent)) {
+            withStyle(SpanStyle(color = AgentBuddyTheme.textPrimary)) {
                 append(filename)
             }
             withStyle(SpanStyle(color = AgentBuddyTheme.success)) {
                 append(" +$additions")
             }
             withStyle(SpanStyle(color = AgentBuddyTheme.danger)) {
-                append(" -$deletions")
+                append(" −$deletions")
             }
         }
         return FileChangeSummary(plainText = plainText, annotatedText = annotatedText)
@@ -217,19 +221,19 @@ private fun buildFileChangeSummary(
 
     if (!hasCountSummary) {
         return FileChangeSummary(
-            plainText = "修改了 ${data.changes.size} 个文件",
-            annotatedText = AnnotatedString("修改了 ${data.changes.size} 个文件"),
+            plainText = "修改 ${data.changes.size} 个文件",
+            annotatedText = AnnotatedString("修改 ${data.changes.size} 个文件"),
         )
     }
 
-    val plainText = "修改了 ${data.changes.size} 个文件 +$additions -$deletions"
+    val plainText = "修改 ${data.changes.size} 个文件 · +$additions −$deletions"
     val annotatedText = buildAnnotatedString {
-        append("修改了 ${data.changes.size} 个文件")
+        append("修改 ${data.changes.size} 个文件 · ")
         withStyle(SpanStyle(color = AgentBuddyTheme.success)) {
-            append(" +$additions")
+            append("+$additions")
         }
         withStyle(SpanStyle(color = AgentBuddyTheme.danger)) {
-            append(" -$deletions")
+            append(" −$deletions")
         }
     }
     return FileChangeSummary(plainText = plainText, annotatedText = annotatedText)
@@ -241,6 +245,9 @@ private fun fileChangeVerb(kind: String): String = when (kind.lowercase()) {
     "update" -> "编辑"
     else -> "修改"
 }
+
+private const val CodeLineHeightRatio = 22f / 14f
+private const val OutputViewportLines = 5
 
 private fun displayCommandText(command: String): String {
     val trimmed = command.trim()

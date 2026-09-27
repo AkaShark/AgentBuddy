@@ -1,23 +1,14 @@
 package com.akashark.agentbuddy.android.ui.conversation
 
 import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.OpenInNew
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -29,14 +20,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.akashark.agentbuddy.android.ui.LocalAppModel
-import com.akashark.agentbuddy.android.ui.AgentBuddyTextStyle
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
-import com.akashark.agentbuddy.android.ui.scaled
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyIconButton
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyMotion
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySize
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySpacing
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyTextStyle
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyReduceMotion
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyTextStyle
 import kotlinx.coroutines.launch
 import uniffi.codex_mobile_client.AppSnapshotRecord
 import uniffi.codex_mobile_client.AppSubagentStatus
@@ -61,6 +56,60 @@ fun SubagentCard(
     val agentRows = remember(data.targets, data.receiverThreadIds, data.agentStates) {
         buildAgentRows(data)
     }
+    // Rows resolve against the live snapshot only while the card is open.
+    val displayRows = if (!expanded) {
+        emptyList()
+    } else {
+        agentRows.map { row ->
+            val threadKey = row.threadId?.let { threadId ->
+                snapshot?.resolvedThreadKey(threadId, serverId)
+                    ?: AgentLabelFormatter.sanitized(threadId)?.let { normalized ->
+                        ThreadKey(serverId = serverId, threadId = normalized)
+                    }
+            }
+            SubagentRowDisplay(
+                label = resolvedLabel(snapshot, row, serverId),
+                status = liveStatus(snapshot, row, serverId),
+                threadKey = threadKey,
+            )
+        }
+    }
+
+    SubagentCardContent(
+        data = data,
+        expanded = expanded,
+        onToggle = { expanded = !expanded },
+        rows = displayRows,
+        onOpen = { threadKey ->
+            if (onOpenThread != null) {
+                onOpenThread(threadKey)
+            } else {
+                scope.launch {
+                    appModel.store.setActiveThread(threadKey)
+                    appModel.refreshThreadSnapshot(threadKey)
+                }
+            }
+        },
+    )
+}
+
+/** One agent line of [SubagentCardContent], already resolved for display. */
+internal data class SubagentRowDisplay(
+    val label: String,
+    val status: AppSubagentStatus?,
+    /** Thread to open; null when the agent has no thread yet. */
+    val threadKey: ThreadKey?,
+)
+
+/** Stateless subagent card: detail-card header plus the agent list when open. */
+@Composable
+internal fun SubagentCardContent(
+    data: HydratedMultiAgentActionData,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    rows: List<SubagentRowDisplay>,
+    onOpen: (ThreadKey) -> Unit,
+) {
     val agentCount = maxOf(data.targets.size, data.agentStates.size)
     val agentCountLabel = if (agentCount == 1) "1 个智能体" else "$agentCount 个智能体"
 
@@ -76,113 +125,97 @@ fun SubagentCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(AgentBuddyTheme.surface, RoundedCornerShape(8.dp))
-            .animateContentSize()
-            .padding(8.dp),
+            .timelineDetailCard()
+            .animateContentSize(animationSpec = BuddyMotion.STATE.spec(buddyReduceMotion)),
     ) {
-        // Header
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { expanded = !expanded },
+        TimelineCardHeader(
+            expanded = expanded,
+            onToggle = onToggle,
+            leading = { TimelineStatusGlyph(data.status, fallbackIcon = Icons.Outlined.Groups) },
         ) {
-            StatusIcon(data.status)
-            Spacer(Modifier.width(6.dp))
             Text(
                 text = actionLabel,
-                color = AgentBuddyTheme.toolCallCollaboration,
-                fontSize = AgentBuddyTextStyle.caption.scaled,
-                fontWeight = FontWeight.Medium,
+                style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.Normal),
+                color = AgentBuddyTheme.textPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
             Text(
                 text = agentCountLabel,
-                color = AgentBuddyTheme.textMuted,
-                fontSize = AgentBuddyTextStyle.caption2.scaled,
-            )
-            Spacer(Modifier.width(4.dp))
-            Icon(
-                if (expanded) Icons.Default.ExpandMore else Icons.Default.ChevronRight,
-                contentDescription = null,
-                tint = AgentBuddyTheme.textMuted,
-                modifier = Modifier.size(16.dp),
+                style = buddyTextStyle(BuddyTextStyle.CAPTION),
+                color = AgentBuddyTheme.textSecondary,
+                maxLines = 1,
             )
         }
 
         // Expanded agent list
         if (expanded) {
-            // Show prompt if present
-            data.prompt?.takeIf { it.isNotBlank() }?.let { prompt ->
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = BuddySpacing.md, end = BuddySpacing.xxs, bottom = BuddySpacing.xs),
+            ) {
+                // Show prompt if present
+                data.prompt?.takeIf { it.isNotBlank() }?.let { prompt ->
+                    Text(
+                        text = prompt,
+                        style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.Normal),
+                        color = AgentBuddyTheme.textSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(end = BuddySpacing.sm, bottom = BuddySpacing.xxs),
+                    )
+                }
+
+                for (row in rows) {
+                    SubagentAgentRow(row = row, onOpen = onOpen)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SubagentAgentRow(
+    row: SubagentRowDisplay,
+    onOpen: (ThreadKey) -> Unit,
+) {
+    val statusText = readableStatus(row.status)
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = BuddySize.minHitTarget),
+    ) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .semantics(mergeDescendants = true) {},
+        ) {
+            Text(
+                text = row.label,
+                style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.Normal),
+                color = AgentBuddyTheme.textPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (statusText.isNotEmpty()) {
                 Text(
-                    text = prompt,
-                    color = AgentBuddyTheme.textMuted,
-                    fontSize = AgentBuddyTextStyle.caption2.scaled,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 4.dp, start = 20.dp),
+                    text = statusText,
+                    style = buddyTextStyle(BuddyTextStyle.CAPTION),
+                    color = statusColor(row.status),
                 )
             }
+        }
 
-            for (row in agentRows) {
-                val threadKey = row.threadId?.let { threadId ->
-                    snapshot?.resolvedThreadKey(threadId, serverId)
-                        ?: AgentLabelFormatter.sanitized(threadId)?.let { normalized ->
-                            ThreadKey(serverId = serverId, threadId = normalized)
-                        }
-                }
-                val displayLabel = resolvedLabel(snapshot, row, serverId)
-                val liveStatus = liveStatus(snapshot, row, serverId)
-                val statusText = readableStatus(liveStatus)
-                val statusColor = statusColor(liveStatus)
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 6.dp, start = 20.dp),
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = displayLabel,
-                            color = AgentBuddyTheme.textPrimary,
-                            fontSize = AgentBuddyTextStyle.caption.scaled,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        if (statusText.isNotEmpty()) {
-                            Text(
-                                text = statusText,
-                                color = statusColor,
-                                fontSize = AgentBuddyTextStyle.caption2.scaled,
-                            )
-                        }
-                    }
-
-                    if (row.threadId != null && threadKey != null) {
-                        IconButton(
-                            onClick = {
-                                if (onOpenThread != null) {
-                                    onOpenThread(threadKey)
-                                } else {
-                                    scope.launch {
-                                        appModel.store.setActiveThread(threadKey)
-                                        appModel.refreshThreadSnapshot(threadKey)
-                                    }
-                                }
-                            },
-                            modifier = Modifier.size(28.dp),
-                        ) {
-                            Icon(
-                                Icons.Default.OpenInNew,
-                                contentDescription = "打开",
-                                tint = AgentBuddyTheme.accent,
-                                modifier = Modifier.size(16.dp),
-                            )
-                        }
-                    }
-                }
-            }
+        row.threadKey?.let { threadKey ->
+            BuddyIconButton(
+                icon = Icons.AutoMirrored.Outlined.OpenInNew,
+                contentDescription = "打开 ${row.label}",
+                onClick = { onOpen(threadKey) },
+                tint = AgentBuddyTheme.link,
+            )
         }
     }
 }
@@ -262,10 +295,10 @@ private fun readableStatus(status: AppSubagentStatus?): String {
 
 private fun statusColor(status: AppSubagentStatus?): Color {
     return when (status ?: AppSubagentStatus.UNKNOWN) {
-        AppSubagentStatus.RUNNING -> AgentBuddyTheme.accent
+        AppSubagentStatus.RUNNING -> AgentBuddyTheme.warning
         AppSubagentStatus.COMPLETED -> AgentBuddyTheme.success
         AppSubagentStatus.ERRORED -> AgentBuddyTheme.danger
-        else -> AgentBuddyTheme.textMuted
+        else -> AgentBuddyTheme.textSecondary
     }
 }
 

@@ -1,17 +1,25 @@
 package com.akashark.agentbuddy.android.ui.conversation
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ListAlt
+import androidx.compose.material.icons.outlined.Adjust
+import androidx.compose.material.icons.outlined.Checklist
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.RadioButtonUnchecked
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -20,11 +28,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.akashark.agentbuddy.android.ui.AgentBuddyTextStyle
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
-import com.akashark.agentbuddy.android.ui.scaled
+import com.akashark.agentbuddy.android.ui.BerkeleyMono
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddySurfaceTone
+import com.akashark.agentbuddy.android.ui.designsystem.components.buddyCard
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyShapes
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySize
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySpacing
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyTextStyle
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyTextStyle
 import uniffi.codex_mobile_client.AppOperationStatus
 import uniffi.codex_mobile_client.HydratedPlanStepStatus
 
@@ -42,8 +63,8 @@ internal fun CodeReviewRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(vertical = BuddySpacing.xxs),
+        verticalArrangement = Arrangement.spacedBy(BuddySpacing.sm),
     ) {
         visibleFindings.forEach { (index, finding) ->
             CodeReviewFindingCard(
@@ -59,11 +80,10 @@ private fun CodeReviewFindingCard(
     finding: uniffi.codex_mobile_client.HydratedCodeReviewFindingData,
     onDismiss: () -> Unit,
 ) {
-    val priorityTint = when (finding.priority?.toInt()) {
-        0, 1 -> AgentBuddyTheme.danger
-        2 -> AgentBuddyTheme.warning
-        3 -> AgentBuddyTheme.textSecondary
-        else -> AgentBuddyTheme.textSecondary
+    val (priorityFill, priorityTint) = when (finding.priority?.toInt()) {
+        0, 1 -> AgentBuddyTheme.dangerSurface to AgentBuddyTheme.danger
+        2 -> AgentBuddyTheme.warningSurface to AgentBuddyTheme.warning
+        else -> AgentBuddyTheme.surfaceSoft to AgentBuddyTheme.textSecondary
     }
     val locationText = remember(finding.codeLocation) {
         val location = finding.codeLocation ?: return@remember null
@@ -78,52 +98,53 @@ private fun CodeReviewFindingCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(AgentBuddyTheme.surface.copy(alpha = 0.72f), RoundedCornerShape(22.dp))
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+            .timelineDetailCard()
+            .padding(start = BuddySpacing.md, end = BuddySpacing.xs, bottom = BuddySpacing.md),
+        verticalArrangement = Arrangement.spacedBy(BuddySpacing.xs),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(BuddySpacing.xs),
         ) {
             finding.priority?.let { priority ->
                 Text(
                     text = "P${priority.toInt()}",
+                    style = buddyTextStyle(BuddyTextStyle.CAPTION, FontWeight.SemiBold),
                     color = priorityTint,
-                    fontSize = AgentBuddyTextStyle.caption2.scaled,
-                    fontWeight = FontWeight.Bold,
                     modifier = Modifier
-                        .background(priorityTint.copy(alpha = 0.12f), RoundedCornerShape(999.dp))
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                        .background(priorityFill, CircleShape)
+                        .padding(horizontal = BuddySpacing.xs, vertical = 2.dp),
                 )
-                Spacer(Modifier.width(10.dp))
             }
 
             Text(
                 text = finding.title,
+                style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.SemiBold),
                 color = AgentBuddyTheme.textPrimary,
-                fontSize = AgentBuddyTextStyle.callout.scaled,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(vertical = BuddySpacing.sm)
+                    .semantics { heading() },
             )
 
-            Text(
+            TimelineLinkButton(
                 text = "忽略",
-                color = AgentBuddyTheme.textSecondary,
-                fontSize = AgentBuddyTextStyle.callout.scaled,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.clickable(onClick = onDismiss),
+                onClick = onDismiss,
+                modifier = Modifier.padding(horizontal = BuddySpacing.xs),
             )
         }
 
-        MarkdownText(text = finding.body)
+        Box(Modifier.padding(end = BuddySpacing.xs)) {
+            MarkdownText(text = finding.body)
+        }
 
         locationText?.takeIf { it.isNotBlank() }?.let { location ->
             Text(
                 text = location,
+                style = buddyTextStyle(BuddyTextStyle.CAPTION).copy(fontFamily = BerkeleyMono),
                 color = AgentBuddyTheme.textSecondary,
-                fontSize = AgentBuddyTextStyle.footnote.scaled,
-                fontFamily = AgentBuddyTheme.monoFont,
+                modifier = Modifier.padding(end = BuddySpacing.xs),
             )
         }
     }
@@ -135,35 +156,93 @@ private fun CodeReviewFindingCard(
 internal fun TodoListRow(
     data: uniffi.codex_mobile_client.HydratedTodoListData,
 ) {
+    val completed = data.steps.count { it.status == HydratedPlanStepStatus.COMPLETED }
+    val isComplete = data.steps.isNotEmpty() && completed == data.steps.size
+    val hasInProgress = data.steps.any { it.status == HydratedPlanStepStatus.IN_PROGRESS }
+    val progressTint = when {
+        isComplete -> AgentBuddyTheme.success
+        hasInProgress -> AgentBuddyTheme.warning
+        else -> AgentBuddyTheme.textSecondary
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 2.dp),
+            .timelineDetailCard()
+            .padding(start = BuddySpacing.md, end = BuddySpacing.md, bottom = BuddySpacing.md),
+        verticalArrangement = Arrangement.spacedBy(BuddySpacing.xs),
     ) {
-        for (step in data.steps) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(vertical = 1.dp),
-            ) {
-                val icon = when (step.status) {
-                    HydratedPlanStepStatus.COMPLETED -> "✓"
-                    HydratedPlanStepStatus.IN_PROGRESS -> "●"
-                    HydratedPlanStepStatus.PENDING -> "○"
-                }
-                val color = when (step.status) {
-                    HydratedPlanStepStatus.COMPLETED -> AgentBuddyTheme.success
-                    HydratedPlanStepStatus.IN_PROGRESS -> AgentBuddyTheme.accent
-                    HydratedPlanStepStatus.PENDING -> AgentBuddyTheme.textMuted
-                }
-                Text(text = icon, color = color, fontSize = AgentBuddyTextStyle.footnote.scaled)
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    text = step.step,
-                    color = AgentBuddyTheme.textBody,
-                    fontSize = AgentBuddyTextStyle.body.scaled,
-                )
-            }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = BuddySpacing.sm)
+                .semantics(mergeDescendants = true) { heading() },
+            horizontalArrangement = Arrangement.spacedBy(BuddySpacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = if (isComplete) Icons.Outlined.CheckCircle else Icons.Outlined.Checklist,
+                contentDescription = null,
+                tint = progressTint,
+                modifier = Modifier.size(BuddySize.icon),
+            )
+            Text(
+                text = "待办",
+                style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.SemiBold),
+                color = AgentBuddyTheme.textPrimary,
+            )
+            Text(
+                text = "已完成 $completed/${data.steps.size} 项",
+                style = buddyTextStyle(BuddyTextStyle.CAPTION, FontWeight.Medium),
+                color = progressTint,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
+        data.steps.forEachIndexed { index, step ->
+            TodoStepRow(index = index, step = step)
+        }
+    }
+}
+
+@Composable
+private fun TodoStepRow(
+    index: Int,
+    step: uniffi.codex_mobile_client.HydratedPlanStep,
+) {
+    val (icon, tint, label) = when (step.status) {
+        HydratedPlanStepStatus.COMPLETED -> Triple(Icons.Outlined.CheckCircle, AgentBuddyTheme.success, "已完成")
+        HydratedPlanStepStatus.IN_PROGRESS -> Triple(Icons.Outlined.Adjust, AgentBuddyTheme.warning, "正在进行")
+        HydratedPlanStepStatus.PENDING -> Triple(Icons.Outlined.RadioButtonUnchecked, AgentBuddyTheme.textSecondary, "待处理")
+    }
+    val isDone = step.status == HydratedPlanStepStatus.COMPLETED
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics(mergeDescendants = true) {},
+        horizontalArrangement = Arrangement.spacedBy(BuddySpacing.xs),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = tint,
+            modifier = Modifier
+                .padding(top = 3.dp)
+                .size(16.dp),
+        )
+        Text(
+            text = "${index + 1}.",
+            style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.Normal),
+            color = AgentBuddyTheme.textSecondary,
+        )
+        Text(
+            text = step.step,
+            style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.Normal).copy(
+                textDecoration = if (isDone) TextDecoration.LineThrough else null,
+            ),
+            color = if (isDone) AgentBuddyTheme.textSecondary else AgentBuddyTheme.textBody,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
@@ -176,15 +255,14 @@ internal fun ProposedPlanRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .buddyCard(BuddySurfaceTone.SURFACE, shape = BuddyShapes.detailCard, padding = BuddySpacing.md),
+        verticalArrangement = Arrangement.spacedBy(BuddySpacing.xs),
     ) {
-        Text(
-            text = "计划",
-            color = AgentBuddyTheme.accent,
-            fontSize = AgentBuddyTextStyle.caption.scaled,
-            fontWeight = FontWeight.SemiBold,
+        TimelineCardTitle(
+            icon = Icons.AutoMirrored.Outlined.ListAlt,
+            title = "计划",
+            tint = AgentBuddyTheme.textSecondary,
         )
-        Spacer(Modifier.height(4.dp))
         MarkdownText(text = data.content)
     }
 }
@@ -196,40 +274,60 @@ internal fun UserInputResponseRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(AgentBuddyTheme.surface, RoundedCornerShape(12.dp))
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+            .buddyCard(BuddySurfaceTone.SURFACE, shape = BuddyShapes.detailCard, padding = BuddySpacing.md),
+        verticalArrangement = Arrangement.spacedBy(BuddySpacing.sm),
     ) {
-        Text(
-            text = "请求的输入",
-            color = AgentBuddyTheme.textPrimary,
-            fontSize = AgentBuddyTextStyle.body.scaled,
-            fontWeight = FontWeight.SemiBold,
+        TimelineCardTitle(
+            icon = Icons.Outlined.CheckCircle,
+            title = "请求的输入",
+            tint = AgentBuddyTheme.success,
         )
 
         data.questions.forEach { question ->
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Column(
+                modifier = Modifier.semantics(mergeDescendants = true) {},
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
                 question.header?.takeIf { it.isNotBlank() }?.let { header ->
                     Text(
-                        text = header.uppercase(),
-                        color = AgentBuddyTheme.textMuted,
-                        fontSize = AgentBuddyTextStyle.caption2.scaled,
-                        fontWeight = FontWeight.Bold,
+                        text = header,
+                        style = buddyTextStyle(BuddyTextStyle.CAPTION, FontWeight.Medium),
+                        color = AgentBuddyTheme.textSecondary,
                     )
                 }
                 Text(
                     text = question.question,
+                    style = buddyTextStyle(BuddyTextStyle.LABEL),
                     color = AgentBuddyTheme.textPrimary,
-                    fontSize = AgentBuddyTextStyle.body.scaled,
-                    fontWeight = FontWeight.Medium,
                 )
                 Text(
                     text = question.answer.ifBlank { "未提供回答" },
+                    style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.Normal),
                     color = AgentBuddyTheme.textSecondary,
-                    fontSize = AgentBuddyTextStyle.body.scaled,
                 )
             }
         }
+    }
+}
+
+/** Icon + semibold label heading at the top of a timeline card. */
+@Composable
+private fun TimelineCardTitle(
+    icon: ImageVector,
+    title: String,
+    tint: Color,
+) {
+    Row(
+        modifier = Modifier.semantics(mergeDescendants = true) { heading() },
+        horizontalArrangement = Arrangement.spacedBy(BuddySpacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(BuddySize.icon))
+        Text(
+            text = title,
+            style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.SemiBold),
+            color = AgentBuddyTheme.textPrimary,
+        )
     }
 }
 
@@ -241,7 +339,6 @@ internal fun TurnDiffRow(
 ) {
     ToolCardShell(
         summary = "本轮差异",
-        accent = AgentBuddyTheme.toolCallFileChange,
         status = AppOperationStatus.COMPLETED,
     ) {
         DiffSection(label = "差异", content = data.diff)
@@ -255,37 +352,47 @@ internal fun DividerRow(
 ) {
     val label = when (data) {
         is uniffi.codex_mobile_client.HydratedDividerData.ContextCompaction ->
-            if (data.isComplete && !isLiveTurn) "\u4e0a\u4e0b\u6587\u5df2\u538b\u7f29" else "\u6b63\u5728\u538b\u7f29\u4e0a\u4e0b\u6587\u2026"
+            if (data.isComplete && !isLiveTurn) "上下文已压缩" else "正在压缩上下文…"
         is uniffi.codex_mobile_client.HydratedDividerData.ModelRerouted -> {
             val route = data.fromModel?.takeIf { it.isNotBlank() }?.let { "$it -> ${data.toModel}" }
-                ?: "\u5df2\u8def\u7531\u81f3 ${data.toModel}"
+                ?: "已路由至 ${data.toModel}"
             val reason = data.reason?.takeIf { it.isNotBlank() }
             if (reason != null) "$route | $reason" else route
         }
-        is uniffi.codex_mobile_client.HydratedDividerData.ReviewEntered -> "\u5df2\u5f00\u59cb\u5ba1\u67e5"
-        is uniffi.codex_mobile_client.HydratedDividerData.ReviewExited -> "\u5df2\u7ed3\u675f\u5ba1\u67e5"
+        is uniffi.codex_mobile_client.HydratedDividerData.ReviewEntered -> "已开始审查"
+        is uniffi.codex_mobile_client.HydratedDividerData.ReviewExited -> "已结束审查"
     }
+    val compacting = data is uniffi.codex_mobile_client.HydratedDividerData.ContextCompaction &&
+        !(data.isComplete && !isLiveTurn)
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
+            .padding(vertical = BuddySpacing.xs)
+            .semantics(mergeDescendants = true) { contentDescription = label },
+        horizontalArrangement = Arrangement.spacedBy(BuddySpacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        HorizontalDivider(
-            modifier = Modifier.weight(1f),
-            color = AgentBuddyTheme.divider,
-        )
+        DividerLine(Modifier.weight(1f))
         Text(
-            text = "  $label  ",
-            color = AgentBuddyTheme.textMuted,
-            fontSize = AgentBuddyTextStyle.caption2.scaled,
+            text = label,
+            style = buddyTextStyle(BuddyTextStyle.CAPTION, FontWeight.Medium),
+            color = if (compacting) AgentBuddyTheme.warning else AgentBuddyTheme.textSecondary,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.widthIn(max = 280.dp),
         )
-        HorizontalDivider(
-            modifier = Modifier.weight(1f),
-            color = AgentBuddyTheme.divider,
-        )
+        DividerLine(Modifier.weight(1f))
     }
+}
+
+@Composable
+private fun DividerLine(modifier: Modifier) {
+    Box(
+        modifier = modifier
+            .height(1.dp)
+            .background(AgentBuddyTheme.border),
+    )
 }
 
 // ── Note ─────────────────────────────────────────────────────────────────────
@@ -297,21 +404,20 @@ internal fun NoteRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(AgentBuddyTheme.surface, RoundedCornerShape(8.dp))
-            .padding(8.dp),
+            .buddyCard(BuddySurfaceTone.SOFT, shape = BuddyShapes.detailCard, padding = BuddySpacing.md)
+            .semantics(mergeDescendants = true) {},
+        verticalArrangement = Arrangement.spacedBy(BuddySpacing.xxs),
     ) {
-        Text(
-            text = data.title,
-            color = AgentBuddyTheme.textPrimary,
-            fontSize = AgentBuddyTextStyle.body.scaled,
-            fontWeight = FontWeight.Medium,
+        TimelineCardTitle(
+            icon = Icons.Outlined.Info,
+            title = data.title,
+            tint = AgentBuddyTheme.textSecondary,
         )
         if (data.body.isNotBlank()) {
             Text(
                 text = data.body,
+                style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.Normal),
                 color = AgentBuddyTheme.textSecondary,
-                fontSize = AgentBuddyTextStyle.body.scaled,
-                modifier = Modifier.padding(top = 2.dp),
             )
         }
     }
@@ -321,32 +427,39 @@ internal fun NoteRow(
 internal fun ErrorRow(
     data: uniffi.codex_mobile_client.HydratedErrorData,
 ) {
-    Column(
+    // Danger banner style: dangerSurface fill with an icon, so the state is
+    // readable without colour.
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(AgentBuddyTheme.surface, RoundedCornerShape(8.dp))
-            .padding(8.dp),
+            .buddyCard(BuddySurfaceTone.DANGER, shape = BuddyShapes.detailCard, padding = BuddySpacing.md),
+        horizontalArrangement = Arrangement.spacedBy(BuddySpacing.sm),
     ) {
-        SelectableConversationText {
-            Text(
-                text = data.title.ifBlank { "错误" },
-                color = AgentBuddyTheme.danger,
-                fontSize = AgentBuddyTextStyle.body.scaled,
-                fontWeight = FontWeight.Medium,
-            )
-            Text(
-                text = data.message,
-                color = AgentBuddyTheme.textPrimary,
-                fontSize = AgentBuddyTextStyle.body.scaled,
-                modifier = Modifier.padding(top = 2.dp),
-            )
-            data.details?.takeIf { it.isNotBlank() }?.let { details ->
+        Icon(
+            imageVector = Icons.Outlined.ErrorOutline,
+            contentDescription = "错误",
+            tint = AgentBuddyTheme.danger,
+            modifier = Modifier.size(BuddySize.icon),
+        )
+        SelectableConversationText(modifier = Modifier.weight(1f)) {
+            Column(verticalArrangement = Arrangement.spacedBy(BuddySpacing.xxs)) {
                 Text(
-                    text = details,
-                    color = AgentBuddyTheme.textSecondary,
-                    fontSize = AgentBuddyTextStyle.body.scaled,
-                    modifier = Modifier.padding(top = 2.dp),
+                    text = data.title.ifBlank { "错误" },
+                    style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.SemiBold),
+                    color = AgentBuddyTheme.textPrimary,
                 )
+                Text(
+                    text = data.message,
+                    style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.Normal),
+                    color = AgentBuddyTheme.textPrimary,
+                )
+                data.details?.takeIf { it.isNotBlank() }?.let { details ->
+                    Text(
+                        text = details,
+                        style = buddyTextStyle(BuddyTextStyle.CAPTION),
+                        color = AgentBuddyTheme.textSecondary,
+                    )
+                }
             }
         }
     }
