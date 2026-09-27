@@ -8,43 +8,48 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.ContentPaste
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.sp
 import com.akashark.agentbuddy.android.state.ComposerImageAttachment
 import com.akashark.agentbuddy.android.state.ComposerFileAttachment
-import com.akashark.agentbuddy.android.ui.BerkeleyMono
-import com.akashark.agentbuddy.android.ui.AgentBuddyTextStyle
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
-import com.akashark.agentbuddy.android.ui.scaled
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyBottomSheet
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyIconButton
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyIconButtonTone
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyIconTile
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyListRow
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyTileContent
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyShapes
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySpacing
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyTextStyle
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyTextStyle
 import java.io.ByteArrayOutputStream
 
 private val SUPPORTED_IMAGE_FILE_MIME_TYPES = arrayOf(
@@ -64,40 +69,34 @@ internal fun ComposerAttachmentPreviews(
     onRemoveFile: (ComposerFileAttachment) -> Unit,
 ) {
     if (attachedImage != null) {
-        val previewBitmap = remember(attachedImage?.data) {
-            attachedImage?.data?.let { bytes -> BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }
+        val previewBitmap = remember(attachedImage.data) {
+            BitmapFactory.decodeByteArray(attachedImage.data, 0, attachedImage.data.size)
         }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, top = 8.dp),
+                .padding(start = BuddySpacing.lg, end = BuddySpacing.md, top = BuddySpacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(BuddySpacing.xxs),
         ) {
-            Box {
-                previewBitmap?.let { bitmap ->
-                    androidx.compose.foundation.Image(
-                        bitmap = bitmap.asImageBitmap(),
-                        contentDescription = "已附加图片",
-                        modifier = Modifier
-                            .size(60.dp)
-                            .clip(RoundedCornerShape(8.dp)),
-                    )
-                }
-                IconButton(
-                    onClick = { onRemoveImage() },
+            previewBitmap?.let { bitmap ->
+                androidx.compose.foundation.Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = "已附加图片",
+                    contentScale = ContentScale.Crop,
                     modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .size(22.dp)
-                        .background(Color.Black.copy(alpha = 0.6f), CircleShape),
-                ) {
-                    Icon(
-                        Icons.Default.Close,
-                        contentDescription = "移除附件",
-                        tint = Color.White,
-                        modifier = Modifier.size(14.dp),
-                    )
-                }
+                        .size(60.dp)
+                        .clip(BuddyShapes.control),
+                )
             }
-            Spacer(Modifier.weight(1f))
+            BuddyIconButton(
+                icon = Icons.Outlined.Close,
+                contentDescription = "移除附件",
+                onClick = onRemoveImage,
+                tone = BuddyIconButtonTone.SOFT,
+                diameter = 28.dp,
+                iconSize = 14.dp,
+            )
         }
     }
 
@@ -105,16 +104,11 @@ internal fun ComposerAttachmentPreviews(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, top = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+                .padding(start = BuddySpacing.md, end = BuddySpacing.md, top = BuddySpacing.xs),
+            verticalArrangement = Arrangement.spacedBy(BuddySpacing.xxs),
         ) {
             attachedFiles.forEach { file ->
-                ComposerFileAttachmentRow(
-                    attachment = file,
-                    onRemove = {
-                        onRemoveFile(file)
-                    },
-                )
+                ComposerFileAttachmentRow(attachment = file, onRemove = { onRemoveFile(file) })
             }
         }
     }
@@ -145,61 +139,40 @@ internal fun ComposerAttachSheet(
             } ?: false
         }
 
-        ModalBottomSheet(
-            onDismissRequest = { onDismiss() },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = AgentBuddyTheme.background,
-        ) {
+        BuddyBottomSheet(onDismissRequest = onDismiss) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                    .padding(horizontal = BuddySpacing.xl)
+                    .padding(bottom = BuddySpacing.xl),
             ) {
                 Text(
                     text = "附加",
+                    style = buddyTextStyle(BuddyTextStyle.TITLE),
                     color = AgentBuddyTheme.textPrimary,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .padding(bottom = BuddySpacing.xs)
+                        .semantics { heading() },
                 )
-
                 if (clipboardHasImage) {
-                    AttachmentActionRow(
-                        title = "粘贴图片",
-                        onClick = {
-                            onDismiss()
-                            val clip = clipboardManager.primaryClip
-                            val uri = clip?.getItemAt(0)?.uri
-                            if (uri != null) {
-                                onAttachedImageChange(readAttachmentFromUri(context, uri))
-                            }
-                        },
-                    )
+                    AttachmentActionRow(title = "粘贴图片", icon = Icons.Outlined.ContentPaste) {
+                        onDismiss()
+                        val uri = clipboardManager.primaryClip?.getItemAt(0)?.uri
+                        if (uri != null) onAttachedImageChange(readAttachmentFromUri(context, uri))
+                    }
                 }
-
-                AttachmentActionRow(
-                    title = "相册",
-                    onClick = {
-                        onDismiss()
-                        photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                    },
-                )
-
-                AttachmentActionRow(
-                    title = "选择文件",
-                    onClick = {
-                        onDismiss()
-                        filePicker.launch(ALL_FILE_MIME_TYPES)
-                    },
-                )
-
-                AttachmentActionRow(
-                    title = "拍照",
-                    onClick = {
-                        onDismiss()
-                        cameraLauncher.launch(null)
-                    },
-                )
+                AttachmentActionRow(title = "相册", icon = Icons.Outlined.PhotoLibrary) {
+                    onDismiss()
+                    photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }
+                AttachmentActionRow(title = "选择文件", icon = Icons.Outlined.Description) {
+                    onDismiss()
+                    filePicker.launch(ALL_FILE_MIME_TYPES)
+                }
+                AttachmentActionRow(title = "拍照", icon = Icons.Outlined.PhotoCamera) {
+                    onDismiss()
+                    cameraLauncher.launch(null)
+                }
             }
         }
     }
@@ -208,18 +181,15 @@ internal fun ComposerAttachSheet(
 @Composable
 private fun AttachmentActionRow(
     title: String,
+    icon: ImageVector,
     onClick: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(AgentBuddyTheme.surface, RoundedCornerShape(18.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(title, color = AgentBuddyTheme.textPrimary, fontSize = AgentBuddyTextStyle.body.scaled, fontWeight = FontWeight.Medium)
-    }
+    BuddyListRow(
+        title = title,
+        onClick = onClick,
+        tile = { BuddyIconTile(BuddyTileContent.Symbol(icon)) },
+        accessory = {},
+    )
 }
 
 @Composable
@@ -230,47 +200,35 @@ private fun ComposerFileAttachmentRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(AgentBuddyTheme.codeBackground.copy(alpha = 0.72f))
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .background(AgentBuddyTheme.surfaceSoft, BuddyShapes.control)
+            .padding(start = BuddySpacing.sm),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(BuddySpacing.xs),
     ) {
-        Text(
-            text = "FILE",
-            color = AgentBuddyTheme.accent,
-            fontSize = AgentBuddyTextStyle.caption2.scaled,
-            fontWeight = FontWeight.SemiBold,
-            fontFamily = BerkeleyMono,
-        )
-        Column(modifier = Modifier.weight(1f)) {
+        Icon(Icons.Outlined.Description, contentDescription = null, tint = AgentBuddyTheme.textSecondary, modifier = Modifier.size(18.dp))
+        Column(modifier = Modifier.weight(1f).semantics(mergeDescendants = true) {}) {
             Text(
                 text = attachment.label,
+                style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.SemiBold),
                 color = AgentBuddyTheme.textPrimary,
-                fontSize = AgentBuddyTextStyle.caption.scaled,
-                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = attachment.path,
-                color = AgentBuddyTheme.textMuted,
-                fontSize = AgentBuddyTextStyle.caption2.scaled,
+                style = buddyTextStyle(BuddyTextStyle.CAPTION),
+                color = AgentBuddyTheme.textSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        IconButton(
+        BuddyIconButton(
+            icon = Icons.Outlined.Close,
+            contentDescription = "移除文件 ${attachment.label}",
             onClick = onRemove,
-            modifier = Modifier.size(28.dp),
-        ) {
-            Icon(
-                Icons.Default.Close,
-                contentDescription = "移除文件",
-                tint = AgentBuddyTheme.textMuted,
-                modifier = Modifier.size(14.dp),
-            )
-        }
+            iconSize = 16.dp,
+            tint = AgentBuddyTheme.textSecondary,
+        )
     }
 }
 

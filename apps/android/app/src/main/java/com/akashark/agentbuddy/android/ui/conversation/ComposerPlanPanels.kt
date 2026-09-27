@@ -23,7 +23,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -93,12 +92,12 @@ internal fun CollaborationModeChip(
         uniffi.codex_mobile_client.AppModeKind.DEFAULT -> "默认"
     }
     val container = if (mode == uniffi.codex_mobile_client.AppModeKind.PLAN) {
-        AgentBuddyTheme.accent
+        AgentBuddyTheme.brand
     } else {
-        AgentBuddyTheme.surfaceLight
+        AgentBuddyTheme.surfaceSoft
     }
     val contentColor = if (mode == uniffi.codex_mobile_client.AppModeKind.PLAN) {
-        Color.Black
+        AgentBuddyTheme.onBrand
     } else {
         AgentBuddyTheme.textPrimary
     }

@@ -104,17 +104,23 @@ internal fun GoalPanel(goal: AppThreadGoal, actions: GoalCardActions) {
 
     // Pulsing status dot — only animates while the goal is active. Mirrors
     // the iOS pill's 0.35 ↔ 1.0 ease-in-out at 1.1s autoreverse.
-    val pulse = rememberInfiniteTransition(label = "goalPulse")
-    val pulseAlpha by pulse.animateFloat(
-        initialValue = 1f,
-        targetValue = 0.35f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1100, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "goalPulseAlpha",
-    )
-    val statusDotAlpha = if (goal.status == AppThreadGoalStatus.ACTIVE) pulseAlpha else 1f
+    // No looping animation when the user removed animations.
+    val pulses = goal.status == AppThreadGoalStatus.ACTIVE &&
+        !com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyReduceMotion
+    val statusDotAlpha = if (pulses) {
+        val pulse = rememberInfiniteTransition(label = "goalPulse")
+        pulse.animateFloat(
+            initialValue = 1f,
+            targetValue = 0.35f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 1100, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "goalPulseAlpha",
+        ).value
+    } else {
+        1f
+    }
     val animatedProgress by animateFloatAsState(
         targetValue = budgetProgress ?: 0f,
         animationSpec = spring(
@@ -158,7 +164,7 @@ internal fun GoalPanel(goal: AppThreadGoal, actions: GoalCardActions) {
                 Text(
                     text = statusLabel.uppercase(),
                     color = tint,
-                    fontSize = 10f.scaled,
+                    fontSize = AgentBuddyTextStyle.caption.scaled,
                     fontWeight = FontWeight.SemiBold,
                     fontFamily = BerkeleyMono,
                 )
@@ -264,7 +270,7 @@ internal fun GoalPanel(goal: AppThreadGoal, actions: GoalCardActions) {
                         Text(
                             text = budgetLabel,
                             color = AgentBuddyTheme.textSecondary,
-                            fontSize = 10f.scaled,
+                            fontSize = AgentBuddyTextStyle.caption.scaled,
                             fontWeight = FontWeight.SemiBold,
                             fontFamily = BerkeleyMono,
                         )
@@ -272,7 +278,7 @@ internal fun GoalPanel(goal: AppThreadGoal, actions: GoalCardActions) {
                     Text(
                         text = "$percent%",
                         color = progressTextTint,
-                        fontSize = 10f.scaled,
+                        fontSize = AgentBuddyTextStyle.caption.scaled,
                         fontWeight = FontWeight.Bold,
                         fontFamily = BerkeleyMono,
                     )
@@ -294,7 +300,7 @@ internal fun GoalPanel(goal: AppThreadGoal, actions: GoalCardActions) {
                     Text(
                         text = "T ${formatGoalTokens(goal.tokensUsed)}",
                         color = AgentBuddyTheme.textSecondary,
-                        fontSize = 10f.scaled,
+                        fontSize = AgentBuddyTextStyle.caption.scaled,
                         fontWeight = FontWeight.SemiBold,
                         fontFamily = BerkeleyMono,
                     )
@@ -303,7 +309,7 @@ internal fun GoalPanel(goal: AppThreadGoal, actions: GoalCardActions) {
                     Text(
                         text = "·",
                         color = AgentBuddyTheme.textMuted.copy(alpha = 0.6f),
-                        fontSize = 10f.scaled,
+                        fontSize = AgentBuddyTextStyle.caption.scaled,
                         fontFamily = BerkeleyMono,
                     )
                 }
@@ -321,7 +327,7 @@ internal fun GoalPanel(goal: AppThreadGoal, actions: GoalCardActions) {
                         Text(
                             text = formatGoalSeconds(goal.timeUsedSeconds),
                             color = AgentBuddyTheme.textSecondary,
-                            fontSize = 10f.scaled,
+                            fontSize = AgentBuddyTextStyle.caption.scaled,
                             fontWeight = FontWeight.SemiBold,
                             fontFamily = BerkeleyMono,
                         )

@@ -341,7 +341,6 @@ fun ConversationScreen(
                         .apply()
                     showUnsupportedHostHint = false
                 },
-                isThinking = isThinking,
                 activeTaskSummary = activeTaskSummary,
                 pendingInput = pendingInput,
                 onShowSessionDiffSheet = { showSessionDiffSheet = true },

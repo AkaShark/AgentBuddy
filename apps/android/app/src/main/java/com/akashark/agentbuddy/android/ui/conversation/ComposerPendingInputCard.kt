@@ -1,16 +1,26 @@
 package com.akashark.agentbuddy.android.ui.conversation
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Send
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.QuestionAnswer
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -19,19 +29,81 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import uniffi.codex_mobile_client.PendingUserInputRequest
-import com.akashark.agentbuddy.android.ui.AgentBuddyTextStyle
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
-import com.akashark.agentbuddy.android.ui.scaled
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyBanner
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyBannerTone
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyButton
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyIconButton
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddySurfaceTone
+import com.akashark.agentbuddy.android.ui.designsystem.components.buddyCard
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyShapes
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySize
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySpacing
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyTextStyle
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyTextStyle
+import com.akashark.agentbuddy.android.state.AppModel
+import com.akashark.agentbuddy.android.util.LLog
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import uniffi.codex_mobile_client.PendingUserInputAnswer
+import uniffi.codex_mobile_client.PendingUserInputQuestion
+import uniffi.codex_mobile_client.PendingUserInputRequest
 
-/** Inline pending user input prompt shown above the composer input row. */
+/** Submits answers to the Rust store; errors stay on the card. */
+@Composable
+internal fun ComposerPendingInputHost(
+    appModel: AppModel,
+    scope: CoroutineScope,
+    request: PendingUserInputRequest,
+    answers: Map<String, String>,
+    onAnswersChange: (Map<String, String>) -> Unit,
+    onDismiss: (() -> Unit)?,
+) {
+    var submitError by remember(request.id) { mutableStateOf<String?>(null) }
+    var isSubmitting by remember(request.id) { mutableStateOf(false) }
+    ComposerPendingInputCard(
+        pendingUserInput = request,
+        userInputAnswers = answers,
+        onAnswerChange = { questionId, answer -> onAnswersChange(answers + (questionId to answer)) },
+        pendingUserInputSubmitError = submitError,
+        isSubmittingPendingUserInput = isSubmitting,
+        onDismissPendingUserInput = onDismiss,
+        onSubmit = submit@{
+            if (isSubmitting) return@submit
+            val payload = request.questions.map { q ->
+                PendingUserInputAnswer(questionId = q.id, answers = listOfNotNull(answers[q.id]))
+            }
+            scope.launch {
+                isSubmitting = true
+                submitError = null
+                try {
+                    appModel.store.respondToUserInput(request.id, payload)
+                    onAnswersChange(emptyMap())
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    LLog.e("ComposerBar", "user input response failed", error, fields = mapOf("requestId" to request.id))
+                    submitError = responseSubmissionErrorMessage(error)
+                } finally {
+                    isSubmitting = false
+                }
+            }
+        },
+    )
+}
+
+/**
+ * Inline request_user_input card above the composer (radius 20). Answers come
+ * from [userInputAnswers], which the composer keys by request id so they never
+ * leak into the next request.
+ */
 @Composable
 internal fun ComposerPendingInputCard(
     pendingUserInput: PendingUserInputRequest,
@@ -41,102 +113,165 @@ internal fun ComposerPendingInputCard(
     isSubmittingPendingUserInput: Boolean,
     onDismissPendingUserInput: (() -> Unit)?,
     onSubmit: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .background(AgentBuddyTheme.codeBackground)
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(horizontal = BuddySpacing.md, vertical = BuddySpacing.xxs)
+            .buddyCard(BuddySurfaceTone.SURFACE, shape = BuddyShapes.confirmCard, padding = null)
+            .padding(start = BuddySpacing.md, end = BuddySpacing.xxs, bottom = BuddySpacing.md),
+        verticalArrangement = Arrangement.spacedBy(BuddySpacing.sm),
     ) {
-        // Header with close button
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Outlined.QuestionAnswer,
+                contentDescription = null,
+                tint = AgentBuddyTheme.warning,
+                modifier = Modifier.size(BuddySize.icon),
+            )
             Text(
-                text = "需要输入",
+                text = "需要你的回答",
+                style = buddyTextStyle(BuddyTextStyle.HEADING),
                 color = AgentBuddyTheme.textPrimary,
-                fontSize = AgentBuddyTextStyle.caption.scaled,
-                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = BuddySpacing.xs)
+                    .semantics { heading() },
             )
             if (onDismissPendingUserInput != null) {
-                Text(
-                    text = "✕",
-                    color = AgentBuddyTheme.textMuted,
-                    fontSize = AgentBuddyTextStyle.body.scaled,
-                    modifier = Modifier
-                        .clickable { onDismissPendingUserInput() }
-                        .padding(4.dp)
-                        .semantics { contentDescription = "关闭输入请求" },
+                BuddyIconButton(
+                    icon = Icons.Outlined.Close,
+                    contentDescription = "关闭输入请求",
+                    onClick = onDismissPendingUserInput,
+                    iconSize = 16.dp,
                 )
             }
         }
-        for (question in pendingUserInput.questions) {
-            Text(question.question, color = AgentBuddyTheme.textPrimary, fontSize = AgentBuddyTextStyle.footnote.scaled)
-            if (question.options.isNotEmpty()) {
-                // FlowRow so long option labels wrap to a new line
-                // instead of crushing a short option into a narrow
-                // column with character-by-character text wrapping.
-                @OptIn(ExperimentalLayoutApi::class)
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    for (option in question.options) {
-                        val selected = userInputAnswers[question.id] == option.label
-                        Text(
-                            text = option.label,
-                            color = if (selected) Color.Black else AgentBuddyTheme.textPrimary,
-                            fontSize = AgentBuddyTextStyle.caption.scaled,
-                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                            modifier = Modifier
-                                .background(
-                                    if (selected) AgentBuddyTheme.accent else AgentBuddyTheme.surface,
-                                    RoundedCornerShape(12.dp),
-                                )
-                                .clickable { onAnswerChange(question.id, option.label) }
-                                .padding(horizontal = 10.dp, vertical = 4.dp),
-                        )
-                    }
-                }
-            } else {
-                var answer by remember { mutableStateOf("") }
-                BasicTextField(
-                    value = answer,
-                    onValueChange = {
-                        answer = it
-                        onAnswerChange(question.id, it)
-                    },
-                    textStyle = TextStyle(color = AgentBuddyTheme.textPrimary, fontSize = AgentBuddyTextStyle.footnote.scaled),
-                    cursorBrush = SolidColor(AgentBuddyTheme.accent),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(AgentBuddyTheme.surface, RoundedCornerShape(8.dp))
-                        .padding(8.dp),
-                )
-            }
-        }
-        pendingUserInputSubmitError?.let { message ->
+        requesterLabel(pendingUserInput)?.let { requester ->
             Text(
-                text = message,
-                color = Color(0xFFFF6B6B),
-                fontSize = AgentBuddyTextStyle.caption.scaled,
+                text = requester,
+                style = buddyTextStyle(BuddyTextStyle.CAPTION),
+                color = AgentBuddyTheme.textSecondary,
+            )
+        }
+        Column(
+            modifier = Modifier.padding(end = BuddySpacing.sm),
+            verticalArrangement = Arrangement.spacedBy(BuddySpacing.md),
+        ) {
+            for (question in pendingUserInput.questions) {
+                PendingQuestion(
+                    question = question,
+                    answer = userInputAnswers[question.id],
+                    onAnswerChange = { onAnswerChange(question.id, it) },
+                )
+            }
+            pendingUserInputSubmitError?.let { message ->
+                BuddyBanner(tone = BuddyBannerTone.DANGER, message = message)
+            }
+            BuddyButton(
+                text = "提交",
+                onClick = onSubmit,
+                icon = Icons.AutoMirrored.Outlined.Send,
+                isLoading = isSubmittingPendingUserInput,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PendingQuestion(
+    question: PendingUserInputQuestion,
+    answer: String?,
+    onAnswerChange: (String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(BuddySpacing.xs)) {
+        question.header?.takeIf { it.isNotBlank() }?.let { header ->
+            Text(
+                text = header,
+                style = buddyTextStyle(BuddyTextStyle.CAPTION, FontWeight.SemiBold),
+                color = AgentBuddyTheme.textSecondary,
             )
         }
         Text(
-            text = "提交",
-            color = if (isSubmittingPendingUserInput) AgentBuddyTheme.textMuted else Color.Black,
-            fontSize = AgentBuddyTextStyle.code.scaled,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier
-                .background(
-                    if (isSubmittingPendingUserInput) AgentBuddyTheme.surface else AgentBuddyTheme.accent,
-                    RoundedCornerShape(8.dp),
-                )
-                .clickable(enabled = !isSubmittingPendingUserInput) { onSubmit() }
-                .padding(horizontal = 16.dp, vertical = 6.dp),
+            text = question.question,
+            style = buddyTextStyle(BuddyTextStyle.BODY),
+            color = AgentBuddyTheme.textPrimary,
         )
+        if (question.options.isNotEmpty()) {
+            // Wraps long option labels onto new rows instead of squeezing them.
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(BuddySpacing.xs)) {
+                for (option in question.options) {
+                    PendingOptionChip(
+                        label = option.label,
+                        selected = answer == option.label,
+                        onClick = { onAnswerChange(option.label) },
+                    )
+                }
+            }
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = BuddySize.control)
+                    .background(AgentBuddyTheme.surfaceSoft, BuddyShapes.control)
+                    .padding(horizontal = BuddySpacing.sm, vertical = BuddySpacing.sm),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                if (answer.isNullOrEmpty()) {
+                    Text("输入回答", style = buddyTextStyle(BuddyTextStyle.BODY), color = AgentBuddyTheme.textSecondary)
+                }
+                BasicTextField(
+                    value = answer.orEmpty(),
+                    onValueChange = onAnswerChange,
+                    textStyle = buddyTextStyle(BuddyTextStyle.BODY).copy(color = AgentBuddyTheme.textPrimary),
+                    cursorBrush = SolidColor(AgentBuddyTheme.focus),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
     }
 }
+
+@Composable
+private fun PendingOptionChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val content = if (selected) AgentBuddyTheme.onBrand else AgentBuddyTheme.textPrimary
+    Box(
+        modifier = Modifier
+            .heightIn(min = BuddySize.minHitTarget)
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            modifier = Modifier
+                .defaultMinSize(minHeight = 36.dp)
+                .background(if (selected) AgentBuddyTheme.brand else AgentBuddyTheme.surfaceSoft, CircleShape)
+                .padding(horizontal = 14.dp, vertical = BuddySpacing.xxs),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (selected) {
+                Icon(Icons.Outlined.Check, contentDescription = null, tint = content, modifier = Modifier.size(16.dp))
+            }
+            Text(
+                text = label,
+                style = buddyTextStyle(BuddyTextStyle.LABEL, if (selected) FontWeight.SemiBold else FontWeight.Normal),
+                color = content,
+            )
+        }
+    }
+}
+
+private fun requesterLabel(request: PendingUserInputRequest): String? =
+    buildString {
+        request.requesterAgentNickname?.takeIf { it.isNotBlank() }?.let { append(it) }
+        request.requesterAgentRole?.takeIf { it.isNotBlank() }?.let {
+            if (isNotEmpty()) append(" ")
+            append("[$it]")
+        }
+    }.ifEmpty { null }

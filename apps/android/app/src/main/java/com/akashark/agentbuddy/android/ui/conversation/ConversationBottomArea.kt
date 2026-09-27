@@ -20,13 +20,20 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.outlined.NotificationsOff
+import androidx.compose.ui.semantics.Role
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyBanner
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyBannerTone
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySize
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySpacing
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyTextStyle
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyTextStyle
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -41,16 +48,20 @@ import androidx.compose.ui.unit.dp
 import com.akashark.agentbuddy.android.state.AppModel
 import com.akashark.agentbuddy.android.state.MinigameOverlayState
 import com.akashark.agentbuddy.android.state.contextPercent
+import com.akashark.agentbuddy.android.state.hasActiveTurn
+import com.akashark.agentbuddy.android.state.isConnected
+import com.akashark.agentbuddy.android.ui.common.runtimeLabel
 import com.akashark.agentbuddy.android.ui.BerkeleyMono
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
-import com.akashark.agentbuddy.android.ui.AgentBuddyTextStyle
-import com.akashark.agentbuddy.android.ui.scaled
 import uniffi.codex_mobile_client.AppServerSnapshot
 import uniffi.codex_mobile_client.AppThreadSnapshot
 import uniffi.codex_mobile_client.HydratedConversationItem
 import uniffi.codex_mobile_client.HydratedConversationItemContent
 import uniffi.codex_mobile_client.PendingUserInputRequest
 import uniffi.codex_mobile_client.ThreadKey
+
+/** Composer and approval cards stop growing on wide screens. */
+private val COMPOSER_MAX_WIDTH = 720.dp
 
 @Composable
 internal fun ConversationBottomArea(
@@ -64,7 +75,6 @@ internal fun ConversationBottomArea(
     pinnedContext: PinnedContextData?,
     showUnsupportedHostHint: Boolean,
     onDismissUnsupportedHostHint: () -> Unit,
-    isThinking: Boolean,
     activeTaskSummary: ActiveTaskSummary?,
     pendingInput: PendingUserInputRequest?,
     onShowSessionDiffSheet: () -> Unit,
@@ -129,9 +139,8 @@ internal fun ConversationBottomArea(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(AgentBuddyTheme.codeBackground.copy(alpha = if (hasWallpaper) 0.75f else 1f))
-                        .padding(horizontal = 16.dp, vertical = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        .padding(horizontal = BuddySpacing.md),
+                    horizontalArrangement = Arrangement.spacedBy(BuddySpacing.xs),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     pinnedContext.todoProgress?.let { todo ->
@@ -180,23 +189,26 @@ internal fun ConversationBottomArea(
                 appModel = appModel,
                 threadKey = threadKey,
                 items = items,
+                modifier = Modifier.align(Alignment.CenterHorizontally).widthIn(max = COMPOSER_MAX_WIDTH),
             )
 
             // Composer bar
             ComposerBar(
                 threadKey = threadKey,
+                modifier = Modifier.align(Alignment.CenterHorizontally).widthIn(max = COMPOSER_MAX_WIDTH),
                 collaborationMode = thread?.collaborationMode ?: uniffi.codex_mobile_client.AppModeKind.DEFAULT,
                 activePlanProgress = thread?.activePlanProgress,
                 activeTurnId = thread?.activeTurnId,
                 contextPercent = thread?.composerContextPercent(),
-                isThinking = isThinking,
+                isTurnActive = thread?.hasActiveTurn == true,
+                isConnected = server?.isConnected == true,
+                partnerLabel = thread?.agentRuntimeKind?.runtimeLabel,
                 activeTaskSummary = activeTaskSummary,
                 queuedFollowUps = thread?.queuedFollowUps ?: emptyList(),
                 goal = thread?.goal,
                 rateLimits = thread?.agentRuntimeKind?.let { runtimeKind ->
                     server?.rateLimitsByRuntime?.firstOrNull { it.runtimeKind == runtimeKind }?.rateLimits
                 },
-                showCollaborationModeChip = pinnedContext?.diffSummary == null,
                 onOpenCollaborationModePicker = onShowCollaborationModeSelector,
                 onToggleModelSelector = onToggleModelSelector,
                 onNavigateToSessions = onNavigateToSessions,
@@ -274,92 +286,55 @@ private fun uniffi.codex_mobile_client.AppThreadSnapshot.composerContextPercent(
 
 @Composable
 private fun UnsupportedHostPushHint(onDismiss: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp)
-            .background(AgentBuddyTheme.surface.copy(alpha = 0.72f), RoundedCornerShape(12.dp))
-            .padding(start = 12.dp, top = 6.dp, bottom = 6.dp, end = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            Icons.Default.NotificationsOff,
-            contentDescription = null,
-            tint = AgentBuddyTheme.warning,
-            modifier = Modifier.size(16.dp),
-        )
-        Text(
-            text = "该主机版本不支持完成通知，升级桌面 App 后可用",
-            color = AgentBuddyTheme.textSecondary,
-            fontSize = AgentBuddyTextStyle.caption.scaled,
-            modifier = Modifier.weight(1f),
-        )
-        IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
-            Icon(
-                Icons.Default.Close,
-                contentDescription = "关闭",
-                tint = AgentBuddyTheme.textSecondary,
-                modifier = Modifier.size(16.dp),
-            )
-        }
-    }
+    BuddyBanner(
+        tone = BuddyBannerTone.INFO,
+        message = "该主机版本不支持完成通知，升级桌面 App 后可用",
+        icon = Icons.Outlined.NotificationsOff,
+        actionTitle = "知道了",
+        onAction = onDismiss,
+        modifier = Modifier.padding(horizontal = BuddySpacing.md, vertical = BuddySpacing.xxs),
+    )
 }
 
 @Composable
 private fun PlanContextBadge(progress: String) {
     Text(
         text = "计划 $progress",
-        color = AgentBuddyTheme.accent,
-        fontSize = AgentBuddyTextStyle.caption2.scaled,
-        fontWeight = FontWeight.Medium,
+        style = buddyTextStyle(BuddyTextStyle.CAPTION, FontWeight.Medium),
+        color = AgentBuddyTheme.textPrimary,
         modifier = Modifier
-            .background(AgentBuddyTheme.surface.copy(alpha = 0.72f), RoundedCornerShape(999.dp))
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+            .background(AgentBuddyTheme.surfaceSoft, CircleShape)
+            .padding(horizontal = BuddySpacing.sm, vertical = 6.dp),
     )
 }
 
+/** Session diff summary; opens the diff sheet (48dp hit area around a compact pill). */
 @Composable
 private fun DiffSummaryBadge(
     summary: DiffSummary,
     onClick: () -> Unit,
 ) {
-    Row(
+    Box(
         modifier = Modifier
-            .background(AgentBuddyTheme.surface.copy(alpha = 0.72f), RoundedCornerShape(999.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .heightIn(min = BuddySize.minHitTarget)
+            .clickable(role = Role.Button, onClickLabel = "查看本次会话的改动", onClick = onClick),
+        contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = "\u2194",
-            color = AgentBuddyTheme.accent,
-            fontSize = AgentBuddyTextStyle.caption2.scaled,
-            fontWeight = FontWeight.SemiBold,
-        )
-        if (summary.hasChanges) {
-            Text(
-                text = "+${summary.additions}",
-                color = AgentBuddyTheme.success,
-                fontSize = AgentBuddyTextStyle.caption2.scaled,
-                fontWeight = FontWeight.SemiBold,
-                fontFamily = BerkeleyMono,
-            )
-            Text(
-                text = "-${summary.deletions}",
-                color = AgentBuddyTheme.danger,
-                fontSize = AgentBuddyTextStyle.caption2.scaled,
-                fontWeight = FontWeight.SemiBold,
-                fontFamily = BerkeleyMono,
-            )
-        } else {
-            Text(
-                text = "差异",
-                color = AgentBuddyTheme.textSecondary,
-                fontSize = AgentBuddyTextStyle.caption2.scaled,
-                fontWeight = FontWeight.SemiBold,
-            )
+        Row(
+            modifier = Modifier
+                .background(AgentBuddyTheme.surfaceSoft, CircleShape)
+                .padding(horizontal = BuddySpacing.sm, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            val style = buddyTextStyle(BuddyTextStyle.CAPTION, FontWeight.SemiBold)
+            Text(text = "\u2194", style = style, color = AgentBuddyTheme.link)
+            if (summary.hasChanges) {
+                Text(text = "+${summary.additions}", style = style, color = AgentBuddyTheme.success, fontFamily = BerkeleyMono)
+                Text(text = "-${summary.deletions}", style = style, color = AgentBuddyTheme.danger, fontFamily = BerkeleyMono)
+            } else {
+                Text(text = "差异", style = style, color = AgentBuddyTheme.textSecondary)
+            }
         }
     }
 }

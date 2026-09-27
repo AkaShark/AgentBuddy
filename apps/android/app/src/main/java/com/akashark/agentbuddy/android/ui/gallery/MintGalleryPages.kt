@@ -25,4 +25,5 @@ val mintGalleryPages: List<MintGalleryPage> =
         MintGalleryPage("approvals", "审批") { GalleryApprovalsPage() },
         MintGalleryPage("approval-banner", "审批横幅") { GalleryApprovalBannerPage() },
         MintGalleryPage("conversation-header", "会话标题栏") { GalleryConversationHeaderPage() },
+        MintGalleryPage("composer", "输入框") { GalleryComposerPage() },
     )

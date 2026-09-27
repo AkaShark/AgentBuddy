@@ -25,6 +25,9 @@ Current tests (`app/src/test/java/com/akashark/agentbuddy/android/`):
 - `state/SnapshotExtensionsTest` — snapshot display helpers (model labels)
 - `state/SshHostKeyMismatchTest` — typed SSH host-key prompts (changed key, unreadable saved key) read from Rust errors
 - `ui/AgentBuddyAppearanceModeTest`, `ui/ConversationTextSizingTest` — appearance mode and text sizing
+- `ui/approvals/ApprovalCoordinatorTest`, `ui/approvals/ApprovalPresentationTest` — approval submit bookkeeping (one decision per request, retryable failures, per-thread outcomes, RESOLVED_ELSEWHERE via reconcile), stack paging, approval wording
+- `ui/conversation/ComposerStateTest` — composer states (idle / running stop + 排队 / stopping / disconnected / creating), send gate, failed-draft restore
+- `ui/conversation/ConversationHeaderModelTest` — header title, connection state and 「搭档 · 主机」 subtitle
 - `ui/conversation/BundledMorphdomAssetTest` — bundled morphdom asset for the widget WebView shell
 - `ui/conversation/ComposerBarSlashCommandTest` — composer slash commands
 - `ui/conversation/MathMarkdownTest` — math Markdown rendering
@@ -301,3 +304,18 @@ Replaces the prior WebSocket + base64-PCM audio pump with a platform-native WebR
 | Known non-blockers | Per-frame input/output meter animation no longer drives — requires `RTCRtpReceiver.stats` polling to restore (follow-up) | Same flat meter behavior; speaker toggle currently stubbed to a boolean — follow-up to honor runtime routing |
 | Regression: custom AEC path | Retired — `codex-ios-audio` crate + `AecBridge.swift` / `VoiceSessionAudioCodec.swift` were deleted; libwebrtc AEC3 handles echo cancellation natively | Retired — `AecBridge.kt` deleted; `JavaAudioDeviceModule` enables the hardware AEC + NS |
 | Regression: SSH-tunneled codex server | RPC still flows through SSH; WebRTC peer goes direct to OpenAI edge from device. If client runs in fully air-gapped network, realtime voice will not establish | Same |
+
+## Conversation composer and approvals (Mint, iOS parity)
+
+| Area | Expected (iOS + Android) |
+|---|---|
+| Idle composer | Send disabled until there is text or an attachment |
+| Running turn | Explicit 「停止」; with input the send control reads 「排队」 and the message goes into the Rust follow-up queue |
+| Stopping | 「正在停止…」, second stop blocked; resets when the turn ends, a new turn starts or the host disconnects; a refused stop shows an error |
+| Disconnected | Persistent banner; send button, full-screen editor and every other send path are blocked without clearing the draft, attachments or a pending question; slash commands still run |
+| Creating | Progress on the send control, no double submit; a failed send keeps the draft (restored only into an empty composer) and shows 「重试」 |
+| Queue | Count + previews; 「干预」 (messages only) and remove |
+| Approval in the open conversation | Card above the composer, one at a time with 「第 N 个，共 M 个」; 「拒绝」/「允许一次」, session grant behind 「本会话都允许…」 + confirmation; submitting / failed (retry) / outcome card; answered elsewhere → 「已在别处处理」 |
+| Approval for another conversation | Non-blocking top banner; tap opens that conversation, close only hides the banner (never a denial) |
+| User-input request | Only inline above the composer (no duplicate overlay); answers are keyed by request id |
+

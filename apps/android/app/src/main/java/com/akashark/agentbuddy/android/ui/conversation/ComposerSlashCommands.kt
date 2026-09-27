@@ -67,7 +67,7 @@ internal fun ComposerSlashCommandMenu(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("/${cmd.name}", color = AgentBuddyTheme.accent, fontSize = AgentBuddyTextStyle.footnote.scaled, fontWeight = FontWeight.Medium)
                         Spacer(Modifier.width(8.dp))
-                        Text(cmd.description, color = AgentBuddyTheme.textMuted, fontSize = AgentBuddyTextStyle.caption2.scaled)
+                        Text(cmd.description, color = AgentBuddyTheme.textMuted, fontSize = AgentBuddyTextStyle.caption.scaled)
                     }
                 },
                 onClick = {

@@ -5,11 +5,114 @@ import com.akashark.agentbuddy.android.state.ComposerImageAttachment
 import com.akashark.agentbuddy.android.state.ComposerFileAttachment
 import com.akashark.agentbuddy.android.state.AppComposerPayload
 import com.akashark.agentbuddy.android.state.ampReasoningEffortLocked
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.akashark.agentbuddy.android.util.LLog
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.MainScope
+import uniffi.codex_mobile_client.AppInterruptTurnRequest
 import uniffi.codex_mobile_client.ReasoningEffort
 import uniffi.codex_mobile_client.ServiceTier
 import kotlinx.coroutines.launch
 import uniffi.codex_mobile_client.ThreadKey
+
+/**
+ * Sends run here instead of the composable's scope so leaving the
+ * conversation never cancels a `startTurn` halfway (the draft was already
+ * cleared optimistically).
+ */
+internal object ComposerSendScope : CoroutineScope by MainScope()
+
+/** A send that failed: what was sent, and whether it went back into the composer. */
+internal data class ComposerFailedSend(
+    val payload: AppComposerPayload,
+    val draft: AppModel.ComposerDraft,
+    val message: String,
+    val restoredToDraft: Boolean,
+)
+
+/** UI-only turn markers of one composer (creating / stopping / their errors). */
+internal class ComposerTurnState {
+    /** `startTurn` in flight: the send control shows progress and blocks double submits. */
+    var isCreating by mutableStateOf(false)
+    var failedSend by mutableStateOf<ComposerFailedSend?>(null)
+
+    /** Turn id a stop was requested for; see [composerStoppingTurn]. */
+    var stopRequestedTurnId by mutableStateOf<String?>(null)
+    var stopError by mutableStateOf<String?>(null)
+}
+
+/**
+ * Starts (or, during a running turn, queues) [payload]. On failure the draft
+ * comes back only into an empty composer ([shouldRestoreFailedDraft]) and the
+ * error stays visible with a retry.
+ */
+internal fun startComposerTurn(
+    appModel: AppModel,
+    threadKey: ThreadKey,
+    state: ComposerTurnState,
+    payload: AppComposerPayload,
+    sentDraft: AppModel.ComposerDraft,
+    currentDraft: () -> AppModel.ComposerDraft,
+    restoreDraft: (AppModel.ComposerDraft) -> Unit,
+) {
+    if (state.isCreating) return
+    state.isCreating = true
+    state.failedSend = null
+    ComposerSendScope.launch {
+        try {
+            appModel.startTurn(threadKey, payload)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            LLog.w("ComposerBar", "start turn failed", fields = mapOf("error" to error.message))
+            val live = currentDraft()
+            val stored = appModel.composerDraft(threadKey)
+            val restore = shouldRestoreFailedDraft(live.text, live.attachment != null || live.fileAttachments.isNotEmpty()) &&
+                stored.isEmpty
+            if (restore) {
+                restoreDraft(sentDraft)
+                appModel.setComposerDraft(threadKey, sentDraft)
+            }
+            state.failedSend = ComposerFailedSend(payload, sentDraft, responseSubmissionErrorMessage(error), restore)
+        } finally {
+            state.isCreating = false
+        }
+    }
+}
+
+/** Asks the host to stop [turnId]; a refusal resets 「正在停止…」 and is shown. */
+internal fun interruptComposerTurn(
+    appModel: AppModel,
+    threadKey: ThreadKey,
+    state: ComposerTurnState,
+    turnId: String?,
+    scope: CoroutineScope,
+) {
+    if (state.stopRequestedTurnId != null) return
+    if (turnId == null) {
+        state.stopError = "暂时无法停止：还没拿到当前这一轮的状态，请稍后再试。"
+        return
+    }
+    state.stopRequestedTurnId = turnId
+    state.stopError = null
+    scope.launch {
+        try {
+            appModel.client.interruptTurn(
+                threadKey.serverId,
+                AppInterruptTurnRequest(threadId = threadKey.threadId, turnId = turnId),
+            )
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            LLog.w("ComposerBar", "interrupt turn failed", fields = mapOf("error" to error.message))
+            if (state.stopRequestedTurnId == turnId) state.stopRequestedTurnId = null
+            state.stopError = "没能停止任务：" + responseSubmissionErrorMessage(error)
+        }
+    }
+}
 
 /** Runs a slash command for [ComposerBar]; returns false when [commandName] is unknown. */
 internal fun dispatchComposerSlashCommand(

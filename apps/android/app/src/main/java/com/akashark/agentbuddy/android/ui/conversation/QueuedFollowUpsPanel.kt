@@ -7,189 +7,208 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.automirrored.outlined.Chat
+import androidx.compose.material.icons.automirrored.outlined.Redo
+import androidx.compose.material.icons.outlined.SubdirectoryArrowRight
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.akashark.agentbuddy.android.ui.AgentBuddyTextStyle
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
-import com.akashark.agentbuddy.android.ui.scaled
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyIconButton
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddySurfaceTone
+import com.akashark.agentbuddy.android.ui.designsystem.components.buddyCard
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyChromeTypeLimit
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyShapes
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySize
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySpacing
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyTextStyle
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyTextStyle
 import uniffi.codex_mobile_client.AppQueuedFollowUpKind
 import uniffi.codex_mobile_client.AppQueuedFollowUpPreview
 
 private data class QueuedFollowUpUiStyle(
     val title: String,
+    val icon: ImageVector,
     val tint: Color,
     val background: Color,
-    val border: Color,
 )
 
+/**
+ * Messages the shared store holds behind the running turn: count, text
+ * previews, 「干预」 (send into the running turn now, messages only) and remove.
+ * Both actions are confirmed by the next snapshot, not patched here.
+ */
 @Composable
 internal fun QueuedFollowUpsPreviewPanel(
     previews: List<AppQueuedFollowUpPreview>,
     onSteer: (AppQueuedFollowUpPreview) -> Unit,
     onDelete: (AppQueuedFollowUpPreview) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp)
-            .background(AgentBuddyTheme.codeBackground, RoundedCornerShape(14.dp))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(horizontal = BuddySpacing.md, vertical = BuddySpacing.xxs)
+            .buddyCard(BuddySurfaceTone.SURFACE, shape = BuddyShapes.detailCard, padding = null)
+            .padding(start = BuddySpacing.sm, end = BuddySpacing.sm, bottom = BuddySpacing.sm),
+        verticalArrangement = Arrangement.spacedBy(BuddySpacing.xs),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                Icons.Default.Schedule,
-                contentDescription = null,
-                tint = AgentBuddyTheme.accent,
-                modifier = Modifier.size(14.dp),
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = "下一项排队中",
-                color = AgentBuddyTheme.textPrimary,
-                fontSize = AgentBuddyTextStyle.caption.scaled,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(Modifier.weight(1f))
-            Text(
-                text = previews.size.toString(),
-                color = AgentBuddyTheme.textSecondary,
-                fontSize = AgentBuddyTextStyle.caption2.scaled,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier
-                    .background(AgentBuddyTheme.surface.copy(alpha = 0.9f), RoundedCornerShape(999.dp))
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-            )
+        BuddyChromeTypeLimit {
+            Row(
+                modifier = Modifier.heightIn(min = BuddySize.minHitTarget),
+                horizontalArrangement = Arrangement.spacedBy(BuddySpacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Outlined.Schedule, contentDescription = null, tint = AgentBuddyTheme.link, modifier = Modifier.size(18.dp))
+                Text(
+                    text = "下一项排队中",
+                    style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.SemiBold),
+                    color = AgentBuddyTheme.textPrimary,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = previews.size.toString(),
+                    style = buddyTextStyle(BuddyTextStyle.CAPTION, FontWeight.SemiBold),
+                    color = AgentBuddyTheme.textSecondary,
+                    modifier = Modifier
+                        .background(AgentBuddyTheme.surfaceSoft, CircleShape)
+                        .padding(horizontal = BuddySpacing.xs, vertical = 2.dp)
+                        .semantics { contentDescription = "${previews.size} 条排队中" },
+                )
+            }
         }
-
         previews.forEach { preview ->
-            QueuedFollowUpCard(
-                preview = preview,
-                onSteer = onSteer,
-                onDelete = onDelete,
-            )
+            QueuedFollowUpRow(preview = preview, onSteer = onSteer, onDelete = onDelete)
         }
     }
 }
 
 @Composable
-private fun QueuedFollowUpCard(
+private fun QueuedFollowUpRow(
     preview: AppQueuedFollowUpPreview,
     onSteer: (AppQueuedFollowUpPreview) -> Unit,
     onDelete: (AppQueuedFollowUpPreview) -> Unit,
 ) {
     val style = queuedFollowUpUiStyle(preview.kind)
-
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, style.border, RoundedCornerShape(12.dp))
-            .background(style.background, RoundedCornerShape(12.dp))
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+            .background(style.background, BuddyShapes.control)
+            .padding(start = BuddySpacing.sm),
     ) {
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Row(
-                modifier = Modifier
-                    .background(style.tint.copy(alpha = 0.14f), RoundedCornerShape(999.dp))
-                    .padding(horizontal = 8.dp, vertical = 5.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .background(style.tint, CircleShape),
-                )
-                Spacer(Modifier.width(6.dp))
+        BuddyChromeTypeLimit {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(style.icon, contentDescription = null, tint = style.tint, modifier = Modifier.size(16.dp))
                 Text(
                     text = style.title,
+                    style = buddyTextStyle(BuddyTextStyle.CAPTION, FontWeight.SemiBold),
                     color = style.tint,
-                    fontSize = AgentBuddyTextStyle.caption2.scaled,
-                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 6.dp),
+                )
+                when (preview.kind) {
+                    AppQueuedFollowUpKind.MESSAGE -> SteerButton(label = "干预", icon = Icons.Outlined.SubdirectoryArrowRight, enabled = true) {
+                        onSteer(preview)
+                    }
+                    AppQueuedFollowUpKind.PENDING_STEER -> SteerButton(label = "干预中", icon = Icons.Outlined.Check, enabled = false) {}
+                    AppQueuedFollowUpKind.RETRYING_STEER -> Unit
+                }
+                BuddyIconButton(
+                    icon = Icons.Outlined.DeleteOutline,
+                    contentDescription = "移除排队消息",
+                    onClick = { onDelete(preview) },
+                    iconSize = 18.dp,
+                    tint = AgentBuddyTheme.textSecondary,
                 )
             }
-
-            Text(
-                text = preview.text,
-                color = AgentBuddyTheme.textSecondary,
-                fontSize = AgentBuddyTextStyle.caption.scaled,
-                maxLines = 4,
-                overflow = TextOverflow.Ellipsis,
-            )
         }
+        Text(
+            text = preview.text,
+            style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.Normal),
+            color = AgentBuddyTheme.textPrimary,
+            maxLines = 4,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(end = BuddySpacing.sm, bottom = BuddySpacing.sm),
+        )
+    }
+}
 
-        if (preview.kind == AppQueuedFollowUpKind.MESSAGE) {
-            Text(
-                text = "\u21b3 \u5f15\u5bfc",
-                color = AgentBuddyTheme.textPrimary,
-                fontSize = AgentBuddyTextStyle.caption.scaled,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier
-                    .background(AgentBuddyTheme.surface.copy(alpha = 0.96f), RoundedCornerShape(999.dp))
-                    .clickable { onSteer(preview) }
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-            )
-        }
-
-        IconButton(
-            onClick = { onDelete(preview) },
-            modifier = Modifier.size(30.dp),
+@Composable
+private fun SteerButton(
+    label: String,
+    icon: ImageVector,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val content = if (enabled) AgentBuddyTheme.textPrimary else AgentBuddyTheme.textSecondary
+    Box(
+        modifier = Modifier
+            .heightIn(min = BuddySize.minHitTarget)
+            .clickable(
+                enabled = enabled,
+                role = Role.Button,
+                onClickLabel = "立即把这条消息发给正在运行的任务",
+                onClick = onClick,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            modifier = Modifier
+                .defaultMinSize(minHeight = BuddySize.compactPill)
+                .background(AgentBuddyTheme.surface, CircleShape)
+                .border(1.dp, AgentBuddyTheme.borderControl, CircleShape)
+                .padding(horizontal = BuddySpacing.sm),
+            horizontalArrangement = Arrangement.spacedBy(BuddySpacing.xxs),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                Icons.Default.Close,
-                contentDescription = "删除排队的后续项",
-                tint = AgentBuddyTheme.textSecondary,
-                modifier = Modifier.size(14.dp),
-            )
+            Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(16.dp))
+            Text(label, style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.SemiBold), color = content, maxLines = 1)
         }
     }
 }
 
 private fun queuedFollowUpUiStyle(kind: AppQueuedFollowUpKind): QueuedFollowUpUiStyle =
     when (kind) {
-        AppQueuedFollowUpKind.MESSAGE ->
-            QueuedFollowUpUiStyle(
-                title = "排队的消息",
-                tint = AgentBuddyTheme.accent,
-                background = AgentBuddyTheme.accent.copy(alpha = 0.08f),
-                border = AgentBuddyTheme.accent.copy(alpha = 0.24f),
-            )
-
-        AppQueuedFollowUpKind.PENDING_STEER ->
-            QueuedFollowUpUiStyle(
-                title = "引导排队中",
-                tint = AgentBuddyTheme.accentStrong,
-                background = AgentBuddyTheme.accentStrong.copy(alpha = 0.10f),
-                border = AgentBuddyTheme.accentStrong.copy(alpha = 0.28f),
-            )
-
-        AppQueuedFollowUpKind.RETRYING_STEER ->
-            QueuedFollowUpUiStyle(
-                title = "重试引导中",
-                tint = AgentBuddyTheme.warning,
-                background = AgentBuddyTheme.warning.copy(alpha = 0.10f),
-                border = AgentBuddyTheme.warning.copy(alpha = 0.28f),
-            )
+        AppQueuedFollowUpKind.MESSAGE -> QueuedFollowUpUiStyle(
+            title = "排队中的消息",
+            icon = Icons.AutoMirrored.Outlined.Chat,
+            tint = AgentBuddyTheme.textSecondary,
+            background = AgentBuddyTheme.surfaceSoft,
+        )
+        AppQueuedFollowUpKind.PENDING_STEER -> QueuedFollowUpUiStyle(
+            title = "干预已排队",
+            icon = Icons.AutoMirrored.Outlined.Redo,
+            tint = AgentBuddyTheme.link,
+            background = AgentBuddyTheme.surfaceSoft,
+        )
+        AppQueuedFollowUpKind.RETRYING_STEER -> QueuedFollowUpUiStyle(
+            title = "正在重试干预",
+            icon = Icons.Outlined.Refresh,
+            tint = AgentBuddyTheme.warning,
+            background = AgentBuddyTheme.warningSurface,
+        )
     }
