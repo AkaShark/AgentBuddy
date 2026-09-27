@@ -22,6 +22,8 @@ final class AppState {
 
     var currentCwd = ""
     var showServerPicker = false
+    /// Where the next add-host sheet starts; reset to `.chooser` on dismiss.
+    var serverPickerEntryPoint: DiscoveryEntryPoint = .chooser
     var collapsedSessionFolders: Set<String> = []
     var sessionsSelectedServerFilterId: String?
     var sessionsShowOnlyForks = false

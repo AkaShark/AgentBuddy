@@ -13,37 +13,47 @@ extension DirectoryPickerView {
     @ViewBuilder
     var content: some View {
         if model.isLoading {
-            ProgressView().tint(AgentBuddyTheme.accent).frame(maxHeight: .infinity)
+            ProgressView().tint(AgentBuddyTheme.textSecondary).frame(maxHeight: .infinity)
         } else if let err = model.errorMessage {
-            VStack(spacing: 12) {
-                Text(DirectoryPickerStrings.loadError)
-                    .agentBuddyFont(.caption)
-                    .foregroundColor(AgentBuddyTheme.danger)
-                Text(err)
-                    .agentBuddyFont(.caption2)
-                    .foregroundColor(AgentBuddyTheme.textSecondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
-                HStack(spacing: 12) {
-                    Button(DirectoryPickerStrings.retry) {
-                        Task {
-                            await model.listDirectory(
-                                for: selectedServerId,
-                                path: model.currentPath,
-                                appModel: appModel,
-                                isLocalServer: selectedServerIsLocal
-                            )
+            ScrollView {
+                VStack(alignment: .leading, spacing: BuddySpacing.md) {
+                    BuddyIconTile(
+                        content: .symbol("exclamationmark.triangle"),
+                        fill: AgentBuddyTheme.warningSurface,
+                        foreground: AgentBuddyTheme.warning,
+                        size: 48
+                    )
+                    VStack(alignment: .leading, spacing: BuddySpacing.xs) {
+                        Text(DirectoryPickerStrings.loadError)
+                            .buddyText(.heading)
+                            .foregroundStyle(AgentBuddyTheme.textPrimary)
+                        Text(err)
+                            .buddyText(.body)
+                            .foregroundStyle(AgentBuddyTheme.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    HStack(spacing: BuddySpacing.sm) {
+                        BuddyButton(verbatim: DirectoryPickerStrings.retry, systemImage: "arrow.clockwise") {
+                            Task {
+                                await model.listDirectory(
+                                    for: selectedServerId,
+                                    path: model.currentPath,
+                                    appModel: appModel,
+                                    isLocalServer: selectedServerIsLocal
+                                )
+                            }
+                        }
+
+                        BuddyButton(verbatim: DirectoryPickerStrings.changeServer, kind: .secondary) {
+                            selectNextServer()
                         }
                     }
-                    .foregroundColor(AgentBuddyTheme.accent)
-
-                    Button(DirectoryPickerStrings.changeServer) {
-                        selectNextServer()
-                    }
-                    .foregroundColor(AgentBuddyTheme.accent)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .buddyCard(.soft, radius: BuddyRadius.card, padding: BuddySpacing.lg)
+                .padding(.horizontal, BuddySpacing.xl)
+                .padding(.vertical, BuddySpacing.xl)
             }
-            .frame(maxHeight: .infinity)
         } else {
             directoryList
         }
@@ -59,25 +69,17 @@ extension DirectoryPickerView {
                             onDirectorySelected?(selectedServerId, recent.path)
                         }
                     } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: "play.fill")
-                                .foregroundColor(AgentBuddyTheme.accent)
-                                .frame(width: 20)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(DirectoryPickerStrings.continueIn((recent.path as NSString).lastPathComponent))
-                                    .agentBuddyFont(.subheadline)
-                                    .foregroundColor(AgentBuddyTheme.textPrimary)
-                                    .lineLimit(1)
-                                Text(PathDisplay.display(recent.path, isLocal: selectedServerIsLocal))
-                                    .agentBuddyFont(.caption2)
-                                    .foregroundColor(AgentBuddyTheme.textMuted)
-                                    .lineLimit(1)
-                            }
-                            Spacer()
-                        }
+                        directoryRow(
+                            symbol: "play.fill",
+                            tileFill: AgentBuddyTheme.brand,
+                            tileForeground: AgentBuddyTheme.onBrand,
+                            title: DirectoryPickerStrings.continueIn((recent.path as NSString).lastPathComponent),
+                            path: recent.path
+                        ) { EmptyView() }
                     }
+                    .buttonStyle(.plain)
                 }
-                .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+                .listRowBackground(AgentBuddyTheme.surface)
             }
 
             if showRecentDirectories {
@@ -89,27 +91,18 @@ extension DirectoryPickerView {
                                 onDirectorySelected?(selectedServerId, recent.path)
                             }
                         } label: {
-                            HStack(spacing: 10) {
-                                Image(systemName: "clock.arrow.circlepath")
-                                    .foregroundColor(AgentBuddyTheme.textSecondary)
-                                    .frame(width: 20)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text((recent.path as NSString).lastPathComponent)
-                                        .agentBuddyFont(.subheadline)
-                                        .foregroundColor(AgentBuddyTheme.textPrimary)
-                                        .lineLimit(1)
-                                    Text(PathDisplay.display(recent.path, isLocal: selectedServerIsLocal))
-                                        .agentBuddyFont(.caption2)
-                                        .foregroundColor(AgentBuddyTheme.textMuted)
-                                        .lineLimit(1)
-                                }
-                                Spacer()
+                            directoryRow(
+                                symbol: "clock.arrow.circlepath",
+                                title: (recent.path as NSString).lastPathComponent,
+                                path: recent.path
+                            ) {
                                 Text(model.relativeDate(for: recent.lastUsedAt))
-                                    .agentBuddyFont(.caption2)
-                                    .foregroundColor(AgentBuddyTheme.textSecondary)
+                                    .buddyText(.caption)
+                                    .foregroundStyle(AgentBuddyTheme.textSecondary)
                                     .lineLimit(1)
                             }
                         }
+                        .buttonStyle(.plain)
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
                                 model.removeRecentEntry(recent, selectedServerId: selectedServerId)
@@ -117,13 +110,14 @@ extension DirectoryPickerView {
                                 Label(String(localized: "directory_picker_remove_recent"), systemImage: "trash")
                             }
                         }
-                        .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+                        .listRowBackground(AgentBuddyTheme.surface)
                     }
                 } header: {
                     HStack {
                         Text(DirectoryPickerStrings.recentDirectories)
-                            .agentBuddyFont(.caption)
-                            .foregroundColor(AgentBuddyTheme.textSecondary)
+                            .buddyText(.caption, weight: .medium)
+                            .foregroundStyle(AgentBuddyTheme.textSecondary)
+                            .textCase(nil)
                         Spacer()
                         Menu {
                             Button(DirectoryPickerStrings.clearRecentDirectories, role: .destructive) {
@@ -131,22 +125,27 @@ extension DirectoryPickerView {
                             }
                         } label: {
                             Image(systemName: "ellipsis.circle")
-                                .foregroundColor(AgentBuddyTheme.textMuted)
+                                .font(.system(size: 17, weight: .medium))
+                                .foregroundStyle(AgentBuddyTheme.textSecondary)
+                                .frame(width: BuddySize.minHitTarget, height: BuddySize.minHitTarget)
+                                .contentShape(Rectangle())
                         }
+                        .accessibilityLabel(Text(DirectoryPickerStrings.clearRecentDirectories))
                     }
                 } footer: {
                     Text(DirectoryPickerStrings.recentFooter)
-                        .agentBuddyFont(.caption2)
-                        .foregroundColor(AgentBuddyTheme.textMuted)
+                        .buddyText(.caption)
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
                 }
             }
 
             let visibleEntries = model.visibleEntries()
             if visibleEntries.isEmpty {
                 Text(model.emptyMessage())
-                    .agentBuddyFont(.caption)
-                    .foregroundColor(AgentBuddyTheme.textMuted)
-                    .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+                    .buddyText(.body)
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
+                    .padding(.vertical, BuddySpacing.xs)
+                    .listRowBackground(AgentBuddyTheme.surface)
             } else {
                 ForEach(visibleEntries, id: \.self) { entry in
                     Button {
@@ -160,26 +159,63 @@ extension DirectoryPickerView {
                             )
                         }
                     } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: "folder.fill")
-                                .foregroundColor(AgentBuddyTheme.accent)
-                                .frame(width: 20)
+                        HStack(spacing: BuddySpacing.md) {
+                            Image(systemName: "folder")
+                                .font(.system(size: 20, weight: .regular))
+                                .foregroundStyle(AgentBuddyTheme.textSecondary)
+                                .frame(width: 24)
+                                .accessibilityHidden(true)
                             Text(entry)
-                                .agentBuddyFont(.subheadline)
-                                .foregroundColor(AgentBuddyTheme.textPrimary)
-                            Spacer()
+                                .buddyText(.body)
+                                .foregroundStyle(AgentBuddyTheme.textPrimary)
+                                .lineLimit(2)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                             Image(systemName: "chevron.right")
-                                .foregroundColor(AgentBuddyTheme.textMuted)
-                                .agentBuddyFont(.caption)
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(AgentBuddyTheme.textSecondary)
+                                .accessibilityHidden(true)
                         }
+                        .frame(minHeight: BuddySize.control)
+                        .contentShape(Rectangle())
                     }
-                    .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+                    .buttonStyle(.plain)
+                    .listRowBackground(AgentBuddyTheme.surface)
                 }
             }
         }
         .scrollContentBackground(.hidden)
         .animation(.easeInOut(duration: 0.2), value: model.recentEntries)
         .accessibilityIdentifier("directoryPicker.list")
+    }
+
+    /// Recent / continue row: tile, folder name, full path in code type.
+    private func directoryRow<Accessory: View>(
+        symbol: String,
+        tileFill: Color = AgentBuddyTheme.surfaceSoft,
+        tileForeground: Color = AgentBuddyTheme.textPrimary,
+        title: String,
+        path: String,
+        @ViewBuilder accessory: () -> Accessory
+    ) -> some View {
+        HStack(spacing: BuddySpacing.md) {
+            BuddyIconTile(content: .symbol(symbol), fill: tileFill, foreground: tileForeground, size: 40)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .buddyText(.heading)
+                    .foregroundStyle(AgentBuddyTheme.textPrimary)
+                    .lineLimit(1)
+                Text(PathDisplay.display(path, isLocal: selectedServerIsLocal))
+                    .buddyText(.code)
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            accessory()
+        }
+        .padding(.vertical, BuddySpacing.xxs)
+        .frame(minHeight: 56)
+        .contentShape(Rectangle())
     }
 
     private func selectNextServer() {

@@ -125,11 +125,16 @@ struct ContentView: View {
         .onChange(of: appModel.snapshot) { _, nextSnapshot in
             appRuntime.handleSnapshot(nextSnapshot)
         }
-        .sheet(isPresented: $bindableAppState.showServerPicker) {
+        .sheet(isPresented: $bindableAppState.showServerPicker, onDismiss: {
+            appState.serverPickerEntryPoint = .chooser
+        }) {
             NavigationStack {
-                DiscoveryView(onServerSelected: { _ in
-                    appState.showServerPicker = false
-                })
+                DiscoveryView(
+                    onServerSelected: { _ in
+                        appState.showServerPicker = false
+                    },
+                    entryPoint: appState.serverPickerEntryPoint
+                )
             }
             .environment(appModel)
             .environment(appState)

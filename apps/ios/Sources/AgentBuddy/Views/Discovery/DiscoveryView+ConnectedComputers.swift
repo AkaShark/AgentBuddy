@@ -5,57 +5,66 @@ extension DiscoveryView {
 
     var slingshotHostsSheet: some View {
         NavigationStack {
-            ZStack {
-                AgentBuddyTheme.backgroundGradient.ignoresSafeArea()
-                List {
-                    Section {
-                        if slingshotIsLoading && slingshotEnvironments.isEmpty {
-                            HStack(spacing: 10) {
-                                ProgressView()
-                                    .tint(AgentBuddyTheme.accent)
-                                Text("Loading connected computers...")
-                                    .agentBuddyFont(.footnote)
-                                    .foregroundColor(AgentBuddyTheme.textSecondary)
-                            }
-                        } else if let slingshotError {
-                            VStack(alignment: .leading, spacing: 8) {
+            List {
+                Section {
+                    if slingshotIsLoading && slingshotEnvironments.isEmpty {
+                        HStack(spacing: BuddySpacing.sm) {
+                            ProgressView()
+                                .tint(AgentBuddyTheme.textSecondary)
+                            Text("Loading connected computers...")
+                                .buddyText(.body)
+                                .foregroundStyle(AgentBuddyTheme.textSecondary)
+                        }
+                        .frame(minHeight: BuddySize.control)
+                    } else if let slingshotError {
+                        VStack(alignment: .leading, spacing: BuddySpacing.sm) {
+                            Label {
                                 Text(slingshotError)
-                                    .agentBuddyFont(.footnote)
-                                    .foregroundColor(AgentBuddyTheme.textSecondary)
-                                Button("Retry") {
-                                    Task { await loadSlingshotEnvironments() }
-                                }
-                                .foregroundColor(AgentBuddyTheme.accent)
-                                .agentBuddyFont(.footnote, weight: .semibold)
+                                    .buddyText(.body)
+                                    .foregroundStyle(AgentBuddyTheme.textPrimary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            } icon: {
+                                Image(systemName: "exclamationmark.triangle")
+                                    .foregroundStyle(AgentBuddyTheme.warning)
+                                    .accessibilityHidden(true)
                             }
-                        } else if slingshotEnvironments.isEmpty {
-                            Text("No connected computers were found for this account.")
-                                .agentBuddyFont(.footnote)
-                                .foregroundColor(AgentBuddyTheme.textSecondary)
-                        } else {
-                            ForEach(slingshotEnvironments, id: \.id) { environment in
-                                Button {
-                                    showSlingshotHosts = false
-                                    Task { await connectSlingshotEnvironment(environment) }
-                                } label: {
-                                    slingshotEnvironmentRow(environment)
-                                }
-                                .buttonStyle(.plain)
-                                .disabled(!environment.online)
+                            BuddyButton("Retry", systemImage: "arrow.clockwise", kind: .secondary) {
+                                Task { await loadSlingshotEnvironments() }
                             }
                         }
-                    } header: {
-                        Text("Connected Computers")
-                            .foregroundColor(AgentBuddyTheme.textSecondary)
-                    } footer: {
-                        Text("These computers come from ChatGPT using your signed-in account. Start Codex on the computer first so it appears here.")
-                            .agentBuddyFont(.caption2)
-                            .foregroundColor(AgentBuddyTheme.textMuted)
+                        .padding(.vertical, BuddySpacing.xs)
+                    } else if slingshotEnvironments.isEmpty {
+                        Text("No connected computers were found for this account.")
+                            .buddyText(.body)
+                            .foregroundStyle(AgentBuddyTheme.textSecondary)
+                            .padding(.vertical, BuddySpacing.xs)
+                    } else {
+                        ForEach(slingshotEnvironments, id: \.id) { environment in
+                            Button {
+                                showSlingshotHosts = false
+                                Task { await connectSlingshotEnvironment(environment) }
+                            } label: {
+                                slingshotEnvironmentRow(environment)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(!environment.online)
+                        }
                     }
-                    .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+                } header: {
+                    Text("Connected Computers")
+                        .buddyText(.caption, weight: .medium)
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
+                        .textCase(nil)
+                } footer: {
+                    Text("These computers come from ChatGPT using your signed-in account. Start Codex on the computer first so it appears here.")
+                        .buddyText(.caption)
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
                 }
-                .scrollContentBackground(.hidden)
+                .listRowBackground(AgentBuddyTheme.surface)
+                .listRowSeparatorTint(AgentBuddyTheme.border)
             }
+            .scrollContentBackground(.hidden)
+            .buddyPageBackground()
             .navigationTitle("Connected Computers")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -64,11 +73,11 @@ extension DiscoveryView {
                         Task { await loadSlingshotEnvironments() }
                     }
                     .disabled(slingshotIsLoading)
-                    .foregroundColor(AgentBuddyTheme.accent)
+                    .foregroundStyle(AgentBuddyTheme.link)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Cancel") { showSlingshotHosts = false }
-                        .foregroundColor(AgentBuddyTheme.accent)
+                        .foregroundStyle(AgentBuddyTheme.link)
                 }
             }
             .task {
@@ -77,28 +86,34 @@ extension DiscoveryView {
                 }
             }
         }
+        .buddySheetStyle()
     }
 
     private func slingshotEnvironmentRow(_ environment: AppSlingshotEnvironment) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: slingshotIconName(for: environment))
-                .foregroundColor(environment.online ? AgentBuddyTheme.accent : AgentBuddyTheme.textMuted)
-                .frame(width: 24)
+        HStack(spacing: BuddySpacing.md) {
+            BuddyIconTile(
+                content: .symbol(slingshotIconName(for: environment)),
+                foreground: environment.online ? AgentBuddyTheme.textPrimary : AgentBuddyTheme.textSecondary
+            )
             VStack(alignment: .leading, spacing: 2) {
                 Text(environment.displayName)
-                    .agentBuddyFont(.subheadline)
-                    .foregroundColor(environment.online ? AgentBuddyTheme.textPrimary : AgentBuddyTheme.textSecondary)
+                    .buddyText(.heading)
+                    .foregroundStyle(environment.online ? AgentBuddyTheme.textPrimary : AgentBuddyTheme.textSecondary)
+                    .lineLimit(2)
                 Text(slingshotSubtitle(for: environment))
-                    .agentBuddyFont(.caption)
-                    .foregroundColor(AgentBuddyTheme.textSecondary)
+                    .buddyText(.label, weight: .regular)
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
+                    .lineLimit(2)
             }
-            Spacer()
-            statusTag(
-                label: environment.online ? (environment.busy ? "busy" : "online") : "offline",
-                color: environment.online ? (environment.busy ? .orange : AgentBuddyTheme.accent) : AgentBuddyTheme.textMuted
+            .frame(maxWidth: .infinity, alignment: .leading)
+            BuddyConnectionPill(
+                state: environment.online ? (environment.busy ? .connecting : .connected) : .disconnected,
+                title: Text(environment.online ? (environment.busy ? "Busy" : "Online") : "Offline")
             )
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, BuddySpacing.xs)
+        .frame(minHeight: 64)
+        .contentShape(Rectangle())
     }
 
     @MainActor

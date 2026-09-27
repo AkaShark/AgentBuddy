@@ -14,7 +14,7 @@ extension AlleycatAddServerSheet {
     }
 
     var pairingSection: some View {
-        Section {
+        DiscoveryFormSection("Pairing") {
             // Mac (Catalyst + iOS-on-Mac) shows paste-JSON only; iOS shows
             // QR scanning first, with paste available as a production fallback
             // for users who already copied the pairing payload.
@@ -23,18 +23,14 @@ extension AlleycatAddServerSheet {
             } else {
                 qrPairingControls
             }
-        } header: {
-            Text("Pairing")
-                .foregroundColor(AgentBuddyTheme.textSecondary)
         }
-        .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
     }
 
     @ViewBuilder
     private var pasteJSONPairingControls: some View {
         Text("Run \(Self.pairCommandLabel) on the host you want to connect to, then paste the JSON it prints below.")
-            .agentBuddyFont(.caption)
-            .foregroundColor(AgentBuddyTheme.textSecondary)
+            .buddyText(.body)
+            .foregroundStyle(AgentBuddyTheme.textSecondary)
             .fixedSize(horizontal: false, vertical: true)
 
         pasteJSONEntryControls(minHeight: 110)
@@ -42,66 +38,69 @@ extension AlleycatAddServerSheet {
 
     @ViewBuilder
     private var qrPairingControls: some View {
-        Button {
-            requestCameraAndScan()
-        } label: {
-            HStack {
-                Image(systemName: "qrcode.viewfinder")
-                    .foregroundColor(AgentBuddyTheme.accent)
-                Text(parsedParams == nil ? "Scan Pairing QR" : "Rescan QR")
-                    .agentBuddyFont(.subheadline)
-                    .foregroundColor(AgentBuddyTheme.accent)
+        VStack(alignment: .leading, spacing: BuddySpacing.md) {
+            HStack(alignment: .top, spacing: BuddySpacing.md) {
+                BuddyIconTile(
+                    content: .symbol("qrcode.viewfinder"),
+                    fill: AgentBuddyTheme.onBrand.opacity(0.1),
+                    foreground: AgentBuddyTheme.onBrand
+                )
+                Text("The pairing code comes from AgentBuddy on your computer. Open it there, then scan the code with this phone.")
+                    .buddyText(.body)
+                    .foregroundStyle(AgentBuddyTheme.onBrand)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            BuddyButton(
+                parsedParams == nil ? "Scan Pairing QR" : "Rescan QR",
+                systemImage: "qrcode.viewfinder",
+                kind: parsedParams == nil ? .primary : .secondary
+            ) {
+                requestCameraAndScan()
             }
         }
+        .buddyCard(.brand, radius: BuddyRadius.card, padding: BuddySpacing.lg)
 
         DisclosureGroup(
             isExpanded: $showPaste,
             content: {
                 pasteJSONEntryControls(minHeight: 90)
+                    .padding(.top, BuddySpacing.xs)
             },
             label: {
                 Text("Paste Pairing JSON")
-                    .agentBuddyFont(.footnote)
-                    .foregroundColor(AgentBuddyTheme.textSecondary)
+                    .buddyText(.label)
+                    .foregroundStyle(AgentBuddyTheme.textPrimary)
+                    .frame(minHeight: BuddySize.minHitTarget)
             }
         )
+        .tint(AgentBuddyTheme.textSecondary)
+        .padding(.top, BuddySpacing.xxs)
     }
 
     @ViewBuilder
     private func pasteJSONEntryControls(minHeight: CGFloat) -> some View {
-        TextEditor(text: $pasteJSON)
-            .agentBuddyFont(.caption)
-            .foregroundColor(AgentBuddyTheme.textPrimary)
-            .scrollContentBackground(.hidden)
-            .frame(minHeight: minHeight)
-            .overlay(alignment: .topLeading) {
-                if pasteJSON.isEmpty {
-                    Text(#"{"v":1,"node_id":"...","token":"...","relay":"https://..."}"#)
-                        .agentBuddyFont(.caption)
-                        .foregroundColor(AgentBuddyTheme.textMuted)
-                        .padding(.top, 8)
-                        .padding(.leading, 4)
-                        .allowsHitTesting(false)
+        VStack(alignment: .leading, spacing: BuddySpacing.xs) {
+            DiscoveryPasteEditor(
+                text: $pasteJSON,
+                placeholder: #"{"v":1,"node_id":"...","token":"...","relay":"https://..."}"#,
+                minHeight: minHeight
+            )
+
+            HStack(spacing: BuddySpacing.sm) {
+                BuddyButton("Paste from Clipboard", systemImage: "doc.on.clipboard", kind: .soft) {
+                    if let clipboard = UIPasteboard.general.string {
+                        pasteJSON = clipboard
+                    }
                 }
-            }
 
-        HStack {
-            Button("Paste from Clipboard") {
-                if let clipboard = UIPasteboard.general.string {
-                    pasteJSON = clipboard
+                BuddyButton(
+                    parsedParams == nil ? "Parse JSON" : "Reparse JSON",
+                    kind: .secondary
+                ) {
+                    handleScannedPayload(pasteJSON)
                 }
+                .disabled(pasteJSON.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
-            .agentBuddyFont(.footnote)
-            .foregroundColor(AgentBuddyTheme.accent)
-
-            Spacer()
-
-            Button(parsedParams == nil ? "Parse JSON" : "Reparse JSON") {
-                handleScannedPayload(pasteJSON)
-            }
-            .agentBuddyFont(.footnote)
-            .foregroundColor(AgentBuddyTheme.accent)
-            .disabled(pasteJSON.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
     }
 

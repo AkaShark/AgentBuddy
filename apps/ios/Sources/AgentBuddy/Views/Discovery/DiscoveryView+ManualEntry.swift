@@ -5,79 +5,69 @@ extension DiscoveryView {
 
     var manualEntrySheet: some View {
         NavigationStack {
-            ZStack {
-                AgentBuddyTheme.backgroundGradient.ignoresSafeArea()
-                Form {
-                    Section {
-                        Picker("Connection Type", selection: $manualConnectionMode) {
-                            ForEach(DiscoveryManualConnectionMode.allCases) { mode in
-                                Text(mode.label).tag(mode)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                    } header: {
-                        Text("Connection")
-                            .foregroundColor(AgentBuddyTheme.textSecondary)
+            ScrollView {
+                VStack(alignment: .leading, spacing: BuddySpacing.xl) {
+                    DiscoveryFormSection("Connection") {
+                        DiscoverySegmentedPicker(
+                            options: DiscoveryManualConnectionMode.allCases.map { ($0, LocalizedStringKey($0.label)) },
+                            selection: $manualConnectionMode
+                        )
                     }
-                    .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
 
-                    Section {
+                    DiscoveryFormSection(
+                        LocalizedStringKey(manualConnectionMode.formHeader),
+                        footer: manualConnectionMode == .codex ? Text(Self.manualCodexSafetyNote) : nil
+                    ) {
                         if manualConnectionMode == .codex {
                             TextField("ws://host:port or wss://...", text: $manualCodexURL)
-                                .agentBuddyFont(.footnote)
-                                .foregroundColor(AgentBuddyTheme.textPrimary)
                                 .textInputAutocapitalization(.never)
                                 .autocorrectionDisabled(true)
                                 .keyboardType(.URL)
+                                .discoveryFieldStyle()
                         } else {
-                            TextField("hostname or IP", text: $manualHost)
-                                .agentBuddyFont(.footnote)
-                                .foregroundColor(AgentBuddyTheme.textPrimary)
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled(true)
-                            TextField("ssh port", text: $manualSSHPort)
-                                .agentBuddyFont(.footnote)
-                                .foregroundColor(AgentBuddyTheme.textPrimary)
-                                .keyboardType(.numberPad)
-                            TextField("wake MAC (optional)", text: $manualWakeMAC)
-                                .agentBuddyFont(.footnote)
-                                .foregroundColor(AgentBuddyTheme.textPrimary)
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled(true)
-                        }
-                    } header: {
-                        Text(manualConnectionMode.formHeader)
-                            .foregroundColor(AgentBuddyTheme.textSecondary)
-                    } footer: {
-                        if manualConnectionMode == .codex {
-                            Text("Prefer the SSH flow — it bootstraps codex on the remote bound to 127.0.0.1 and forwards the port over SSH.\nIf you run it manually, bind loopback and tunnel yourself: codex app-server --listen ws://127.0.0.1:8390\nFor reverse proxies: wss://example.com/ws?token=SECRET\nDo not bind 0.0.0.0 or expose directly to the internet unless you know what you are doing.")
-                                .agentBuddyFont(.caption2)
-                                .foregroundColor(AgentBuddyTheme.textMuted)
+                            VStack(spacing: BuddySpacing.sm) {
+                                TextField("hostname or IP", text: $manualHost)
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled(true)
+                                    .discoveryFieldStyle()
+                                TextField("ssh port", text: $manualSSHPort)
+                                    .keyboardType(.numberPad)
+                                    .discoveryFieldStyle()
+                                TextField("wake MAC (optional)", text: $manualWakeMAC)
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled(true)
+                                    .discoveryFieldStyle()
+                            }
                         }
                     }
-                    .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
-
-                    Section {
-                        Button(manualConnectionMode.primaryButtonTitle) {
-                            submitManualEntry()
-                        }
-                        .foregroundColor(AgentBuddyTheme.accent)
-                        .agentBuddyFont(.subheadline)
-                    }
-                    .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
                 }
-                .scrollContentBackground(.hidden)
+                .padding(.horizontal, BuddySpacing.xl)
+                .padding(.top, BuddySpacing.md)
+                .padding(.bottom, BuddySpacing.xl)
             }
-            .navigationTitle("Add Server")
+            .scrollDismissesKeyboard(.interactively)
+            .buddyPageBackground()
+            .safeAreaInset(edge: .bottom) {
+                BuddyButton(LocalizedStringKey(manualConnectionMode.primaryButtonTitle)) {
+                    submitManualEntry()
+                }
+                .padding(.horizontal, BuddySpacing.xl)
+                .padding(.vertical, BuddySpacing.sm)
+                .background(AgentBuddyTheme.background)
+            }
+            .navigationTitle("SSH or address")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Cancel") { showManualEntry = false }
-                        .foregroundColor(AgentBuddyTheme.accent)
+                        .foregroundStyle(AgentBuddyTheme.link)
                 }
             }
         }
+        .buddySheetStyle()
     }
+
+    private static let manualCodexSafetyNote: LocalizedStringKey = "Prefer the SSH flow — it bootstraps codex on the remote bound to 127.0.0.1 and forwards the port over SSH.\nIf you run it manually, bind loopback and tunnel yourself: codex app-server --listen ws://127.0.0.1:8390\nFor reverse proxies: wss://example.com/ws?token=SECRET\nDo not bind 0.0.0.0 or expose directly to the internet unless you know what you are doing."
 
     func maybeStartSimulatorAutoSSH() {
 #if DEBUG

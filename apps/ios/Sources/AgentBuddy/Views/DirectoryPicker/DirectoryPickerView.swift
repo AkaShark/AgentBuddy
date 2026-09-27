@@ -43,19 +43,18 @@ struct DirectoryPickerView: View {
     }
 
     var body: some View {
-        ZStack {
-            AgentBuddyTheme.backgroundGradient.ignoresSafeArea()
-            VStack(spacing: 0) {
-                controls
-                Divider().background(AgentBuddyTheme.separator)
-                content
-            }
+        VStack(spacing: 0) {
+            controls
+            BuddyDivider()
+            content
         }
+        .buddyPageBackground()
         .safeAreaInset(edge: .bottom) {
             bottomActionBar
         }
         .navigationTitle(DirectoryPickerStrings.title)
         .navigationBarTitleDisplayMode(.inline)
+        .buddySheetStyle()
         .interactiveDismissDisabled(model.canNavigateUp)
         .task(id: selectedServerId) {
             onServerChanged?(selectedServerId)
@@ -142,37 +141,26 @@ struct DirectoryPickerView: View {
     }
 
     private var bottomActionBar: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: BuddySpacing.xs) {
             if !model.currentPath.isEmpty {
                 Text(PathDisplay.display(model.currentPath, isLocal: selectedServerIsLocal))
-                    .agentBuddyFont(.caption)
-                    .foregroundColor(AgentBuddyTheme.textMuted)
+                    .buddyText(.code)
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else if !canSelectPath {
                 Text(DirectoryPickerStrings.chooseFolderHelper)
-                    .agentBuddyFont(.caption)
-                    .foregroundColor(AgentBuddyTheme.textSecondary)
+                    .buddyText(.caption)
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            HStack(spacing: 10) {
-                Button(DirectoryPickerStrings.cancel) {
+            HStack(spacing: BuddySpacing.sm) {
+                BuddyButton(verbatim: DirectoryPickerStrings.cancel, kind: .secondary) {
                     onDismissRequested?()
                 }
-                .buttonStyle(.plain)
-                .agentBuddyFont(.subheadline)
-                .foregroundColor(AgentBuddyTheme.textSecondary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .background(AgentBuddyTheme.surface.opacity(0.65))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(AgentBuddyTheme.border.opacity(0.75), lineWidth: 1)
-                )
-                .cornerRadius(8)
 
-                Button(DirectoryPickerStrings.selectFolder) {
+                BuddyButton(verbatim: DirectoryPickerStrings.selectFolder) {
                     emitSuccessHaptic()
                     withAnimation(.easeInOut(duration: 0.16)) {
                         onDirectorySelected?(selectedServerId, model.currentPath)
@@ -180,23 +168,16 @@ struct DirectoryPickerView: View {
                 }
                 .accessibilityIdentifier("directoryPicker.selectFolderButton")
                 .disabled(!canSelectPath)
-                .buttonStyle(.plain)
-                .agentBuddyFont(.subheadline)
-                .foregroundColor(canSelectPath ? AgentBuddyTheme.textOnAccent : AgentBuddyTheme.textMuted)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .background(canSelectPath ? AgentBuddyTheme.accent : AgentBuddyTheme.surface.opacity(0.65))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(canSelectPath ? AgentBuddyTheme.accent.opacity(0.8) : AgentBuddyTheme.border.opacity(0.75), lineWidth: 1)
-                )
-                .cornerRadius(8)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
-        .padding(.bottom, 8)
-        .background(.ultraThinMaterial)
+        .padding(.horizontal, BuddySpacing.xl)
+        .padding(.top, BuddySpacing.sm)
+        .padding(.bottom, BuddySpacing.xs)
+        .background(alignment: .top) {
+            AgentBuddyTheme.background
+                .overlay(alignment: .top) { BuddyDivider() }
+                .ignoresSafeArea(edges: .bottom)
+        }
     }
 
     func emitSuccessHaptic() {

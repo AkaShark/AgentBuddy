@@ -64,22 +64,21 @@ struct SSHAgentPickerSheet: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                AgentBuddyTheme.backgroundGradient.ignoresSafeArea()
-                Form {
-                    hostSection
+            ScrollView {
+                VStack(alignment: .leading, spacing: BuddySpacing.xl) {
+                    DiscoveryHostSummary(systemImage: "terminal", name: context.server.name, address: context.host)
                     agentSection
-                    connectSection
                     if let connectError {
-                        Section {
-                            Text(connectError)
-                                .agentBuddyFont(.caption)
-                                .foregroundColor(AgentBuddyTheme.danger)
-                        }
-                        .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+                        BuddyBanner(tone: .danger, message: Text(connectError))
                     }
                 }
-                .scrollContentBackground(.hidden)
+                .padding(.horizontal, BuddySpacing.xl)
+                .padding(.top, BuddySpacing.md)
+                .padding(.bottom, BuddySpacing.xl)
+            }
+            .buddyPageBackground()
+            .safeAreaInset(edge: .bottom) {
+                connectSection
             }
             .navigationTitle("Remote Agents")
             .navigationBarTitleDisplayMode(.inline)
@@ -89,117 +88,78 @@ struct SSHAgentPickerSheet: View {
                         onCancel()
                         dismiss()
                     }
-                    .foregroundColor(AgentBuddyTheme.accent)
+                    .foregroundStyle(AgentBuddyTheme.link)
                     .disabled(isConnecting)
                 }
             }
         }
-    }
-
-    private var hostSection: some View {
-        Section {
-            HStack(spacing: 12) {
-                Image(systemName: "terminal")
-                    .foregroundColor(AgentBuddyTheme.accent)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(context.server.name)
-                        .agentBuddyFont(.subheadline)
-                        .foregroundColor(AgentBuddyTheme.textPrimary)
-                    Text(context.host)
-                        .agentBuddyFont(.caption)
-                        .foregroundColor(AgentBuddyTheme.textSecondary)
-                }
-            }
-        }
-        .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+        .buddySheetStyle()
     }
 
     private var agentSection: some View {
-        Section {
-            ForEach(context.availability, id: \.kind) { agent in
-                Button {
-                    guard isBridgeKind(agent.kind), agent.status == .available else { return }
-                    if selectedKinds.contains(agent.kind) {
-                        selectedKinds.remove(agent.kind)
-                    } else {
-                        selectedKinds.insert(agent.kind)
-                    }
-                } label: {
-                    HStack(spacing: 10) {
-                        AgentIconView(kind: agent.kind, size: 22)
-                            .opacity(agent.status == .available ? 1 : 0.45)
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack(spacing: 6) {
-                                Text(runtimeDisplayName(agent.kind))
-                                    .agentBuddyFont(.subheadline)
-                                    .foregroundColor(agent.status == .available ? AgentBuddyTheme.textPrimary : AgentBuddyTheme.textMuted)
-                                if agent.kind.isBeta {
-                                    BetaBadge()
-                                }
-                            }
-                            Text(statusLabel(agent.status, kind: agent.kind))
-                                .agentBuddyFont(.caption)
-                                .foregroundColor(AgentBuddyTheme.textSecondary)
-                        }
-                        Spacer()
+        VStack(alignment: .leading, spacing: BuddySpacing.xs) {
+            DiscoveryAgentListHeader(
+                showsToggle: !availableBridgeKinds.isEmpty,
+                allSelected: selectedKinds.count == availableBridgeKinds.count,
+                isEnabled: !isConnecting
+            ) {
+                if selectedKinds.count == availableBridgeKinds.count {
+                    selectedKinds = []
+                } else {
+                    selectedKinds = Set(availableBridgeKinds)
+                }
+            }
+
+            VStack(spacing: 0) {
+                ForEach(Array(context.availability.enumerated()), id: \.element.kind) { index, agent in
+                    if index > 0 { BuddyDivider().padding(.leading, BuddySpacing.md) }
+                    Button {
+                        guard isBridgeKind(agent.kind), agent.status == .available else { return }
                         if selectedKinds.contains(agent.kind) {
-                            Image(systemName: "checkmark.square.fill")
-                                .foregroundColor(AgentBuddyTheme.accent)
-                        } else if isBridgeKind(agent.kind), agent.status == .available {
-                            Image(systemName: "square")
-                                .foregroundColor(AgentBuddyTheme.textMuted)
-                        }
-                    }
-                }
-                .disabled(!isBridgeKind(agent.kind) || agent.status != .available || isConnecting)
-            }
-        } header: {
-            HStack {
-                Text("Agents")
-                Spacer()
-                if !availableBridgeKinds.isEmpty {
-                    Button(selectedKinds.count == availableBridgeKinds.count ? "None" : "All") {
-                        if selectedKinds.count == availableBridgeKinds.count {
-                            selectedKinds = []
+                            selectedKinds.remove(agent.kind)
                         } else {
-                            selectedKinds = Set(availableBridgeKinds)
+                            selectedKinds.insert(agent.kind)
                         }
+                    } label: {
+                        DiscoveryAgentRow(
+                            kind: agent.kind,
+                            title: runtimeDisplayName(agent.kind),
+                            detail: statusLabel(agent.status, kind: agent.kind),
+                            isBeta: agent.kind.isBeta,
+                            mark: agentMark(for: agent)
+                        )
                     }
-                    .font(.caption)
-                    .foregroundColor(AgentBuddyTheme.accent)
-                    .disabled(isConnecting)
+                    .buttonStyle(.plain)
+                    .disabled(!isBridgeKind(agent.kind) || agent.status != .available || isConnecting)
                 }
             }
-            .foregroundColor(AgentBuddyTheme.textSecondary)
+            .buddyCard(.surface, radius: BuddyRadius.detailCard, padding: nil)
         }
-        .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+    }
+
+    private func agentMark(for agent: RemoteAgentAvailability) -> DiscoveryAgentRow.Mark {
+        if selectedKinds.contains(agent.kind) { return .selected }
+        if isBridgeKind(agent.kind), agent.status == .available { return .unselected }
+        // The detail line already says why (CLI missing, Windows…).
+        return .unavailable(note: nil)
     }
 
     private var connectSection: some View {
-        Section {
-            Button {
+        VStack(spacing: BuddySpacing.xxs) {
+            BuddyButton("Connect", isLoading: isConnecting) {
                 connect()
-            } label: {
-                HStack {
-                    if isConnecting {
-                        ProgressView().tint(AgentBuddyTheme.accent)
-                    }
-                    Text("Connect")
-                        .foregroundColor(AgentBuddyTheme.accent)
-                        .agentBuddyFont(.subheadline)
-                }
             }
             .disabled(isConnecting || selectedKinds.isEmpty)
 
-            Button("Use Codex SSH") {
+            BuddyButton("Use Codex SSH", kind: .quiet) {
                 onUseCodex()
                 dismiss()
             }
-            .agentBuddyFont(.footnote)
-            .foregroundColor(AgentBuddyTheme.textSecondary)
             .disabled(isConnecting)
         }
-        .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+        .padding(.horizontal, BuddySpacing.xl)
+        .padding(.vertical, BuddySpacing.sm)
+        .background(AgentBuddyTheme.background)
     }
 
     private var availableBridgeKinds: [AgentRuntimeKind] {

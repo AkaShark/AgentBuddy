@@ -48,36 +48,42 @@ struct AlleycatAddServerSheet: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                AgentBuddyTheme.backgroundGradient.ignoresSafeArea()
-                Form {
+            ScrollView {
+                VStack(alignment: .leading, spacing: BuddySpacing.xl) {
                     pairingSection
                     if let params = parsedParams {
                         previewSection(params: params)
                         agentSection
                     }
                     if let parseError {
-                        errorSection(parseError, color: AgentBuddyTheme.warning)
+                        errorBanner(parseError, tone: .warning)
                     }
                     if let agentError {
-                        errorSection(agentError, color: AgentBuddyTheme.warning)
+                        errorBanner(agentError, tone: .warning)
                     }
-                    connectSection
                     if let connectError {
-                        errorSection(connectError, color: AgentBuddyTheme.danger)
+                        errorBanner(connectError, tone: .danger)
                     }
                 }
-                .scrollContentBackground(.hidden)
+                .padding(.horizontal, BuddySpacing.xl)
+                .padding(.top, BuddySpacing.md)
+                .padding(.bottom, BuddySpacing.xl)
             }
-            .navigationTitle("Add Remote Host")
+            .scrollDismissesKeyboard(.interactively)
+            .buddyPageBackground()
+            .safeAreaInset(edge: .bottom) {
+                connectSection
+            }
+            .navigationTitle("Pair with QR code")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
-                        .foregroundColor(AgentBuddyTheme.accent)
+                        .foregroundStyle(AgentBuddyTheme.link)
                 }
             }
         }
+        .buddySheetStyle()
         .onAppear {
             requestInitialScanIfNeeded()
         }
@@ -117,67 +123,59 @@ struct AlleycatAddServerSheet: View {
     }
 
     private func previewSection(params: AppAlleycatPairPayload) -> some View {
-        Section {
-            previewRow(label: "node", value: shortNodeId(params.nodeId))
-            previewRow(label: "protocol", value: "v\(params.v)")
-            if let relay = params.relay, !relay.isEmpty {
-                previewRow(label: "relay", value: relay)
+        DiscoveryFormSection("Scanned Host") {
+            VStack(spacing: 0) {
+                previewRow(label: "node", value: shortNodeId(params.nodeId))
+                BuddyDivider()
+                previewRow(label: "protocol", value: "v\(params.v)")
+                if let relay = params.relay, !relay.isEmpty {
+                    BuddyDivider()
+                    previewRow(label: "relay", value: relay)
+                }
+                if let hostName = params.hostName, !hostName.isEmpty {
+                    BuddyDivider()
+                    previewRow(label: "host", value: hostName)
+                }
             }
-            if let hostName = params.hostName, !hostName.isEmpty {
-                previewRow(label: "host", value: hostName)
-            }
+            .padding(.horizontal, BuddySpacing.md)
+            .buddyCard(.surface, radius: BuddyRadius.detailCard, padding: nil)
+
             TextField("display name (optional)", text: $displayName)
-                .agentBuddyFont(.caption)
-                .foregroundColor(AgentBuddyTheme.textPrimary)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled(true)
-        } header: {
-            Text("Scanned Host")
-                .foregroundColor(AgentBuddyTheme.textSecondary)
+                .discoveryFieldStyle()
+                .padding(.top, BuddySpacing.xxs)
         }
-        .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
     }
 
     private func previewRow(label: String, value: String) -> some View {
-        HStack {
+        HStack(spacing: BuddySpacing.md) {
             Text(label)
-                .agentBuddyFont(.caption)
-                .foregroundColor(AgentBuddyTheme.textSecondary)
+                .buddyText(.label, weight: .regular)
+                .foregroundStyle(AgentBuddyTheme.textSecondary)
             Spacer()
             Text(value)
-                .agentBuddyFont(.caption)
-                .foregroundColor(AgentBuddyTheme.textPrimary)
+                .buddyText(.code)
+                .foregroundStyle(AgentBuddyTheme.textPrimary)
                 .lineLimit(1)
                 .truncationMode(.middle)
         }
+        .frame(minHeight: BuddySize.minHitTarget)
+        .accessibilityElement(children: .combine)
     }
 
     private var connectSection: some View {
-        Section {
-            Button {
-                connect()
-            } label: {
-                HStack {
-                    if isConnecting {
-                        ProgressView().tint(AgentBuddyTheme.accent)
-                    }
-                    Text("Connect")
-                        .foregroundColor(AgentBuddyTheme.accent)
-                        .agentBuddyFont(.subheadline)
-                }
-            }
-            .disabled(!canConnect)
+        BuddyButton("Connect", isLoading: isConnecting) {
+            connect()
         }
-        .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+        .disabled(!canConnect)
+        .padding(.horizontal, BuddySpacing.xl)
+        .padding(.vertical, BuddySpacing.sm)
+        .background(AgentBuddyTheme.background)
     }
 
-    private func errorSection(_ message: String, color: Color) -> some View {
-        Section {
-            Text(message)
-                .agentBuddyFont(.caption)
-                .foregroundColor(color)
-        }
-        .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+    private func errorBanner(_ message: String, tone: BuddyBanner.Tone) -> some View {
+        BuddyBanner(tone: tone, message: Text(message))
     }
 
     private var canConnect: Bool {

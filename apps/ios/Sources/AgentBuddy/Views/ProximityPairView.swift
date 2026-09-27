@@ -70,26 +70,30 @@ struct ProximityPairView: View {
 
     @State private var animatedScore: Float = 0
     @State private var lastFrame: ProximityFrame?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
-            backgroundGradient
-            TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { context in
-                let frame = currentFrame()
-                let t = context.date.timeIntervalSinceReferenceDate
-                pulseField(score: animatedScore, time: t)
-                    .blendMode(.plusLighter)
+            // Proximity rings are a looping decoration, so Reduce Motion
+            // drops them; the distance readout and status text remain.
+            if !reduceMotion {
+                TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { context in
+                    let t = context.date.timeIntervalSinceReferenceDate
+                    pulseField(score: animatedScore, time: t)
+                }
+                .ignoresSafeArea()
+                .accessibilityHidden(true)
             }
-            .ignoresSafeArea()
 
-            VStack(spacing: 24) {
+            VStack(spacing: BuddySpacing.xl) {
                 Spacer()
                 centerStack
                 Spacer()
                 actionRow
             }
-            .padding(24)
+            .padding(BuddySpacing.xl)
         }
+        .buddyPageBackground()
         .navigationTitle("Pair")
         .navigationBarTitleDisplayMode(.inline)
         #if targetEnvironment(macCatalyst)
@@ -135,22 +139,8 @@ struct ProximityPairView: View {
 
     // MARK: - Visual sub-views
 
-    private var backgroundGradient: some View {
-        let s = CGFloat(animatedScore)
-        return LinearGradient(
-            colors: [
-                Color.black,
-                AgentBuddyTheme.surface.opacity(0.4 + 0.4 * s)
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .ignoresSafeArea()
-    }
-
-    /// Three concentric rings + a halo around the peer-icon, all keyed off
-    /// the smoothed proximity score. Pulses faster as you get closer; the
-    /// halo brightens too.
+    /// Three concentric rings around the peer icon, keyed off the smoothed
+    /// proximity score. They pulse faster and stronger as you get closer.
     private func pulseField(score: Float, time: TimeInterval) -> some View {
         let s = CGFloat(score)
         // Pulse period shrinks from 1.6s (far) to 0.45s (very close).
@@ -166,54 +156,42 @@ struct ProximityPairView: View {
                     let radius = (0.15 + p * 0.85) * maxRadius
                     let opacity = max(0, 1.0 - p) * (0.25 + 0.5 * s)
                     Circle()
-                        .stroke(AgentBuddyTheme.accent.opacity(Double(opacity)), lineWidth: 2)
+                        .stroke(AgentBuddyTheme.link.opacity(Double(opacity)), lineWidth: 2)
                         .frame(width: radius * 2, height: radius * 2)
                         .position(center)
                 }
-                // Halo around the peer icon — brightens with proximity.
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            colors: [
-                                AgentBuddyTheme.accent.opacity(0.6 * Double(s)),
-                                AgentBuddyTheme.accent.opacity(0)
-                            ],
-                            center: .center,
-                            startRadius: 0,
-                            endRadius: maxRadius * 0.4
-                        )
-                    )
-                    .frame(width: maxRadius * 0.8, height: maxRadius * 0.8)
-                    .position(center)
             }
         }
     }
 
     private var centerStack: some View {
         let frame = currentFrame()
-        return VStack(spacing: 18) {
+        return VStack(spacing: BuddySpacing.md) {
             Image(systemName: peerIconName)
-                .font(.system(size: 64, weight: .light))
-                .foregroundColor(AgentBuddyTheme.accent)
-                .shadow(color: AgentBuddyTheme.accent.opacity(Double(animatedScore) * 0.8), radius: 24)
-                .scaleEffect(1 + CGFloat(animatedScore) * 0.08)
-                .animation(.smooth, value: animatedScore)
+                .font(.system(size: 44, weight: .regular))
+                .foregroundStyle(AgentBuddyTheme.onBrand)
+                .frame(width: 112, height: 112)
+                .background(AgentBuddyTheme.brand, in: Circle())
+                .scaleEffect(reduceMotion ? 1 : 1 + CGFloat(animatedScore) * 0.08)
+                .animation(reduceMotion ? nil : .smooth, value: animatedScore)
+                .accessibilityHidden(true)
 
             if let name = frame.peerName {
                 Text(name)
-                    .agentBuddyFont(.title3, weight: .semibold)
-                    .foregroundColor(AgentBuddyTheme.textPrimary)
+                    .buddyText(.title)
+                    .foregroundStyle(AgentBuddyTheme.textPrimary)
+                    .multilineTextAlignment(.center)
             } else {
                 Text(frame.phase == .searching ? "Searching…" : "—")
-                    .agentBuddyFont(.title3, weight: .semibold)
-                    .foregroundColor(AgentBuddyTheme.textSecondary)
+                    .buddyText(.title)
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
             }
 
             distanceReadout(frame: frame)
 
             Text(frame.phase.statusText(peerLabel: peerLabel, isHost: isHost))
-                .agentBuddyFont(.subheadline)
-                .foregroundColor(AgentBuddyTheme.textSecondary)
+                .buddyText(.body)
+                .foregroundStyle(AgentBuddyTheme.textSecondary)
                 .multilineTextAlignment(.center)
         }
     }
@@ -241,21 +219,24 @@ struct ProximityPairView: View {
     private func distanceReadout(frame: ProximityFrame) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Text(frame.distanceM.map { String(format: "%.1f", $0) } ?? "—")
-                .agentBuddyFont(size: 56, weight: .semibold)
-                .foregroundColor(AgentBuddyTheme.textPrimary)
+                .buddyText(.display)
+                .monospacedDigit()
+                .foregroundStyle(AgentBuddyTheme.textPrimary)
                 .contentTransition(.numericText())
             Text("m")
-                .agentBuddyFont(.title3)
-                .foregroundColor(AgentBuddyTheme.textMuted)
+                .buddyText(.heading, weight: .regular)
+                .foregroundStyle(AgentBuddyTheme.textSecondary)
             if let v = frame.velocityMS, abs(v) > 0.1 {
                 let arrow = v > 0 ? "arrow.down.right" : "arrow.up.left"
-                let color = v > 0 ? AgentBuddyTheme.accentStrong : AgentBuddyTheme.textMuted
+                let color = v > 0 ? AgentBuddyTheme.link : AgentBuddyTheme.textSecondary
                 Image(systemName: arrow)
-                    .agentBuddyFont(.subheadline)
-                    .foregroundColor(color)
+                    .buddyText(.label)
+                    .foregroundStyle(color)
+                    .accessibilityHidden(true)
                 Text(String(format: "%.1f m/s", abs(v)))
-                    .agentBuddyFont(.subheadline)
-                    .foregroundColor(color)
+                    .buddyText(.label)
+                    .monospacedDigit()
+                    .foregroundStyle(color)
             }
         }
     }
@@ -264,40 +245,22 @@ struct ProximityPairView: View {
         let frame = currentFrame()
         return HStack(spacing: 12) {
             #if !targetEnvironment(macCatalyst)
-            Button(role: .cancel) {
+            BuddyButton("Cancel", kind: .secondary) {
                 pairing.cancel()
-            } label: {
-                Text("Cancel")
-                    .agentBuddyFont(.body, weight: .semibold)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(AgentBuddyTheme.surface)
-                    .foregroundColor(AgentBuddyTheme.textPrimary)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
             }
             if frame.phase == .failed || frame.phase == .rejected {
-                Button {
+                BuddyButton("Retry", systemImage: "arrow.clockwise") {
                     pairing.retry()
-                } label: {
-                    Text("Retry")
-                        .agentBuddyFont(.body, weight: .semibold)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(AgentBuddyTheme.accent)
-                        .foregroundColor(.black)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
             }
             #else
             // On the Mac side the host runs continuously; nothing to
             // start/stop from this screen. Show a passive status pill.
             Text(frame.phase == .paired ? "Paired" : (frame.peerName != nil ? "Connected" : "Broadcasting"))
-                .agentBuddyFont(.body, weight: .semibold)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(AgentBuddyTheme.surface.opacity(0.8))
-                .foregroundColor(AgentBuddyTheme.textPrimary)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .buddyText(.label, weight: .semibold)
+                .foregroundStyle(AgentBuddyTheme.textPrimary)
+                .frame(maxWidth: .infinity, minHeight: BuddySize.control)
+                .buddyCard(.soft, radius: BuddyRadius.button, padding: nil)
             #endif
         }
     }

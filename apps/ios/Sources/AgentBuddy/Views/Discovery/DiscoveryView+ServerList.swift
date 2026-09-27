@@ -11,25 +11,25 @@ extension DiscoveryView {
         Section {
             if allServers.isEmpty {
                 if discovery.isInitialLoad {
-                    HStack {
-                        ProgressView().tint(AgentBuddyTheme.textMuted).scaleEffect(0.7)
+                    HStack(spacing: BuddySpacing.sm) {
+                        ProgressView().tint(AgentBuddyTheme.textSecondary)
                         Text("Scanning...")
-                            .agentBuddyFont(.footnote)
-                            .foregroundColor(AgentBuddyTheme.textMuted)
+                            .buddyText(.body)
+                            .foregroundStyle(AgentBuddyTheme.textSecondary)
                     }
-                    .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+                    .listRowBackground(AgentBuddyTheme.surface)
                 } else {
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: BuddySpacing.xxs) {
                         Text("No servers found")
-                            .agentBuddyFont(.footnote)
-                            .foregroundColor(AgentBuddyTheme.textMuted)
+                            .buddyText(.body)
+                            .foregroundStyle(AgentBuddyTheme.textPrimary)
                         if discovery.isScanning {
                             Text("Still searching network...")
-                                .agentBuddyFont(.caption)
-                                .foregroundColor(AgentBuddyTheme.textSecondary)
+                                .buddyText(.caption)
+                                .foregroundStyle(AgentBuddyTheme.textSecondary)
                         }
                     }
-                    .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+                    .listRowBackground(AgentBuddyTheme.surface)
                 }
             } else {
                 ForEach(allServers) { server in
@@ -38,36 +38,38 @@ extension DiscoveryView {
             }
 
             if let notice = discovery.tailscaleDiscoveryNotice {
-                HStack(alignment: .top, spacing: 10) {
+                HStack(alignment: .top, spacing: BuddySpacing.sm) {
                     Image(systemName: "network.slash")
-                        .foregroundColor(AgentBuddyTheme.textSecondary)
-                        .frame(width: 18, alignment: .top)
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
+                        .frame(width: 20, alignment: .top)
+                        .accessibilityHidden(true)
                     Text(notice)
-                        .agentBuddyFont(.caption)
-                        .foregroundColor(AgentBuddyTheme.textSecondary)
+                        .buddyText(.caption)
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
                 }
-                .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+                .listRowBackground(AgentBuddyTheme.surface)
             }
         } header: {
             VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 8) {
+                HStack(spacing: BuddySpacing.xs) {
                     Text("Servers")
-                        .foregroundColor(AgentBuddyTheme.textSecondary)
+                        .buddyText(.caption, weight: .medium)
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
                     Spacer()
                     if discovery.isScanning, let label = discovery.scanProgressLabel {
                         Text(label)
-                            .agentBuddyFont(.caption2)
-                            .foregroundColor(AgentBuddyTheme.textMuted)
+                            .buddyText(.caption)
+                            .foregroundStyle(AgentBuddyTheme.textSecondary)
                     }
                 }
                 if discovery.isScanning {
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
                             Capsule()
-                                .fill(AgentBuddyTheme.surface)
+                                .fill(AgentBuddyTheme.surfaceSoft)
                                 .frame(height: 3)
                             Capsule()
-                                .fill(AgentBuddyTheme.accent)
+                                .fill(AgentBuddyTheme.action)
                                 .frame(
                                     width: geo.size.width * CGFloat(discovery.scanProgress),
                                     height: 3
@@ -79,7 +81,7 @@ extension DiscoveryView {
                 }
             }
         }
-        .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+        .listRowBackground(AgentBuddyTheme.surface)
     }
 
     // MARK: - Row
@@ -90,34 +92,37 @@ extension DiscoveryView {
         return Button {
             handleTap(server)
         } label: {
-            HStack(spacing: 12) {
-                Image(systemName: serverIconName(for: server))
-                    .foregroundColor(server.hasCodexServer ? AgentBuddyTheme.accent : AgentBuddyTheme.textSecondary)
-                    .frame(width: 24)
+            HStack(spacing: BuddySpacing.md) {
+                BuddyIconTile(
+                    content: .symbol(serverIconName(for: server)),
+                    foreground: server.hasCodexServer ? AgentBuddyTheme.textPrimary : AgentBuddyTheme.textSecondary
+                )
                 VStack(alignment: .leading, spacing: 2) {
                     Text(server.name)
-                        .agentBuddyFont(.subheadline)
-                        .foregroundColor(AgentBuddyTheme.textPrimary)
+                        .buddyText(.heading)
+                        .foregroundStyle(AgentBuddyTheme.textPrimary)
                     Text(serverSubtitle(server))
-                        .agentBuddyFont(.caption)
-                        .foregroundColor(AgentBuddyTheme.textSecondary)
+                        .buddyText(.label, weight: .regular)
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
                 }
                 Spacer()
                 if let progressTag = progressTag(for: serverSnapshot) {
                     statusTag(label: progressTag.label, color: progressTag.color)
                 } else if let health = serverSnapshot?.health,
                           health != .disconnected {
-                    statusTag(label: health.displayLabel.lowercased(), color: health.accentColor)
+                    statusTag(label: health.displayLabel.lowercased(), color: healthDotColor(health))
                 } else if connectingServer?.id == server.id {
-                    ProgressView().controlSize(.small).tint(AgentBuddyTheme.accent)
+                    ProgressView().controlSize(.small).tint(AgentBuddyTheme.textSecondary)
                 } else if wakingServer?.id == server.id {
-                    ProgressView().controlSize(.small).tint(AgentBuddyTheme.accent)
+                    ProgressView().controlSize(.small).tint(AgentBuddyTheme.textSecondary)
                 } else {
                     Image(systemName: "chevron.right")
-                        .foregroundColor(AgentBuddyTheme.textMuted)
-                        .font(.caption)
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
+                        .font(.system(size: 15, weight: .semibold))
+                        .accessibilityHidden(true)
                 }
             }
+            .frame(minHeight: 64)
         }
         .accessibilityIdentifier(rowIdentifier)
         .disabled(connectingServer != nil || wakingServer != nil)
@@ -167,15 +172,31 @@ extension DiscoveryView {
         return parts.joined()
     }
 
+    /// Dot + text status capsule; the text carries the state, the dot only
+    /// reinforces it.
     @ViewBuilder
     func statusTag(label: String, color: Color) -> some View {
-        Text(label)
-            .agentBuddyFont(.caption2)
-            .foregroundColor(color)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(color.opacity(0.15))
-            .cornerRadius(4)
+        HStack(spacing: 6) {
+            Circle()
+                .fill(color)
+                .frame(width: 8, height: 8)
+                .accessibilityHidden(true)
+            Text(label)
+                .buddyText(.caption, weight: .medium)
+                .foregroundStyle(AgentBuddyTheme.textPrimary)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, BuddySpacing.sm)
+        .frame(minHeight: 28)
+        .background(AgentBuddyTheme.surfaceSoft, in: Capsule())
+    }
+
+    private func healthDotColor(_ health: AppServerHealth) -> Color {
+        switch health {
+        case .connected: return AgentBuddyTheme.success
+        case .connecting, .unresponsive: return AgentBuddyTheme.warning
+        case .disconnected, .unknown: return AgentBuddyTheme.textSecondary
+        }
     }
 
     private func connectedSnapshot(for server: DiscoveredServer) -> AppServerSnapshot? {
@@ -194,13 +215,13 @@ extension DiscoveryView {
         let color: Color
         switch step.state {
         case .failed:
-            color = .red
+            color = AgentBuddyTheme.danger
         case .completed where step.kind == .connected:
-            color = AgentBuddyTheme.accentStrong
+            color = AgentBuddyTheme.success
         case .awaitingUserInput:
-            color = .orange
+            color = AgentBuddyTheme.warning
         default:
-            color = AgentBuddyTheme.accent
+            color = AgentBuddyTheme.link
         }
 
         return (label, color)

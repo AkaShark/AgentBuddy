@@ -6,52 +6,50 @@ extension DiscoveryView {
     @ViewBuilder
     var chooserContent: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: BuddySpacing.md) {
                 Text("Pick how you want to connect.")
-                    .agentBuddyFont(.footnote)
-                    .foregroundColor(AgentBuddyTheme.textSecondary)
-                    .padding(.top, 8)
+                    .buddyText(.body)
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
 
-                chooserCard(
-                    title: "Pair with AgentBuddy",
-                    subtitle: "Install the AgentBuddy desktop app on your Mac, open its Pairing page, then scan the QR code.",
-                    badge: "RECOMMENDED",
-                    icon: "qrcode.viewfinder",
-                    supportedAgents: Self.kittylitterAgents,
-                    isRecommended: true,
-                    accessibilityID: "discovery.chooser.kittylitter"
-                ) {
-                    showAlleycatSheet = true
+                VStack(spacing: BuddySpacing.sm) {
+                    chooserCard(
+                        title: "Scan QR from the computer",
+                        subtitle: "Open AgentBuddy on your computer and scan the pairing code it shows.",
+                        icon: "qrcode.viewfinder",
+                        supportedAgents: Self.kittylitterAgents,
+                        isRecommended: true,
+                        accessibilityID: "discovery.chooser.kittylitter"
+                    ) {
+                        showAlleycatSheet = true
+                    }
+
+                    chooserCard(
+                        title: "Connected computer",
+                        subtitle: "A computer running Codex with this ChatGPT account.",
+                        icon: "desktopcomputer",
+                        supportedAgents: [AgentRuntimeKind.codex],
+                        isRecommended: false,
+                        accessibilityID: "discovery.chooser.slingshot"
+                    ) {
+                        showSlingshotHosts = true
+                    }
+
+                    chooserCard(
+                        title: "SSH or address",
+                        subtitle: "Sign in over SSH, or enter a ws:// Codex address.",
+                        icon: "terminal",
+                        supportedAgents: [AgentRuntimeKind.codex],
+                        isRecommended: false,
+                        accessibilityID: "discovery.chooser.manual"
+                    ) {
+                        showManualEntry = true
+                    }
                 }
-
-                chooserCard(
-                    title: "Connected Computer",
-                    subtitle: "Connect to a computer already signed in and running Codex for this ChatGPT account.",
-                    badge: nil,
-                    icon: "desktopcomputer",
-                    supportedAgents: [AgentRuntimeKind.codex],
-                    isRecommended: false,
-                    accessibilityID: "discovery.chooser.slingshot"
-                ) {
-                    showSlingshotHosts = true
-                }
-
-                chooserCard(
-                    title: "SSH or Codex URL",
-                    subtitle: "Connect over SSH or paste a ws:// codex URL.",
-                    badge: nil,
-                    icon: "terminal",
-                    supportedAgents: [AgentRuntimeKind.codex],
-                    isRecommended: false,
-                    accessibilityID: "discovery.chooser.manual"
-                ) {
-                    showManualEntry = true
-                }
-
-                Spacer(minLength: 8)
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
+            .padding(.horizontal, BuddySpacing.xl)
+            .padding(.top, BuddySpacing.xs)
+            .padding(.bottom, BuddySpacing.xl)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollIndicators(.hidden)
@@ -74,102 +72,77 @@ extension DiscoveryView {
         "grok",
     ]
 
+    /// One connection option. The recommended QR option uses the brand
+    /// surface; the others sit on plain surface cards.
     private func chooserCard(
-        title: String,
-        subtitle: String,
-        badge: String?,
+        title: LocalizedStringKey,
+        subtitle: LocalizedStringKey,
         icon: String,
         supportedAgents: [AgentRuntimeKind],
         isRecommended: Bool,
         accessibilityID: String,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .top, spacing: 14) {
-                    Image(systemName: icon)
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundColor(AgentBuddyTheme.accent)
-                        .frame(width: 36, height: 36)
-                        .background(
-                            Circle()
-                                .fill(AgentBuddyTheme.accent.opacity(isRecommended ? 0.16 : 0.10))
-                        )
-                        .padding(.top, 2)
+        let primaryText = isRecommended ? AgentBuddyTheme.onBrand : AgentBuddyTheme.textPrimary
+        let secondaryText = isRecommended ? AgentBuddyTheme.onBrand : AgentBuddyTheme.textSecondary
+        return Button(action: action) {
+            VStack(alignment: .leading, spacing: BuddySpacing.md) {
+                HStack(alignment: .top, spacing: BuddySpacing.md) {
+                    BuddyIconTile(
+                        content: .symbol(icon),
+                        fill: isRecommended ? AgentBuddyTheme.onBrand.opacity(0.1) : AgentBuddyTheme.surfaceSoft,
+                        foreground: primaryText
+                    )
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 8) {
-                            Text(title)
-                                .agentBuddyFont(.subheadline, weight: .semibold)
-                                .foregroundColor(AgentBuddyTheme.textPrimary)
-                            if let badge {
-                                Text(badge)
-                                    .agentBuddyFont(.caption2, weight: .semibold)
-                                    .foregroundColor(AgentBuddyTheme.accentStrong)
-                                    .tracking(0.5)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(
-                                        Capsule()
-                                            .fill(AgentBuddyTheme.accent.opacity(0.14))
-                                    )
-                                    .overlay(
-                                        Capsule()
-                                            .stroke(AgentBuddyTheme.accent.opacity(0.45), lineWidth: 0.6)
-                                    )
-                            }
+                    VStack(alignment: .leading, spacing: BuddySpacing.xxs) {
+                        if isRecommended {
+                            BuddyChip(localized: "Recommended", tone: .onBrand)
+                                .padding(.bottom, BuddySpacing.xxs)
                         }
+                        Text(title)
+                            .buddyText(.heading)
+                            .foregroundStyle(primaryText)
                         Text(subtitle)
-                            .agentBuddyFont(.caption)
-                            .foregroundColor(AgentBuddyTheme.textSecondary)
+                            .buddyText(.label, weight: .regular)
+                            .foregroundStyle(secondaryText)
                             .multilineTextAlignment(.leading)
                             .fixedSize(horizontal: false, vertical: true)
-                            .padding(.top, 2)
                     }
-
-                    Spacer()
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                     Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundColor(AgentBuddyTheme.textMuted)
-                        .padding(.top, 10)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(secondaryText)
+                        .frame(minHeight: BuddySize.rowTile)
+                        .accessibilityHidden(true)
                 }
 
                 if !supportedAgents.isEmpty {
-                    supportedAgentsStrip(supportedAgents)
+                    supportedAgentsStrip(supportedAgents, textColor: secondaryText)
                 }
             }
-            .padding(.vertical, 14)
-            .padding(.horizontal, 16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(AgentBuddyTheme.surface.opacity(isRecommended ? 0.85 : 0.6))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(
-                        AgentBuddyTheme.accent.opacity(isRecommended ? 0.45 : 0.18),
-                        lineWidth: isRecommended ? 1.0 : 0.8
-                    )
-            )
+            .buddyCard(isRecommended ? .brand : .surface, radius: BuddyRadius.card, padding: BuddySpacing.lg)
+            .contentShape(RoundedRectangle(cornerRadius: BuddyRadius.card, style: .continuous))
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier(accessibilityID)
     }
 
     @ViewBuilder
-    private func supportedAgentsStrip(_ agents: [AgentRuntimeKind]) -> some View {
-        HStack(spacing: 8) {
+    private func supportedAgentsStrip(_ agents: [AgentRuntimeKind], textColor: Color) -> some View {
+        HStack(spacing: BuddySpacing.xs) {
             Text("Works with")
-                .agentBuddyFont(.caption2)
-                .foregroundColor(AgentBuddyTheme.textMuted)
-                .tracking(0.4)
+                .buddyText(.caption, weight: .medium)
+                .foregroundStyle(textColor)
                 .fixedSize(horizontal: true, vertical: false)
-            HStack(spacing: 5) {
+            HStack(spacing: 6) {
                 ForEach(agents, id: \.self) { agent in
-                    AgentIconView(kind: agent, size: 18)
-                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                    AgentIconView(kind: agent, size: 20)
+                        .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                        .accessibilityLabel(Text(verbatim: agent.displayLabel))
                 }
             }
             Spacer(minLength: 0)

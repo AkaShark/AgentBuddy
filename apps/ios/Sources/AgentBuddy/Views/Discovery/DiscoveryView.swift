@@ -30,18 +30,23 @@ struct DiscoveryView: View {
     @State var guidedSSHAttempt: DiscoveryGuidedSSHAttempt?
     @State var renameTarget: DiscoveredServer?
     @State var renameText = ""
+    @State private var didHandleEntryPoint = false
     @Environment(AppState.self) var appState
+    @Environment(\.dismiss) private var dismiss
+    private let entryPoint: DiscoveryEntryPoint
     private let autoStartDiscovery: Bool
     private let initialServers: [DiscoveredServer]
     let slingshotBaseURL = "https://chatgpt.com/backend-api"
 
     init(
         onServerSelected: ((DiscoveredServer) -> Void)? = nil,
+        entryPoint: DiscoveryEntryPoint = .chooser,
         discovery: NetworkDiscovery? = nil,
         autoStartDiscovery: Bool = true,
         initialServers: [DiscoveredServer] = []
     ) {
         self.onServerSelected = onServerSelected
+        self.entryPoint = entryPoint
         _discovery = State(initialValue: discovery ?? NetworkDiscovery())
         self.autoStartDiscovery = autoStartDiscovery
         self.initialServers = initialServers
@@ -70,24 +75,42 @@ struct DiscoveryView: View {
     }
 
     private func handleAppear() {
+        openEntryPointIfNeeded()
         guard autoStartDiscovery else { return }
         maybeStartSimulatorAutoSSH()
     }
 
     private func handleDisappear() {}
 
+    /// "Scan to connect" on home opens the QR pairing sheet directly, through
+    /// the same presentation the chooser's QR card uses. Runs once, so
+    /// dismissing the sheet leaves the chooser for the other options.
+    private func openEntryPointIfNeeded() {
+        guard !didHandleEntryPoint else { return }
+        didHandleEntryPoint = true
+        guard entryPoint == .pairWithQRCode else { return }
+        // Same hand-off the pairing sheet uses for its camera cover: let
+        // this sheet finish appearing before presenting on top of it.
+        Task { @MainActor in
+            await Task.yield()
+            showAlleycatSheet = true
+        }
+    }
+
     var body: some View {
-        ZStack {
-            AgentBuddyTheme.backgroundGradient.ignoresSafeArea()
+        Group {
             chooserContent
         }
-        .navigationTitle("Add Server")
+        .buddyPageBackground()
+        .navigationTitle("Add a host")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .principal) {
-                BrandLogo(size: 44)
+            ToolbarItem(placement: .topBarLeading) {
+                Button("Close") { dismiss() }
+                    .foregroundStyle(AgentBuddyTheme.link)
             }
         }
+        .buddySheetStyle()
         .onAppear { handleAppear() }
         .onDisappear { handleDisappear() }
         .sheet(item: $sshServer) { server in
