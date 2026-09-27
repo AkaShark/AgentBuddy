@@ -4,27 +4,27 @@ extension ConversationInfoView {
     // MARK: - Section C: Server Info
 
     var serverInfoSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: BuddySpacing.sm) {
             Text("Server")
-                .agentBuddyFont(size: 14, weight: .semibold)
+                .buddyText(.heading)
                 .foregroundStyle(AgentBuddyTheme.textPrimary)
+                .accessibilityAddTraits(.isHeader)
 
             if let server {
                 infoRow("Name", value: server.displayName)
-                infoRow("Address", value: "\(server.host):\(server.port)")
+                infoRow("Address", value: "\(server.host):\(server.port)", isCode: true)
                 infoRow("Mode", value: server.connectionModeLabel)
 
-                HStack(spacing: 6) {
-                    Text("Health")
-                        .agentBuddyFont(size: 12)
-                        .foregroundStyle(AgentBuddyTheme.textMuted)
-                    Spacer()
-                    Circle()
-                        .fill(healthColor(server.health))
-                        .frame(width: 8, height: 8)
-                    Text(healthLabel(server.health))
-                        .agentBuddyFont(size: 12)
-                        .foregroundStyle(AgentBuddyTheme.textSecondary)
+                infoRow("Health") {
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(healthColor(server.health))
+                            .frame(width: 8, height: 8)
+                            .accessibilityHidden(true)
+                        Text(healthLabel(server.health))
+                            .buddyText(.label, weight: .regular)
+                            .foregroundStyle(AgentBuddyTheme.textPrimary)
+                    }
                 }
 
                 if let account = server.account {
@@ -32,58 +32,75 @@ extension ConversationInfoView {
                 }
 
                 if let models = server.availableModels, !models.isEmpty {
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: BuddySpacing.xxs) {
                         Text("Available Models")
-                            .agentBuddyFont(size: 12)
-                            .foregroundStyle(AgentBuddyTheme.textMuted)
+                            .buddyText(.label, weight: .regular)
+                            .foregroundStyle(AgentBuddyTheme.textSecondary)
                         ForEach(models.prefix(8), id: \.id) { model in
-                            Text(model.displayName)
-                                .agentBuddyFont(size: 12)
-                                .foregroundStyle(AgentBuddyTheme.textSecondary)
+                            Text(verbatim: model.displayName)
+                                .buddyText(.label, weight: .regular)
+                                .foregroundStyle(AgentBuddyTheme.textPrimary)
                         }
                         if models.count > 8 {
                             Text("+\(models.count - 8) more")
-                                .agentBuddyFont(size: 11)
-                                .foregroundStyle(AgentBuddyTheme.textMuted)
+                                .buddyText(.caption)
+                                .foregroundStyle(AgentBuddyTheme.textSecondary)
                         }
                     }
+                    .padding(.top, BuddySpacing.xxs)
                 }
 
                 if server.isLocal {
+                    BuddyDivider()
                     Button {
                         isShowingMountedFolders = true
                     } label: {
-                        HStack(spacing: 6) {
+                        HStack(spacing: BuddySpacing.sm) {
                             Image(systemName: "externaldrive.badge.icloud")
-                                .agentBuddyFont(size: 12)
-                                .foregroundStyle(AgentBuddyTheme.accent)
+                                .font(.system(size: 17, weight: .medium))
+                                .foregroundStyle(AgentBuddyTheme.link)
+                                .accessibilityHidden(true)
                             Text("Mounted folders")
-                                .agentBuddyFont(size: 12)
-                                .foregroundStyle(AgentBuddyTheme.textSecondary)
+                                .buddyText(.body)
+                                .foregroundStyle(AgentBuddyTheme.textPrimary)
                             Spacer()
                             Image(systemName: "chevron.right")
-                                .agentBuddyFont(size: 11, weight: .semibold)
-                                .foregroundStyle(AgentBuddyTheme.textMuted)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(AgentBuddyTheme.textSecondary)
+                                .accessibilityHidden(true)
                         }
+                        .frame(minHeight: BuddySize.control)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }
             }
         }
-        .padding(16)
-        .modifier(GlassRectModifier(cornerRadius: 12))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .buddyCard(.surface, radius: BuddyRadius.card, padding: BuddySpacing.lg)
     }
 
-    private func infoRow(_ label: String, value: String) -> some View {
-        HStack {
-            Text(label)
-                .agentBuddyFont(size: 12)
-                .foregroundStyle(AgentBuddyTheme.textMuted)
-            Spacer()
-            Text(value)
-                .agentBuddyFont(size: 12)
-                .foregroundStyle(AgentBuddyTheme.textSecondary)
+    private func infoRow(_ label: LocalizedStringKey, value: String, isCode: Bool = false) -> some View {
+        infoRow(label) {
+            Text(verbatim: value)
+                .buddyText(isCode ? .code : .label, weight: isCode ? nil : .regular)
+                .foregroundStyle(AgentBuddyTheme.textPrimary)
+                .multilineTextAlignment(.trailing)
+                .textSelection(.enabled)
         }
+    }
+
+    /// Label on the leading edge, value on the trailing edge; the value
+    /// wraps instead of shrinking.
+    private func infoRow<Value: View>(_ label: LocalizedStringKey, @ViewBuilder value: () -> Value) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: BuddySpacing.md) {
+            Text(label)
+                .buddyText(.label, weight: .regular)
+                .foregroundStyle(AgentBuddyTheme.textSecondary)
+            Spacer(minLength: BuddySpacing.xs)
+            value()
+        }
+        .accessibilityElement(children: .combine)
     }
 
     private func healthColor(_ health: AppServerHealth) -> Color {
@@ -91,11 +108,11 @@ extension ConversationInfoView {
         case .connected: return AgentBuddyTheme.success
         case .connecting: return AgentBuddyTheme.warning
         case .disconnected, .unresponsive: return AgentBuddyTheme.danger
-        case .unknown: return AgentBuddyTheme.textMuted
+        case .unknown: return AgentBuddyTheme.textSecondary
         }
     }
 
-    private func healthLabel(_ health: AppServerHealth) -> String {
+    private func healthLabel(_ health: AppServerHealth) -> LocalizedStringKey {
         switch health {
         case .connected: return "Connected"
         case .connecting: return "Connecting"
@@ -106,24 +123,20 @@ extension ConversationInfoView {
     }
 
     private func accountRow(_ account: Account) -> some View {
-        HStack {
-            Text("Account")
-                .agentBuddyFont(size: 12)
-                .foregroundStyle(AgentBuddyTheme.textMuted)
-            Spacer()
+        infoRow("Account") {
             switch account {
             case .apiKey:
                 Text("API Key")
-                    .agentBuddyFont(size: 12)
-                    .foregroundStyle(AgentBuddyTheme.textSecondary)
+                    .buddyText(.label, weight: .regular)
+                    .foregroundStyle(AgentBuddyTheme.textPrimary)
             case .chatgpt(let email, let planType):
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text(email)
-                        .agentBuddyFont(size: 12)
+                    Text(verbatim: email)
+                        .buddyText(.label, weight: .regular)
+                        .foregroundStyle(AgentBuddyTheme.textPrimary)
+                    Text(verbatim: planTypeLabel(planType))
+                        .buddyText(.caption)
                         .foregroundStyle(AgentBuddyTheme.textSecondary)
-                    Text(planTypeLabel(planType))
-                        .agentBuddyFont(size: 10)
-                        .foregroundStyle(AgentBuddyTheme.textMuted)
                 }
             }
         }

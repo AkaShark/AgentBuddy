@@ -10,43 +10,68 @@ struct CollaborationModeSelectorSheet: View {
         NavigationStack {
             List {
                 if isLoading && presets.isEmpty {
-                    HStack(spacing: 10) {
+                    HStack(spacing: BuddySpacing.sm) {
                         ProgressView()
                         Text("Loading modes…")
-                            .agentBuddyFont(.body)
+                            .buddyText(.body)
                             .foregroundStyle(AgentBuddyTheme.textSecondary)
                     }
                     .listRowBackground(AgentBuddyTheme.surface)
                 }
 
                 ForEach(presets, id: \.kind) { preset in
-                    Button(action: { onSelect(preset.kind) }) {
-                        HStack(spacing: 12) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(preset.name)
-                                    .agentBuddyFont(.body, weight: .semibold)
-                                    .foregroundStyle(AgentBuddyTheme.textPrimary)
-                                if let reasoningEffort = preset.reasoningEffort {
-                                    Text(collaborationModeEffortLabel(reasoningEffort))
-                                        .agentBuddyFont(.caption)
-                                        .foregroundStyle(AgentBuddyTheme.textSecondary)
-                                }
-                            }
-                            Spacer()
-                            if preset.kind == selectedMode {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(AgentBuddyTheme.accent)
-                            }
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .listRowBackground(AgentBuddyTheme.surface)
+                    modeRow(preset)
+                        .listRowBackground(AgentBuddyTheme.surface)
                 }
             }
             .scrollContentBackground(.hidden)
-            .background(AgentBuddyTheme.surface)
+            .buddyPageBackground()
             .navigationTitle("Collaboration Mode")
+            .navigationBarTitleDisplayMode(.inline)
         }
+    }
+
+    /// Mode name, what it does and its reasoning effort. The current mode
+    /// is marked with a checkmark, the word "Selected" and a heavier name.
+    private func modeRow(_ preset: AppCollaborationModePreset) -> some View {
+        let isSelected = preset.kind == selectedMode
+        return Button(action: { onSelect(preset.kind) }) {
+            HStack(alignment: .firstTextBaseline, spacing: BuddySpacing.sm) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: preset.name)
+                        .buddyText(.body, weight: isSelected ? .semibold : .regular)
+                        .foregroundStyle(AgentBuddyTheme.textPrimary)
+                    Text(collaborationModeExplanation(preset.kind))
+                        .buddyText(.label, weight: .regular)
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let reasoningEffort = preset.reasoningEffort {
+                        Text(verbatim: collaborationModeEffortLabel(reasoningEffort))
+                            .buddyText(.caption)
+                            .foregroundStyle(AgentBuddyTheme.textSecondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                if isSelected {
+                    Label("Selected", systemImage: "checkmark")
+                        .buddyText(.label, weight: .semibold)
+                        .foregroundStyle(AgentBuddyTheme.link)
+                }
+            }
+            .frame(minHeight: BuddySize.control)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
+private func collaborationModeExplanation(_ kind: AppModeKind) -> LocalizedStringKey {
+    switch kind {
+    case .default:
+        return "Works on the task directly."
+    case .plan:
+        return "Proposes a plan before making changes."
     }
 }
 

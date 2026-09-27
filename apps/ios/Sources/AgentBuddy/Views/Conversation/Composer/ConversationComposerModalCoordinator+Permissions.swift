@@ -53,103 +53,61 @@ extension ConversationComposerModalCoordinator {
             && selectedSandboxValue == ComposerSandboxOption.default.wireValue
     }
 
+    private var selectedApprovalIsKnown: Bool {
+        ComposerApprovalOption.allCases.contains { $0.wireValue == selectedApprovalValue }
+    }
+
+    private var selectedSandboxIsKnown: Bool {
+        ComposerSandboxOption.allCases.contains { $0.wireValue == selectedSandboxValue }
+    }
+
     @ViewBuilder
     var permissionsSheetContent: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack(alignment: .center) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Thread permissions")
-                                    .foregroundStyle(AgentBuddyTheme.textPrimary)
-                                    .agentBuddyFont(.headline)
-                                Text(currentRuntimeSupportsPermissionOverrides ? "Changes apply on your next turn and later turns." : "This runtime controls its own permissions.")
-                                    .foregroundStyle(AgentBuddyTheme.textMuted)
-                                    .agentBuddyFont(.caption)
-                            }
-                            Spacer(minLength: 12)
-                            Text(currentRuntimeSupportsPermissionOverrides ? (usesThreadDefaults ? "Using defaults" : "Custom override") : "Runtime managed")
-                                .foregroundStyle(usesThreadDefaults ? AgentBuddyTheme.textSecondary : AgentBuddyTheme.accentStrong)
-                                .agentBuddyFont(size: 11, weight: .semibold)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(
-                                    Capsule()
-                                        .fill((usesThreadDefaults ? AgentBuddyTheme.surfaceLight : AgentBuddyTheme.accentStrong).opacity(0.16))
-                                )
-                        }
-
-                        HStack(spacing: 10) {
-                            permissionSummaryTile(
-                                title: "Next turn",
-                                approval: selectedApprovalLabel,
-                                sandbox: selectedSandboxLabel,
-                                accent: AgentBuddyTheme.accentStrong
-                            )
-                            permissionSummaryTile(
-                                title: "Current thread",
-                                approval: currentApprovalLabel,
-                                sandbox: currentSandboxLabel,
-                                accent: hasAuthoritativeThreadPermissions ? AgentBuddyTheme.textSecondary : AgentBuddyTheme.warning
-                            )
-                        }
-                    }
-                    .padding(14)
-                    .background(
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .fill(AgentBuddyTheme.surface.opacity(0.82))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .stroke(AgentBuddyTheme.border.opacity(0.55), lineWidth: 1)
-                    )
+                VStack(alignment: .leading, spacing: BuddySpacing.xl) {
+                    permissionSummaryCard
 
                     if currentRuntimeSupportsPermissionOverrides {
                         permissionSection(
                             title: "Approval policy",
-                            subtitle: "Choose when Codex asks for approval"
+                            subtitle: "Choose when Codex asks for approval",
+                            customNote: selectedApprovalIsKnown ? nil : selectedApprovalDescription
                         ) {
-                            permissionDropdown(
-                                title: selectedApprovalLabel,
-                                detail: selectedApprovalDescription
-                            ) {
-                                ForEach(ComposerApprovalOption.allCases) { option in
-                                    permissionMenuItem(
-                                        title: option.title,
-                                        description: option.description,
-                                        isSelected: selectedApprovalValue == option.wireValue
-                                    ) {
-                                        appState.setPermissions(
-                                            approvalPolicy: option.wireValue,
-                                            sandboxMode: selectedSandboxValue,
-                                            for: snapshot.threadKey
-                                        )
-                                    }
+                            ForEach(Array(ComposerApprovalOption.allCases.enumerated()), id: \.element.id) { index, option in
+                                if index > 0 { BuddyDivider() }
+                                permissionOptionRow(
+                                    title: option.title,
+                                    description: option.description,
+                                    isSelected: selectedApprovalValue == option.wireValue
+                                ) {
+                                    appState.setPermissions(
+                                        approvalPolicy: option.wireValue,
+                                        sandboxMode: selectedSandboxValue,
+                                        for: snapshot.threadKey
+                                    )
                                 }
                             }
                         }
 
                         permissionSection(
                             title: "Sandbox settings",
-                            subtitle: "Choose how much Codex can do when running commands"
+                            subtitle: "Choose how much Codex can do when running commands",
+                            customNote: selectedSandboxIsKnown ? nil : selectedSandboxDescription
                         ) {
-                            permissionDropdown(
-                                title: selectedSandboxLabel,
-                                detail: selectedSandboxDescription
-                            ) {
-                                ForEach(ComposerSandboxOption.allCases) { option in
-                                    permissionMenuItem(
-                                        title: option.title,
-                                        description: option.description,
-                                        isSelected: selectedSandboxValue == option.wireValue
-                                    ) {
-                                        appState.setPermissions(
-                                            approvalPolicy: selectedApprovalValue,
-                                            sandboxMode: option.wireValue,
-                                            for: snapshot.threadKey
-                                        )
-                                    }
+                            ForEach(Array(ComposerSandboxOption.allCases.enumerated()), id: \.element.id) { index, option in
+                                if index > 0 { BuddyDivider() }
+                                permissionOptionRow(
+                                    title: option.title,
+                                    description: option.description,
+                                    isSelected: selectedSandboxValue == option.wireValue,
+                                    isDanger: option == .fullAccess
+                                ) {
+                                    appState.setPermissions(
+                                        approvalPolicy: selectedApprovalValue,
+                                        sandboxMode: option.wireValue,
+                                        for: snapshot.threadKey
+                                    )
                                 }
                             }
                         }
@@ -157,178 +115,208 @@ extension ConversationComposerModalCoordinator {
                         unsupportedPermissionRuntimeCard
                     }
                 }
-                .padding(16)
-                .padding(.bottom, 28)
+                .padding(.horizontal, BuddySpacing.xl)
+                .padding(.top, BuddySpacing.xs)
+                .padding(.bottom, BuddySpacing.xxl)
             }
-            .background(AgentBuddyTheme.backgroundGradient.ignoresSafeArea())
+            .buddyPageBackground()
             .navigationTitle("Permissions")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { showPermissionsSheet = false }
-                        .foregroundColor(AgentBuddyTheme.accent)
+                        .foregroundStyle(AgentBuddyTheme.link)
                 }
             }
         }
     }
 
-    private var unsupportedPermissionRuntimeCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Image(systemName: "info.circle.fill")
-                    .foregroundStyle(AgentBuddyTheme.accentStrong)
-                Text("Runtime-managed permissions")
-                    .foregroundStyle(AgentBuddyTheme.textPrimary)
-                    .agentBuddyFont(.subheadline, weight: .semibold)
+    /// Next-turn vs current-thread summary with the override state.
+    private var permissionSummaryCard: some View {
+        VStack(alignment: .leading, spacing: BuddySpacing.md) {
+            HStack(alignment: .firstTextBaseline, spacing: BuddySpacing.sm) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Thread permissions")
+                        .buddyText(.heading)
+                        .foregroundStyle(AgentBuddyTheme.textPrimary)
+                        .accessibilityAddTraits(.isHeader)
+                    (currentRuntimeSupportsPermissionOverrides
+                        ? Text("Changes apply on your next turn and later turns.")
+                        : Text("This runtime controls its own permissions."))
+                        .buddyText(.label, weight: .regular)
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                permissionOverrideBadge
             }
-            Text("This agent does not support AgentBuddy-side thread permission overrides, so approval and sandbox choices are not sent for this session.")
-                .foregroundStyle(AgentBuddyTheme.textMuted)
-                .agentBuddyFont(.caption)
+
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: BuddySpacing.sm) { permissionSummaryTiles }
+                VStack(spacing: BuddySpacing.sm) { permissionSummaryTiles }
+            }
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(AgentBuddyTheme.surface.opacity(0.82))
+        .buddyCard(.surface, radius: BuddyRadius.card, padding: BuddySpacing.lg)
+    }
+
+    @ViewBuilder
+    private var permissionSummaryTiles: some View {
+        permissionSummaryTile(
+            title: "Next turn",
+            approval: selectedApprovalLabel,
+            sandbox: selectedSandboxLabel,
+            accent: AgentBuddyTheme.textPrimary
         )
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(AgentBuddyTheme.border.opacity(0.55), lineWidth: 1)
+        permissionSummaryTile(
+            title: "Current thread",
+            approval: currentApprovalLabel,
+            sandbox: currentSandboxLabel,
+            accent: hasAuthoritativeThreadPermissions ? AgentBuddyTheme.textPrimary : AgentBuddyTheme.warning
         )
     }
 
+    /// "Using defaults" / "Custom override" / "Runtime managed" as icon + text.
+    private var permissionOverrideBadge: some View {
+        let isCustom = currentRuntimeSupportsPermissionOverrides && !usesThreadDefaults
+        let title: LocalizedStringKey = currentRuntimeSupportsPermissionOverrides
+            ? (usesThreadDefaults ? "Using defaults" : "Custom override")
+            : "Runtime managed"
+        let systemImage = currentRuntimeSupportsPermissionOverrides
+            ? (usesThreadDefaults ? "checkmark.circle" : "slider.horizontal.3")
+            : "gearshape"
+        return Label(title, systemImage: systemImage)
+            .buddyText(.caption, weight: .semibold)
+            .foregroundStyle(isCustom ? AgentBuddyTheme.onBrand : AgentBuddyTheme.textSecondary)
+            .padding(.horizontal, BuddySpacing.sm)
+            .padding(.vertical, 6)
+            .background(isCustom ? AgentBuddyTheme.brand : AgentBuddyTheme.surfaceSoft, in: Capsule())
+            .fixedSize()
+    }
+
+    private var unsupportedPermissionRuntimeCard: some View {
+        VStack(alignment: .leading, spacing: BuddySpacing.xs) {
+            Label {
+                Text("Runtime-managed permissions")
+                    .buddyText(.heading)
+                    .foregroundStyle(AgentBuddyTheme.textPrimary)
+            } icon: {
+                Image(systemName: "info.circle")
+                    .foregroundStyle(AgentBuddyTheme.link)
+                    .accessibilityHidden(true)
+            }
+            Text("This agent does not support AgentBuddy-side thread permission overrides, so approval and sandbox choices are not sent for this session.")
+                .buddyText(.label, weight: .regular)
+                .foregroundStyle(AgentBuddyTheme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .buddyCard(.soft, radius: BuddyRadius.resultCard, padding: BuddySpacing.lg)
+    }
+
     private func permissionSummaryTile(
-        title: String,
+        title: LocalizedStringKey,
         approval: String,
         sandbox: String,
         accent: Color
     ) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: BuddySpacing.xs) {
             Text(title)
+                .buddyText(.caption, weight: .semibold)
                 .foregroundStyle(AgentBuddyTheme.textSecondary)
-                .agentBuddyFont(size: 11, weight: .semibold)
-            VStack(alignment: .leading, spacing: 8) {
-                permissionSummaryRow(label: "Approval", value: approval, accent: accent)
-                permissionSummaryRow(label: "Sandbox", value: sandbox, accent: accent)
-            }
+            permissionSummaryRow(label: "Approval", value: approval, accent: accent)
+            permissionSummaryRow(label: "Sandbox", value: sandbox, accent: accent)
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(AgentBuddyTheme.surfaceLight.opacity(0.78))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(AgentBuddyTheme.border.opacity(0.45), lineWidth: 1)
-        )
+        .buddyCard(.soft, radius: BuddyRadius.tile, padding: BuddySpacing.md)
     }
 
-    private func permissionSummaryRow(label: String, value: String, accent: Color) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+    private func permissionSummaryRow(label: LocalizedStringKey, value: String, accent: Color) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
             Text(label)
-                .foregroundStyle(AgentBuddyTheme.textMuted)
-                .agentBuddyFont(size: 10, weight: .medium)
-            Text(value)
+                .buddyText(.caption)
+                .foregroundStyle(AgentBuddyTheme.textSecondary)
+            Text(LocalizedStringKey(value))
+                .buddyText(.label, weight: .semibold)
                 .foregroundStyle(accent)
-                .agentBuddyFont(.subheadline, weight: .semibold)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
         }
+        .accessibilityElement(children: .combine)
     }
 
     private func permissionSection<SectionContent: View>(
-        title: String,
-        subtitle: String,
+        title: LocalizedStringKey,
+        subtitle: LocalizedStringKey,
+        customNote: String?,
         @ViewBuilder content: () -> SectionContent
     ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: BuddySpacing.sm) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(title)
+                    .buddyText(.heading)
                     .foregroundStyle(AgentBuddyTheme.textPrimary)
-                    .agentBuddyFont(.headline)
+                    .accessibilityAddTraits(.isHeader)
                 Text(subtitle)
+                    .buddyText(.label, weight: .regular)
                     .foregroundStyle(AgentBuddyTheme.textSecondary)
-                    .agentBuddyFont(.caption)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            content()
+            if let customNote {
+                BuddyBanner(
+                    tone: .info,
+                    message: Text(LocalizedStringKey(customNote)),
+                    systemImage: "slider.horizontal.3"
+                )
+            }
+            VStack(spacing: 0) {
+                content()
+            }
+            .padding(.horizontal, BuddySpacing.md)
+            .buddyCard(.surface, radius: BuddyRadius.card, padding: nil)
         }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(AgentBuddyTheme.surface.opacity(0.74))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(AgentBuddyTheme.border.opacity(0.5), lineWidth: 1)
-        )
     }
 
-    private func permissionDropdown<MenuContent: View>(
-        title: String,
-        detail: String,
-        @ViewBuilder content: () -> MenuContent
-    ) -> some View {
-        Menu {
-            content()
-        } label: {
-            HStack(spacing: 10) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .foregroundStyle(AgentBuddyTheme.textPrimary)
-                        .agentBuddyFont(size: 14, weight: .semibold)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
-                    Text(detail)
-                        .foregroundStyle(AgentBuddyTheme.textMuted)
-                        .agentBuddyFont(size: 11)
-                        .lineLimit(1)
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.up.chevron.down")
-                    .foregroundStyle(AgentBuddyTheme.textMuted)
-                    .imageScale(.small)
-            }
-            .frame(maxWidth: .infinity, minHeight: 46, alignment: .leading)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(AgentBuddyTheme.surfaceLight.opacity(0.9))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(AgentBuddyTheme.border.opacity(0.45), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func permissionMenuItem(
+    /// One option: title, what it allows, and — when current — a checkmark
+    /// with the word "Selected". Risky options carry the danger role.
+    private func permissionOptionRow(
         title: String,
         description: String,
         isSelected: Bool,
+        isDanger: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 8) {
-                    Text(title)
-                        .foregroundStyle(AgentBuddyTheme.textPrimary)
-                        .agentBuddyFont(size: 14, weight: .semibold)
-                        .multilineTextAlignment(.leading)
-                    Spacer(minLength: 0)
-                    if isSelected {
-                        Image(systemName: "checkmark")
-                            .foregroundStyle(AgentBuddyTheme.accentStrong)
-                            .imageScale(.small)
+            HStack(alignment: .firstTextBaseline, spacing: BuddySpacing.sm) {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        if isDanger {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(AgentBuddyTheme.danger)
+                                .accessibilityHidden(true)
+                        }
+                        Text(LocalizedStringKey(title))
+                            .buddyText(.body, weight: isSelected ? .semibold : .regular)
+                            .foregroundStyle(isDanger ? AgentBuddyTheme.danger : AgentBuddyTheme.textPrimary)
                     }
+                    Text(LocalizedStringKey(description))
+                        .buddyText(.label, weight: .regular)
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                Text(description)
-                    .foregroundStyle(AgentBuddyTheme.textMuted)
-                    .agentBuddyFont(size: 11)
-                    .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                if isSelected {
+                    Label("Selected", systemImage: "checkmark")
+                        .buddyText(.label, weight: .semibold)
+                        .foregroundStyle(AgentBuddyTheme.link)
+                        .fixedSize()
+                }
             }
+            .padding(.vertical, BuddySpacing.sm)
+            .frame(minHeight: 56)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }

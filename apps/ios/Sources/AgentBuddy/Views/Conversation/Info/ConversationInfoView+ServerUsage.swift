@@ -5,10 +5,11 @@ extension ConversationInfoView {
     // MARK: - Section B: Server-Wide Charts
 
     var serverChartsSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: BuddySpacing.lg) {
             Text("Server Usage")
-                .agentBuddyFont(size: 14, weight: .semibold)
+                .buddyText(.heading)
                 .foregroundStyle(AgentBuddyTheme.textPrimary)
+                .accessibilityAddTraits(.isHeader)
 
             if let usage = serverUsage {
                 if !usage.tokensByThread.isEmpty {
@@ -28,36 +29,44 @@ extension ConversationInfoView {
                 rateLimitGauge(rateLimits)
             }
         }
-        .padding(16)
-        .modifier(GlassRectModifier(cornerRadius: 12))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .buddyCard(.surface, radius: BuddyRadius.card, padding: BuddySpacing.lg)
     }
 
+    private func chartTitle(_ title: LocalizedStringKey) -> some View {
+        Text(title)
+            .buddyText(.label)
+            .foregroundStyle(AgentBuddyTheme.textSecondary)
+    }
+
+    /// Axis labels: 12pt caption with tabular digits, secondary text.
+    private var axisLabelFont: Font { .caption.monospacedDigit() }
+
     private func tokenUsageChart(_ usage: AppServerUsageStats) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Token Usage by Conversation")
-                .agentBuddyFont(size: 12, weight: .medium)
-                .foregroundStyle(AgentBuddyTheme.textSecondary)
+        VStack(alignment: .leading, spacing: BuddySpacing.xs) {
+            chartTitle("Token Usage by Conversation")
 
             Chart(Array(usage.tokensByThread.enumerated()), id: \.offset) { _, entry in
                 AreaMark(
                     x: .value("Thread", entry.threadTitle),
                     y: .value("Tokens", entry.tokens)
                 )
-                .foregroundStyle(AgentBuddyTheme.accent.opacity(0.3))
+                .foregroundStyle(AgentBuddyTheme.link.opacity(0.18))
                 .interpolationMethod(.catmullRom)
 
                 LineMark(
                     x: .value("Thread", entry.threadTitle),
                     y: .value("Tokens", entry.tokens)
                 )
-                .foregroundStyle(AgentBuddyTheme.accent)
+                .foregroundStyle(AgentBuddyTheme.link)
+                .lineStyle(StrokeStyle(lineWidth: 2))
                 .interpolationMethod(.catmullRom)
             }
             .chartXAxis {
                 AxisMarks { _ in
                     AxisValueLabel()
-                        .font(.system(size: 9, design: .monospaced))
-                        .foregroundStyle(AgentBuddyTheme.textMuted)
+                        .font(axisLabelFont)
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
                 }
             }
             .chartYAxis {
@@ -65,8 +74,8 @@ extension ConversationInfoView {
                     AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
                         .foregroundStyle(AgentBuddyTheme.border)
                     AxisValueLabel()
-                        .font(.system(size: 9, design: .monospaced))
-                        .foregroundStyle(AgentBuddyTheme.textMuted)
+                        .font(axisLabelFont)
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
                 }
             }
             .frame(height: 160)
@@ -74,24 +83,22 @@ extension ConversationInfoView {
     }
 
     private func activityChart(_ usage: AppServerUsageStats) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Activity Timeline")
-                .agentBuddyFont(size: 12, weight: .medium)
-                .foregroundStyle(AgentBuddyTheme.textSecondary)
+        VStack(alignment: .leading, spacing: BuddySpacing.xs) {
+            chartTitle("Activity Timeline")
 
             Chart(Array(usage.activityByDay.enumerated()), id: \.offset) { _, entry in
                 BarMark(
                     x: .value("Date", Date(timeIntervalSince1970: TimeInterval(entry.dateEpoch)), unit: .day),
                     y: .value("Activity", entry.turnCount)
                 )
-                .foregroundStyle(AgentBuddyTheme.accent.opacity(0.7))
-                .cornerRadius(2)
+                .foregroundStyle(AgentBuddyTheme.success)
+                .cornerRadius(3)
             }
             .chartXAxis {
                 AxisMarks(values: .automatic(desiredCount: 5)) { _ in
                     AxisValueLabel(format: .dateTime.month(.abbreviated).day())
-                        .font(.system(size: 9, design: .monospaced))
-                        .foregroundStyle(AgentBuddyTheme.textMuted)
+                        .font(axisLabelFont)
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
                 }
             }
             .chartYAxis {
@@ -99,8 +106,8 @@ extension ConversationInfoView {
                     AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
                         .foregroundStyle(AgentBuddyTheme.border)
                     AxisValueLabel()
-                        .font(.system(size: 9, design: .monospaced))
-                        .foregroundStyle(AgentBuddyTheme.textMuted)
+                        .font(axisLabelFont)
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
                 }
             }
             .frame(height: 140)
@@ -108,46 +115,42 @@ extension ConversationInfoView {
     }
 
     private func modelBreakdownChart(_ usage: AppServerUsageStats) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Model Usage")
-                .agentBuddyFont(size: 12, weight: .medium)
-                .foregroundStyle(AgentBuddyTheme.textSecondary)
+        VStack(alignment: .leading, spacing: BuddySpacing.xs) {
+            chartTitle("Model Usage")
 
             Chart(Array(usage.modelUsage.enumerated()), id: \.offset) { _, entry in
                 BarMark(
                     x: .value("Count", entry.threadCount),
                     y: .value("Model", entry.model)
                 )
-                .foregroundStyle(AgentBuddyTheme.accent.opacity(0.7))
-                .cornerRadius(2)
+                .foregroundStyle(AgentBuddyTheme.link)
+                .cornerRadius(3)
             }
             .chartXAxis {
                 AxisMarks { _ in
                     AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
                         .foregroundStyle(AgentBuddyTheme.border)
                     AxisValueLabel()
-                        .font(.system(size: 9, design: .monospaced))
-                        .foregroundStyle(AgentBuddyTheme.textMuted)
+                        .font(axisLabelFont)
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
                 }
             }
             .chartYAxis {
                 AxisMarks { _ in
                     AxisValueLabel()
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(AgentBuddyTheme.textSecondary)
+                        .font(axisLabelFont)
+                        .foregroundStyle(AgentBuddyTheme.textPrimary)
                 }
             }
-            .frame(height: CGFloat(max(usage.modelUsage.count * 32, 60)))
+            .frame(height: CGFloat(max(usage.modelUsage.count * 36, 60)))
         }
     }
 
     private func rateLimitGauge(_ rateLimits: RateLimitSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Rate Limits")
-                .agentBuddyFont(size: 12, weight: .medium)
-                .foregroundStyle(AgentBuddyTheme.textSecondary)
+        VStack(alignment: .leading, spacing: BuddySpacing.xs) {
+            chartTitle("Rate Limits")
 
-            HStack(spacing: 16) {
+            HStack(spacing: BuddySpacing.xl) {
                 if let primary = rateLimits.primary {
                     rateLimitRing(label: "Primary", window: primary)
                 }
@@ -158,30 +161,34 @@ extension ConversationInfoView {
         }
     }
 
-    private func rateLimitRing(label: String, window: RateLimitWindow) -> some View {
-        VStack(spacing: 6) {
+    private func rateLimitRing(label: LocalizedStringKey, window: RateLimitWindow) -> some View {
+        let level = InfoUsageLevel(fraction: Double(window.usedPercent) / 100)
+        return VStack(spacing: BuddySpacing.xs) {
             ZStack {
                 Circle()
-                    .stroke(AgentBuddyTheme.border, lineWidth: 4)
+                    .stroke(AgentBuddyTheme.surfaceSoft, lineWidth: 6)
                 Circle()
                     .trim(from: 0, to: Double(window.usedPercent) / 100)
-                    .stroke(rateLimitColor(percent: Int(window.usedPercent)), style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                    .stroke(level.color, style: StrokeStyle(lineWidth: 6, lineCap: .round))
                     .rotationEffect(.degrees(-90))
-                Text("\(window.usedPercent)%")
-                    .agentBuddyFont(size: 12, weight: .bold)
+                Text(verbatim: "\(window.usedPercent)%")
+                    .buddyText(.label, weight: .semibold)
+                    .monospacedDigit()
                     .foregroundStyle(AgentBuddyTheme.textPrimary)
             }
-            .frame(width: 56, height: 56)
+            .frame(width: 64, height: 64)
 
-            Text(label)
-                .agentBuddyFont(size: 10)
-                .foregroundStyle(AgentBuddyTheme.textMuted)
+            HStack(spacing: BuddySpacing.xxs) {
+                if let systemImage = level.systemImage {
+                    Image(systemName: systemImage)
+                        .foregroundStyle(level.color)
+                        .accessibilityHidden(true)
+                }
+                Text(label)
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
+            }
+            .buddyText(.caption)
         }
-    }
-
-    private func rateLimitColor(percent: Int) -> Color {
-        if percent >= 80 { return AgentBuddyTheme.danger }
-        if percent >= 60 { return AgentBuddyTheme.warning }
-        return AgentBuddyTheme.accent
+        .accessibilityElement(children: .combine)
     }
 }

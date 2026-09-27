@@ -1,5 +1,8 @@
 import SwiftUI
 
+/// Partner, model and permission panel. Groups, top to bottom: search,
+/// partner (runtime filter), model list, reasoning effort, then the
+/// Plan / Fast / Full access toggles with a note on what the access level allows.
 struct InlineModelSelectorView: View {
     let models: [ModelInfo]
     @Binding var selectedModel: String
@@ -22,6 +25,8 @@ struct InlineModelSelectorView: View {
     @State private var selectedRuntimeFilter: AgentRuntimeKind?
     @State private var initializedRuntimeFilter = false
     var onDismiss: () -> Void
+
+    private let gutter = BuddySpacing.md
 
     private var activeModelSearchIndex: ModelSearchIndex {
         if modelSearchIndex.isEmpty, !runtimeScopedModels.isEmpty {
@@ -93,30 +98,39 @@ struct InlineModelSelectorView: View {
         let effectiveReasoningEfforts = isReasoningEffortLocked ? [] : (currentModel?.supportedReasoningEfforts ?? [])
 
         VStack(spacing: 0) {
-            modelSearchField
-            runtimeFilterRow
+            VStack(alignment: .leading, spacing: BuddySpacing.sm) {
+                ModelPickerSearchField(query: $modelSearchQuery)
+                    .padding(.horizontal, gutter)
+                ModelPickerPartnerSection(
+                    buckets: runtimeBuckets,
+                    totalCount: self.visibleModels.count,
+                    selectedRuntime: activeRuntimeFilter,
+                    contentInset: gutter,
+                    onSelect: { selectedRuntimeFilter = $0 }
+                )
+                ModelPickerSectionLabel(title: "Model")
+                    .padding(.horizontal, gutter)
+            }
+            .padding(.top, BuddySpacing.xs)
 
             ScrollView {
                 LazyVStack(spacing: 0) {
                     if self.visibleModels.isEmpty {
-                        Text("Loading models...")
-                            .agentBuddyFont(.caption)
-                            .foregroundColor(AgentBuddyTheme.textSecondary)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 24)
+                        statusText("Loading models...")
                     } else if visibleModels.isEmpty {
-                        Text("No matching models")
-                            .agentBuddyFont(.caption)
-                            .foregroundColor(AgentBuddyTheme.textSecondary)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 24)
+                        statusText("No matching models")
                     }
 
                     let lastModelID = visibleModels.last?.id
                     ForEach(visibleModels) { model in
-                        Button {
+                        ModelPickerRow(
+                            model: model,
+                            isSelected: modelMatchesSelection(
+                                model,
+                                selectedModel,
+                                runtime: selectedAgentRuntimeKind
+                            )
+                        ) {
                             selectedModel = model.id
                             selectedAgentRuntimeKind = model.agentRuntimeKind
                             if isReasoningEffortLocked && visibleModeNames(for: model.agentRuntimeKind) != nil {
@@ -129,158 +143,79 @@ struct InlineModelSelectorView: View {
                             // let the user pick a model AND change plan or
                             // permissions before hitting Done.
                             if threadKey != nil { onDismiss() }
-                        } label: {
-                            HStack {
-                                ModelRuntimeIcon(kind: model.agentRuntimeKind)
-
-                                VStack(alignment: .leading, spacing: 2) {
-                                    HStack(spacing: 6) {
-                                        Text(modelPickerDisplayName(model))
-                                            .agentBuddyFont(.footnote)
-                                            .foregroundColor(AgentBuddyTheme.textPrimary)
-                                        if model.isDefault {
-                                            Text("default")
-                                                .agentBuddyFont(.caption2, weight: .medium)
-                                                .foregroundColor(AgentBuddyTheme.accent)
-                                                .padding(.horizontal, 6)
-                                                .padding(.vertical, 1)
-                                                .background(AgentBuddyTheme.accent.opacity(0.15))
-                                                .clipShape(Capsule())
-                                        }
-                                    }
-                                    Text(model.description)
-                                        .agentBuddyFont(.caption2)
-                                        .foregroundColor(AgentBuddyTheme.textSecondary)
-                                }
-                                Spacer()
-                                if modelMatchesSelection(
-                                    model,
-                                    selectedModel,
-                                    runtime: selectedAgentRuntimeKind
-                                ) {
-                                    Image(systemName: "checkmark")
-                                        .agentBuddyFont(size: 12, weight: .medium)
-                                        .foregroundColor(AgentBuddyTheme.accent)
-                                }
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
                         }
                         if model.id != lastModelID {
-                            Divider().background(AgentBuddyTheme.separator).padding(.leading, 16)
+                            BuddyDivider().padding(.leading, BuddySize.icon + BuddySpacing.sm)
                         }
                     }
                 }
+                .padding(.horizontal, gutter)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
-            if isReasoningEffortLocked && selectedModelIsAmp {
-                Divider().background(AgentBuddyTheme.separator).padding(.horizontal, 12)
+            BuddyDivider()
 
-                Text("Reasoning effort is locked after the first message.")
-                    .agentBuddyFont(.caption2)
-                    .foregroundColor(AgentBuddyTheme.textSecondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-            } else if !effectiveReasoningEfforts.isEmpty {
-                Divider().background(AgentBuddyTheme.separator).padding(.horizontal, 12)
+            VStack(alignment: .leading, spacing: BuddySpacing.sm) {
+                if isReasoningEffortLocked && selectedModelIsAmp {
+                    ModelPickerSectionLabel(title: "Reasoning effort")
+                        .padding(.horizontal, gutter)
+                    ModelPickerLockedEffortNote()
+                        .padding(.horizontal, gutter)
+                } else if !effectiveReasoningEfforts.isEmpty {
+                    VStack(alignment: .leading, spacing: BuddySpacing.xxs) {
+                        ModelPickerSectionLabel(title: "Reasoning effort")
+                            .padding(.horizontal, gutter)
+                        ModelPickerEffortChips(
+                            efforts: effectiveReasoningEfforts,
+                            selection: reasoningEffort,
+                            contentInset: gutter
+                        ) { value in
+                            reasoningEffort = value
+                            onDismiss()
+                        }
+                    }
+                }
 
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(effectiveReasoningEfforts) { effort in
-                            Button {
-                                reasoningEffort = effort.reasoningEffort.wireValue
-                                onDismiss()
-                            } label: {
-                                Text(effort.reasoningEffort.wireValue)
-                                    .agentBuddyFont(.caption2, weight: .medium)
-                                    .foregroundColor(effort.reasoningEffort.wireValue == reasoningEffort ? AgentBuddyTheme.textOnAccent : AgentBuddyTheme.textPrimary)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 5)
-                                    .background(effort.reasoningEffort.wireValue == reasoningEffort ? AgentBuddyTheme.accent : AgentBuddyTheme.surfaceLight)
-                                    .clipShape(Capsule())
+                VStack(alignment: .leading, spacing: BuddySpacing.xxs) {
+                    ModelPickerSectionLabel(title: "Mode and access")
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: BuddySpacing.xs) {
+                            ModelPickerToggleChip(
+                                title: "Plan",
+                                systemImage: "doc.text",
+                                isOn: effectiveCollaborationMode == .plan,
+                                hint: Text("Proposes a plan before making changes."),
+                                action: togglePlanMode
+                            )
+                            ModelPickerToggleChip(
+                                title: "Fast",
+                                systemImage: "bolt.fill",
+                                isOn: fastMode,
+                                hint: Text("Uses the faster service tier."),
+                                action: { fastMode.toggle() }
+                            )
+                            if selectedRuntimeSupportsPermissionOverrides {
+                                ModelPickerToggleChip(
+                                    title: "Full access",
+                                    systemImage: isFullAccess ? "lock.open.fill" : "lock.fill",
+                                    isOn: isFullAccess,
+                                    isDanger: true,
+                                    action: toggleFullAccess
+                                )
                             }
                         }
+                        .padding(.horizontal, gutter)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, -gutter)
+                    if selectedRuntimeSupportsPermissionOverrides {
+                        ModelPickerAccessNote(isFullAccess: isFullAccess)
+                    }
                 }
+                .padding(.horizontal, gutter)
             }
-
-            Divider().background(AgentBuddyTheme.separator).padding(.horizontal, 12)
-
-            HStack(spacing: 6) {
-                Button {
-                    let current = effectiveCollaborationMode
-                    let next: AppModeKind = current == .plan ? .default : .plan
-                    if let threadKey {
-                        Task {
-                            try? await appModel.store.setThreadCollaborationMode(
-                                key: threadKey, mode: next
-                            )
-                        }
-                    } else {
-                        appState.pendingCollaborationMode = next
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "doc.text")
-                            .agentBuddyFont(size: 9, weight: .semibold)
-                        Text("Plan")
-                            .agentBuddyFont(.caption2, weight: .medium)
-                    }
-                    .foregroundColor(effectiveCollaborationMode == .plan ? .black : AgentBuddyTheme.textPrimary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(effectiveCollaborationMode == .plan ? AgentBuddyTheme.accent : AgentBuddyTheme.surfaceLight)
-                    .clipShape(Capsule())
-                }
-
-                Button {
-                    fastMode.toggle()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "bolt.fill")
-                            .agentBuddyFont(size: 9, weight: .semibold)
-                        Text("Fast")
-                            .agentBuddyFont(.caption2, weight: .medium)
-                    }
-                    .foregroundColor(fastMode ? AgentBuddyTheme.textOnAccent : AgentBuddyTheme.textPrimary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(fastMode ? AgentBuddyTheme.warning : AgentBuddyTheme.surfaceLight)
-                    .clipShape(Capsule())
-                }
-
-                if selectedRuntimeSupportsPermissionOverrides {
-                    Button {
-                        if isFullAccess {
-                            appState.setPermissions(approvalPolicy: "on-request", sandboxMode: "workspace-write", for: threadKey)
-                        } else {
-                            appState.setPermissions(approvalPolicy: "never", sandboxMode: "danger-full-access", for: threadKey)
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: isFullAccess ? "lock.open.fill" : "lock.fill")
-                                .agentBuddyFont(size: 9, weight: .semibold)
-                            Text(isFullAccess ? "Full Access" : "Supervised")
-                                .agentBuddyFont(.caption2, weight: .medium)
-                        }
-                        .foregroundColor(isFullAccess ? AgentBuddyTheme.textOnAccent : AgentBuddyTheme.textPrimary)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(isFullAccess ? AgentBuddyTheme.danger : AgentBuddyTheme.surfaceLight)
-                        .clipShape(Capsule())
-                    }
-                }
-
-                Spacer()
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
+            .padding(.vertical, BuddySpacing.sm)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, BuddySpacing.xxs)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(showsBackground ? AgentBuddyTheme.surface : Color.clear)
         .onAppear {
@@ -299,38 +234,35 @@ struct InlineModelSelectorView: View {
         }
     }
 
-    private var modelSearchField: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(AgentBuddyTheme.textMuted)
-            TextField("Search models", text: $modelSearchQuery)
-                .agentBuddyFont(.caption)
-                .foregroundStyle(AgentBuddyTheme.textPrimary)
-                .tint(AgentBuddyTheme.accent)
-                .autocorrectionDisabled()
-                .textInputAutocapitalization(.never)
-            if !modelSearchQuery.isEmpty {
-                Button { modelSearchQuery = "" } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(AgentBuddyTheme.textMuted)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
+    private func statusText(_ text: LocalizedStringKey) -> some View {
+        Text(text)
+            .buddyText(.label, weight: .regular)
+            .foregroundStyle(AgentBuddyTheme.textSecondary)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.vertical, BuddySpacing.xl)
     }
 
-    @ViewBuilder
-    private var runtimeFilterRow: some View {
-        if runtimeBuckets.count > 1 {
-            RuntimeFilterRow(
-                buckets: runtimeBuckets,
-                totalCount: visibleModels.count,
-                selectedRuntime: activeRuntimeFilter,
-                onSelect: { selectedRuntimeFilter = $0 }
-            )
-            .padding(.bottom, 6)
+    /// Flips between plan and default on the thread, or on the pending
+    /// pre-thread selection.
+    private func togglePlanMode() {
+        let current = effectiveCollaborationMode
+        let next: AppModeKind = current == .plan ? .default : .plan
+        if let threadKey {
+            Task {
+                try? await appModel.store.setThreadCollaborationMode(
+                    key: threadKey, mode: next
+                )
+            }
+        } else {
+            appState.pendingCollaborationMode = next
+        }
+    }
+
+    private func toggleFullAccess() {
+        if isFullAccess {
+            appState.setPermissions(approvalPolicy: "on-request", sandboxMode: "workspace-write", for: threadKey)
+        } else {
+            appState.setPermissions(approvalPolicy: "never", sandboxMode: "danger-full-access", for: threadKey)
         }
     }
 
