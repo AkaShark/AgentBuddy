@@ -159,10 +159,12 @@ extension ConversationInputBar {
     }
 
     func interruptActiveTurn() {
+        guard !isStopping else { return }
         guard let activeTurnId else {
             LLog.warn("conversation", "interrupt requested but no activeTurnId")
             return
         }
+        isStopping = true
         let threadKey = snapshot.threadKey
         LLog.info(
             "conversation",
@@ -181,6 +183,7 @@ extension ConversationInputBar {
                 LLog.info("conversation", "interrupt turn rpc ok")
             } catch {
                 LLog.warn("conversation", "interrupt turn failed", fields: ["error": String(describing: error)])
+                isStopping = false
                 slashErrorMessage = error.localizedDescription
             }
         }

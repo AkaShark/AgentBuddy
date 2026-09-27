@@ -171,17 +171,18 @@ struct ApprovalDetails: View {
     }
 
     private func detailRow(_ label: LocalizedStringKey, value: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: BuddySpacing.xs) {
+        VStack(alignment: .leading, spacing: 2) {
             Text(label)
-                .buddyText(.label)
+                .buddyText(.caption, weight: .medium)
                 .foregroundStyle(AgentBuddyTheme.textSecondary)
             Text(verbatim: value)
                 .buddyText(.code)
                 .foregroundStyle(AgentBuddyTheme.textPrimary)
-                .lineLimit(3)
+                .lineLimit(4)
                 .truncationMode(.middle)
                 .textSelection(.enabled)
         }
+        .padding(.top, BuddySpacing.xxs)
         .accessibilityElement(children: .combine)
     }
 
@@ -191,11 +192,20 @@ struct ApprovalDetails: View {
     }
 }
 
-/// Monospaced, scrollable command block with a copy button.
+/// Monospaced command block with a copy button. Short commands take their
+/// natural height; long ones are clamped with an explicit "Show all" so the
+/// decision buttons stay reachable. Only this block scrolls sideways.
 struct ApprovalCodeBlock: View {
     let text: String
     let label: LocalizedStringKey
     @State private var copied = false
+    @State private var isExpanded = false
+
+    private static let collapsedLineLimit = 6
+
+    private var lineCount: Int {
+        text.split(separator: "\n", omittingEmptySubsequences: false).count
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -217,17 +227,26 @@ struct ApprovalCodeBlock: View {
                 .buttonStyle(.plain)
             }
             .padding(.horizontal, BuddySpacing.sm)
-            ScrollView([.vertical, .horizontal]) {
+            ScrollView(.horizontal, showsIndicators: false) {
                 Text(verbatim: text)
                     .buddyText(.code)
                     .foregroundStyle(AgentBuddyTheme.textPrimary)
+                    .lineLimit(isExpanded ? nil : Self.collapsedLineLimit)
                     .textSelection(.enabled)
-                    .fixedSize(horizontal: true, vertical: true)
+                    .fixedSize(horizontal: true, vertical: false)
                     .padding(.horizontal, BuddySpacing.sm)
                     .padding(.bottom, BuddySpacing.sm)
-                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(maxHeight: 180)
+            if lineCount > Self.collapsedLineLimit {
+                Button(isExpanded ? "Show less" : "Show all") {
+                    isExpanded.toggle()
+                }
+                .buddyText(.caption, weight: .semibold)
+                .foregroundStyle(AgentBuddyTheme.link)
+                .frame(minHeight: 32)
+                .padding(.horizontal, BuddySpacing.sm)
+                .padding(.bottom, BuddySpacing.xxs)
+            }
         }
         .background(AgentBuddyTheme.surface, in: RoundedRectangle(cornerRadius: BuddyRadius.control, style: .continuous))
     }

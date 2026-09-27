@@ -29,7 +29,10 @@ struct ContentView: View {
                 AgentBuddyTheme.backgroundGradient.ignoresSafeArea()
 
                 #if DEBUG
-                if ConversationDisplayUITestHarnessView.isEnabled {
+                if MintGalleryView.isEnabled {
+                    MintGalleryView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if ConversationDisplayUITestHarnessView.isEnabled {
                     ConversationDisplayUITestHarnessView()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
@@ -46,7 +49,7 @@ struct ContentView: View {
                 #endif
 
                 #if DEBUG
-                if !ConversationDisplayUITestHarnessView.isEnabled {
+                if !ConversationDisplayUITestHarnessView.isEnabled && !MintGalleryView.isEnabled {
                     standardOverlays
                 }
                 #else

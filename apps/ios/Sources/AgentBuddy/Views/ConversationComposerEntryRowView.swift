@@ -1,6 +1,17 @@
 import SwiftUI
 import UIKit
 
+/// Mint composer card (radius 24): editor on top, then attach / partner chip
+/// on the left and dictation plus the single primary action on the right.
+///
+/// Primary action by state:
+/// - idle, nothing typed: send disabled;
+/// - idle with text or attachment: send;
+/// - running, nothing typed: explicit Stop (then "Stopping…" until the
+///   snapshot says the turn ended);
+/// - running with text: Stop stays available and send becomes "Queue",
+///   because the shared store queues follow-ups while a turn is active;
+/// - disconnected: the draft stays, sending is disabled.
 struct ConversationComposerEntryRowView: View {
     @Binding var showAttachMenu: Bool
     @Binding var inputText: String
@@ -10,19 +21,20 @@ struct ConversationComposerEntryRowView: View {
     let isTurnActive: Bool
     let hasAttachment: Bool
     let allowsVoiceInput: Bool
+    var isStopping: Bool = false
+    var isConnected: Bool = true
+    /// A send that creates something (new task) is in flight.
+    var isSubmitting: Bool = false
+    var placeholder: LocalizedStringKey = "Add details, or change direction…"
     let onPasteImage: (UIImage) -> Void
     let onSendText: () -> Void
     let onStopRecording: () -> Void
     let onStartRecording: () -> Void
     let onInterrupt: () -> Void
 
-    private enum Metrics {
-        static let controlSize: CGFloat = 44
-        static let inputCornerRadius: CGFloat = controlSize / 2
-        static let trailingControlSize: CGFloat = 44
-        static let horizontalPadding: CGFloat = 10
-        static let verticalPadding: CGFloat = 6
-    }
+    @Environment(\.conversationPartnerLabel) private var partnerLabel
+    @Environment(AppState.self) private var appState: AppState?
+    @State private var showExpanded: Bool = false
 
     init(
         showAttachMenu: Binding<Bool>,
@@ -33,6 +45,10 @@ struct ConversationComposerEntryRowView: View {
         isTurnActive: Bool,
         hasAttachment: Bool,
         allowsVoiceInput: Bool = true,
+        isStopping: Bool = false,
+        isConnected: Bool = true,
+        isSubmitting: Bool = false,
+        placeholder: LocalizedStringKey = "Add details, or change direction…",
         onPasteImage: @escaping (UIImage) -> Void,
         onSendText: @escaping () -> Void,
         onStopRecording: @escaping () -> Void,
@@ -47,6 +63,10 @@ struct ConversationComposerEntryRowView: View {
         self.isTurnActive = isTurnActive
         self.hasAttachment = hasAttachment
         self.allowsVoiceInput = allowsVoiceInput
+        self.isStopping = isStopping
+        self.isConnected = isConnected
+        self.isSubmitting = isSubmitting
+        self.placeholder = placeholder
         self.onPasteImage = onPasteImage
         self.onSendText = onSendText
         self.onStopRecording = onStopRecording
@@ -54,157 +74,39 @@ struct ConversationComposerEntryRowView: View {
         self.onInterrupt = onInterrupt
     }
 
-    @State private var showExpanded: Bool = false
-
     private var hasText: Bool {
         !inputText.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
-    private var canSend: Bool {
-        hasText || hasAttachment
-    }
+    private var hasContent: Bool { hasText || hasAttachment }
 
-    /// Show the expand affordance once the composer is multi-line or starts to
-    /// wrap, matching ChatGPT's behaviour. Short prompts stay clutter-free.
+    private var isVoiceBusy: Bool { voiceManager.isRecording || voiceManager.isTranscribing }
+
+    private var canSend: Bool { hasContent && isConnected && !isVoiceBusy && !isSubmitting }
+
+    /// Show the expand affordance once the composer is multi-line or starts to wrap.
     private var shouldShowExpand: Bool {
-        !voiceManager.isRecording
-            && !voiceManager.isTranscribing
-            && (inputText.contains("\n") || inputText.count > 60)
+        !isVoiceBusy && (inputText.contains("\n") || inputText.count > 60)
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 8) {
-            if !voiceManager.isRecording && !voiceManager.isTranscribing && !isTurnActive {
-                Button {
-                    showAttachMenu = true
-                } label: {
-                    Image(systemName: "plus")
-                        .font(AgentBuddyFont.styled(size: 20, weight: .semibold))
-                        .foregroundColor(AgentBuddyTheme.textPrimary)
-                        .frame(width: Metrics.controlSize, height: Metrics.controlSize)
-                        .modifier(GlassCircleModifier())
-                }
-                .padding(4)
-                .contentShape(Rectangle())
-                .padding(-4)
-                .buttonStyle(.plain)
-                .hoverEffect(.highlight)
-                .transition(.scale.combined(with: .opacity))
-                .accessibilityLabel("Attach")
-                .zIndex(1)
-            }
-
-            HStack(spacing: 0) {
-                ZStack(alignment: .topLeading) {
-                    ConversationComposerTextView(
-                        text: $inputText,
-                        isFocused: $isComposerFocused,
-                        selectedRange: $composerSelectionRange,
-                        onPasteImage: onPasteImage,
-                        onHardwareSubmit: {
-                            if canSend { onSendText() }
-                        }
-                    )
-
-                    if inputText.isEmpty {
-                        Text("Message AgentBuddy...")
-                            .font(AgentBuddyFont.styled(size: 17))
-                            .foregroundColor(AgentBuddyTheme.textMuted)
-                            .padding(.leading, 16)
-                            .padding(.top, 11)
-                            .allowsHitTesting(false)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                if voiceManager.isRecording {
-                    AudioWaveformView(level: voiceManager.audioLevel)
-                        .frame(width: 48, height: 20)
-
-                    Button(action: onStopRecording) {
-                        Image(systemName: "stop.circle.fill")
-                            .font(AgentBuddyFont.styled(size: 28))
-                            .foregroundColor(AgentBuddyTheme.accentStrong)
-                            .frame(width: Metrics.trailingControlSize, height: Metrics.trailingControlSize)
-                            .contentShape(Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .hoverEffect(.highlight)
-                    .accessibilityLabel("Stop recording")
-                } else if voiceManager.isTranscribing {
-                    ProgressView()
-                        .tint(AgentBuddyTheme.accent)
-                        .frame(width: Metrics.trailingControlSize, height: Metrics.trailingControlSize)
-                } else if allowsVoiceInput {
-                    Button(action: onStartRecording) {
-                        Image(systemName: "mic.fill")
-                            .font(AgentBuddyFont.styled(size: 18))
-                            .foregroundColor(AgentBuddyTheme.textSecondary)
-                            .frame(width: Metrics.trailingControlSize, height: Metrics.trailingControlSize)
-                            .contentShape(Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .hoverEffect(.highlight)
-                    .accessibilityLabel("Dictate")
-                }
-            }
-            .frame(maxWidth: .infinity, minHeight: Metrics.controlSize)
-            .modifier(GlassRoundedRectModifier(cornerRadius: Metrics.inputCornerRadius))
-            .overlay(alignment: .topTrailing) {
-                if shouldShowExpand {
-                    Button {
-                        showExpanded = true
-                    } label: {
-                        Image(systemName: "arrow.up.left.and.arrow.down.right")
-                            .font(AgentBuddyFont.styled(size: 12, weight: .semibold))
-                            .foregroundColor(AgentBuddyTheme.textSecondary)
-                            .padding(6)
-                            .contentShape(Rectangle())
-                    }
-                    .hoverEffect(.highlight)
-                    .padding(.top, 2)
-                    .padding(.trailing, 6)
-                    .accessibilityLabel("Expand composer")
-                    .transition(.opacity.combined(with: .scale))
-                }
-            }
-            .animation(.easeInOut(duration: 0.15), value: shouldShowExpand)
-
-            if canSend {
-                Button(action: onSendText) {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(AgentBuddyFont.styled(size: 30))
-                        .foregroundColor(AgentBuddyTheme.accent)
-                        .frame(width: Metrics.trailingControlSize, height: Metrics.trailingControlSize)
-                        .contentShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .hoverEffect(.highlight)
-                .disabled(voiceManager.isRecording || voiceManager.isTranscribing)
-                .opacity(voiceManager.isRecording || voiceManager.isTranscribing ? 0.45 : 1)
-                .accessibilityLabel("Send")
-                .transition(.move(edge: .trailing).combined(with: .opacity))
-            }
-
-            if isTurnActive && !canSend {
-                Button(action: onInterrupt) {
-                    Text("Cancel")
-                        .font(AgentBuddyFont.styled(size: 15, weight: .medium))
-                        .foregroundColor(AgentBuddyTheme.textPrimary)
-                        .padding(.horizontal, 14)
-                        .frame(height: Metrics.controlSize)
-                        .modifier(GlassCapsuleModifier())
-                }
-                .buttonStyle(.plain)
-                .transition(.move(edge: .trailing).combined(with: .opacity))
-            }
+        VStack(alignment: .leading, spacing: BuddySpacing.xs) {
+            editor
+            controls
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .animation(.spring(response: 0.3, dampingFraction: 0.86), value: isTurnActive)
-        .animation(.spring(response: 0.3, dampingFraction: 0.86), value: canSend)
-        .padding(.horizontal, Metrics.horizontalPadding)
-        .padding(.top, Metrics.verticalPadding)
-        .padding(.bottom, Metrics.verticalPadding)
+        .padding(.horizontal, BuddySpacing.sm)
+        .padding(.top, BuddySpacing.xs)
+        .padding(.bottom, BuddySpacing.xs)
+        .background(AgentBuddyTheme.surface, in: RoundedRectangle(cornerRadius: BuddyRadius.composer, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: BuddyRadius.composer, style: .continuous)
+                .strokeBorder(isComposerFocused ? AgentBuddyTheme.borderControl : AgentBuddyTheme.border, lineWidth: 1)
+        }
+        .shadow(color: AgentBuddyTheme.floatingShadow, radius: 12, y: 8)
+        .padding(.horizontal, BuddySpacing.md)
+        .padding(.vertical, BuddySpacing.xxs)
+        .animation(.easeOut(duration: BuddyMotion.Kind.state.duration), value: isTurnActive)
+        .animation(.easeOut(duration: BuddyMotion.Kind.state.duration), value: hasContent)
         .fullScreenCover(isPresented: $showExpanded) {
             ConversationComposerExpandedView(
                 inputText: $inputText,
@@ -212,6 +114,211 @@ struct ConversationComposerEntryRowView: View {
                 onPasteImage: onPasteImage,
                 onSend: onSendText,
                 hasAttachment: hasAttachment
+            )
+        }
+    }
+
+    // MARK: Editor
+
+    private var editor: some View {
+        ZStack(alignment: .topLeading) {
+            ConversationComposerTextView(
+                text: $inputText,
+                isFocused: $isComposerFocused,
+                selectedRange: $composerSelectionRange,
+                onPasteImage: onPasteImage,
+                onHardwareSubmit: {
+                    if canSend { onSendText() }
+                }
+            )
+            if inputText.isEmpty {
+                Text(placeholder)
+                    .buddyText(.body)
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
+                    .padding(.leading, 4)
+                    .padding(.top, 10)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: BuddySize.composerMinHeight, alignment: .leading)
+        .overlay(alignment: .topTrailing) {
+            if shouldShowExpand {
+                Button {
+                    showExpanded = true
+                } label: {
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
+                        .frame(width: 32, height: 32)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel(Text("Expand composer"))
+                .transition(.opacity)
+            }
+        }
+    }
+
+    // MARK: Controls
+
+    private var controls: some View {
+        HStack(spacing: BuddySpacing.xs) {
+            if !isVoiceBusy {
+                BuddyIconButton(
+                    systemImage: "plus",
+                    accessibilityLabel: "Attach",
+                    tone: .soft,
+                    diameter: 36,
+                    iconSize: 17
+                ) {
+                    showAttachMenu = true
+                }
+            }
+            if let partnerLabel, let appState {
+                Button {
+                    appState.showModelSelector = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(verbatim: partnerLabel)
+                            .lineLimit(1)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 10, weight: .semibold))
+                            .accessibilityHidden(true)
+                    }
+                    .buddyText(.label)
+                    .foregroundStyle(AgentBuddyTheme.textPrimary)
+                    .padding(.horizontal, BuddySpacing.sm)
+                    .frame(minHeight: BuddySize.compactPill)
+                    .background(AgentBuddyTheme.surfaceSoft, in: Capsule())
+                    .frame(minHeight: BuddySize.minHitTarget)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .layoutPriority(-1)
+                .accessibilityLabel(Text("Partner: \(partnerLabel)"))
+                .accessibilityHint(Text("Choose partner, model and permissions"))
+            }
+
+            Spacer(minLength: BuddySpacing.xxs)
+
+            voiceControl
+            if isTurnActive {
+                stopButton
+            }
+            if hasContent || !isTurnActive {
+                sendButton
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var voiceControl: some View {
+        if voiceManager.isRecording {
+            AudioWaveformView(level: voiceManager.audioLevel)
+                .frame(width: 44, height: 20)
+            BuddyIconButton(
+                systemImage: "stop.fill",
+                accessibilityLabel: "Stop recording",
+                tone: .soft,
+                diameter: 36,
+                iconSize: 14,
+                action: onStopRecording
+            )
+        } else if voiceManager.isTranscribing {
+            ProgressView()
+                .tint(AgentBuddyTheme.textSecondary)
+                .frame(width: BuddySize.minHitTarget, height: BuddySize.minHitTarget)
+                .accessibilityLabel(Text("Transcribing"))
+        } else if allowsVoiceInput {
+            BuddyIconButton(
+                systemImage: "mic",
+                accessibilityLabel: "Dictate",
+                tone: .plain,
+                diameter: 36,
+                iconSize: 18,
+                action: onStartRecording
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var stopButton: some View {
+        if isStopping {
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.small)
+                Text("Stopping…")
+                    .buddyText(.label, weight: .medium)
+                    .fixedSize()
+            }
+            .foregroundStyle(AgentBuddyTheme.textSecondary)
+            .padding(.horizontal, BuddySpacing.sm)
+            .frame(minHeight: BuddySize.minHitTarget)
+            .accessibilityElement(children: .combine)
+        } else {
+            Button(action: onInterrupt) {
+                HStack(spacing: 6) {
+                    Image(systemName: "stop.fill")
+                        .font(.system(size: 11, weight: .bold))
+                    if !hasContent {
+                        Text("Stop")
+                            .buddyText(.label, weight: .semibold)
+                            .fixedSize()
+                    }
+                }
+                .foregroundStyle(hasContent ? AgentBuddyTheme.textPrimary : AgentBuddyTheme.onAction)
+                .padding(.horizontal, hasContent ? 0 : BuddySpacing.md)
+                .frame(minWidth: 36, minHeight: 36)
+                .background(hasContent ? AgentBuddyTheme.surfaceSoft : AgentBuddyTheme.action, in: Capsule())
+                .frame(minWidth: BuddySize.minHitTarget, minHeight: BuddySize.minHitTarget)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text("Stop task"))
+            .transition(.opacity)
+        }
+    }
+
+    @ViewBuilder
+    private var sendButton: some View {
+        if isTurnActive {
+            // Queue: the store holds this until the current turn finishes;
+            // it can then be steered or removed from the queue list.
+            Button(action: onSendText) {
+                HStack(spacing: 6) {
+                    Image(systemName: "text.line.last.and.arrowtriangle.forward")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("Queue")
+                        .buddyText(.label, weight: .semibold)
+                        .fixedSize()
+                }
+                .foregroundStyle(canSend ? AgentBuddyTheme.onAction : AgentBuddyTheme.onDisabled)
+                .padding(.horizontal, BuddySpacing.md)
+                .frame(minHeight: 36)
+                .background(canSend ? AgentBuddyTheme.action : AgentBuddyTheme.disabled, in: Capsule())
+                .frame(minHeight: BuddySize.minHitTarget)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(!canSend)
+            .accessibilityLabel(Text("Queue message"))
+            .accessibilityHint(Text("Sends after the current step finishes"))
+        } else if isSubmitting {
+            ZStack {
+                Circle().fill(AgentBuddyTheme.action)
+                ProgressView().tint(AgentBuddyTheme.onAction)
+            }
+            .frame(width: 38, height: 38)
+            .frame(minWidth: BuddySize.minHitTarget, minHeight: BuddySize.minHitTarget)
+            .accessibilityLabel(Text("Sending"))
+        } else {
+            BuddyIconButton(
+                systemImage: "arrow.up",
+                accessibilityLabel: "Send",
+                tone: .action,
+                diameter: 38,
+                iconSize: 17,
+                isEnabled: canSend,
+                action: onSendText
             )
         }
     }

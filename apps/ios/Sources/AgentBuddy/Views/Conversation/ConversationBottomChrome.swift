@@ -36,15 +36,19 @@ struct ConversationBottomChrome: View {
                 attachedImage: $composerAttachedImage
             )
             .background(.clear, ignoresSafeAreaEdges: .bottom)
+            ConversationHostStatusLine(threadKey: composer.threadKey)
         }
         .padding(.bottom, 4)
         .background(
             LinearGradient(
-                colors: Array(AgentBuddyTheme.headerScrim.reversed()),
+                stops: [
+                    .init(color: AgentBuddyTheme.background.opacity(0), location: 0),
+                    .init(color: AgentBuddyTheme.background, location: 0.35),
+                ],
                 startPoint: .top,
                 endPoint: .bottom
             )
-            .padding(.top, -30)
+            .padding(.top, -24)
             .ignoresSafeArea(.container, edges: .bottom)
             .allowsHitTesting(false)
         )
@@ -130,6 +134,35 @@ struct ConversationBottomChrome: View {
             )
         } catch {
             collaborationModeError = error.localizedDescription
+        }
+    }
+}
+
+/// "💻 MacBook Pro · 已连接" under the composer. Connection is shown apart from
+/// task state, so a lost connection never reads as a failed task.
+struct ConversationHostStatusLine: View {
+    let threadKey: ThreadKey
+    @Environment(AppModel.self) private var appModel
+
+    var body: some View {
+        if let server = appModel.snapshot?.serverSnapshot(for: threadKey.serverId) {
+            let state: BuddyConnectionState = server.isConnected ? .connected : .disconnected
+            HStack(spacing: 6) {
+                Image(systemName: server.isLocal ? "iphone" : "laptopcomputer")
+                    .font(.system(size: 12, weight: .medium))
+                    .accessibilityHidden(true)
+                Text(verbatim: server.displayName)
+                Text(verbatim: "·")
+                Circle().fill(state.dotColor).frame(width: 6, height: 6)
+                    .accessibilityHidden(true)
+                Text(state.title)
+            }
+            .buddyText(.caption, weight: .medium)
+            .foregroundStyle(AgentBuddyTheme.textSecondary)
+            .lineLimit(1)
+            .frame(maxWidth: .infinity)
+            .padding(.top, 2)
+            .accessibilityElement(children: .combine)
         }
     }
 }

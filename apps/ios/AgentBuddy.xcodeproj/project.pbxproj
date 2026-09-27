@@ -79,6 +79,7 @@
 		100258A61FC99AEBED02D9B5 /* one-light.json in Resources */ = {isa = PBXBuildFile; fileRef = D390EA62DE27017C0FCEA5A7 /* one-light.json */; };
 		101EE72875B90627CCC2CEF1 /* ConversationTimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A709BFE82FE8E0D83276930 /* ConversationTimelineView.swift */; };
 		10511FF111B86339596973D1 /* HomeComposerView+Actions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 774AD7F309755E29D147E1D5 /* HomeComposerView+Actions.swift */; };
+		10C61ED6988FFEC605B901E1 /* MintGalleryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E74492FC688AE785605B528 /* MintGalleryView.swift */; };
 		113C7C6B0F7AB9F58A3F0260 /* VideoWallpaperPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57CF884E9E899D4667F55790 /* VideoWallpaperPlayerView.swift */; };
 		11509D204A3ECB24F6F7C77A /* gruvbox-dark-soft.json in Resources */ = {isa = PBXBuildFile; fileRef = C946CD0555CB6AA1517A6F93 /* gruvbox-dark-soft.json */; };
 		11BF3EF7BB371BF0DEBBF414 /* StatusDot.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20EDEB81CB706BB168BDF31 /* StatusDot.swift */; };
@@ -202,6 +203,7 @@
 		2D826CD878A6E0E550E7099F /* ConversationInputBar+SlashCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0BD90049DA2920C20B47840 /* ConversationInputBar+SlashCommands.swift */; };
 		2E92492F583115E43CBC318C /* SettingsConnectionAccountSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCDABCF930C271CDBBB4E1C9 /* SettingsConnectionAccountSection.swift */; };
 		2EA527817E5C839A5DE6EDBE /* kanagawa-dragon-VscOyZL-.json in Resources */ = {isa = PBXBuildFile; fileRef = 9B75EE1D105C1B02324FAFBD /* kanagawa-dragon-VscOyZL-.json */; };
+		2EA906500F6ABC3AA4B2A8D1 /* MintGalleryPages.swift in Sources */ = {isa = PBXBuildFile; fileRef = 237BE2596DA6D6CA147A0E6F /* MintGalleryPages.swift */; };
 		2ED1E482411A6DD769B3B06A /* gruvbox-dark-medium.json in Resources */ = {isa = PBXBuildFile; fileRef = 90BCA975D56998089A54FEF6 /* gruvbox-dark-medium.json */; };
 		2F03809A63425F8FB564DA0B /* SubagentDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4963B1E23024BDBAEF05D2C /* SubagentDetailSheet.swift */; };
 		2F413B3BCEFF5556180E8C9A /* notion-dark-BTRKJ-yg.json in Resources */ = {isa = PBXBuildFile; fileRef = 4E1597370DE11C54FB9DBE10 /* notion-dark-BTRKJ-yg.json */; };
@@ -351,6 +353,7 @@
 		4DB2F4777BDBDAEA6405E306 /* ConversationExplorationGroupRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEBAC13972215BF2013957EE /* ConversationExplorationGroupRow.swift */; };
 		4DBAC1EE3BE027A00854263F /* ProjectChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B81124A0CC4E9BEAD47C0B6 /* ProjectChip.swift */; };
 		4DC8B8C21D982A4027326A39 /* TerminalScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64AD7C6C616ADFC88150EE7A /* TerminalScreen.swift */; };
+		4DD087D8A69AC667E51C1315 /* MintGalleryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E74492FC688AE785605B528 /* MintGalleryView.swift */; };
 		4E0C20136A98F702A7156024 /* PetSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 398B047BB6408B08E53BC426 /* PetSettingsView.swift */; };
 		4E6DF99B7CB7BDF6B3C8B044 /* ConversationModelPickerPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28401B52759D3E98450F324F /* ConversationModelPickerPanel.swift */; };
 		4E6F185F21B7B2649070F88C /* DiscoveryView+ManualEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75F1640D568CA9532D4277D9 /* DiscoveryView+ManualEntry.swift */; };
@@ -988,6 +991,7 @@
 		DAA6485B188E45C267486596 /* ConversationTurnDiffRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 044AB63014D7C23EE38D5E05 /* ConversationTurnDiffRow.swift */; };
 		DB1DD59DD1CAFCF15DBB1B76 /* PulsingDot.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3F30A88340B2B7832653605 /* PulsingDot.swift */; };
 		DB54CEE169436E918B85EA26 /* ConversationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4F6BAD94A3E3A34D2B2EFBE /* ConversationView.swift */; };
+		DBC712330274260D13BF77B4 /* MintGalleryPages.swift in Sources */ = {isa = PBXBuildFile; fileRef = 237BE2596DA6D6CA147A0E6F /* MintGalleryPages.swift */; };
 		DC5179C9706764A45534A658 /* WatchApprovalNotification.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DD0E335A9F83EC7800FB675 /* WatchApprovalNotification.swift */; };
 		DC612847D21662E1C3985858 /* morphdom-umd.min.js in Resources */ = {isa = PBXBuildFile; fileRef = B26DCF3000FC1039F80FDDA1 /* morphdom-umd.min.js */; };
 		DC7AB82DACC4BA8E28387965 /* LocalCodexBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5286F6BA530BFEF3822402A1 /* LocalCodexBootstrap.swift */; };
@@ -1339,6 +1343,7 @@
 		22ED5E0B49A6D8902AE5B4C5 /* WatchThemePayloadTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchThemePayloadTests.swift; sourceTree = "<group>"; };
 		22FA3B6710590490F714A244 /* DirectoryPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectoryPickerView.swift; sourceTree = "<group>"; };
 		233DE335EF78C5315B1DCEF5 /* AgentBuddyComplicationEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentBuddyComplicationEntry.swift; sourceTree = "<group>"; };
+		237BE2596DA6D6CA147A0E6F /* MintGalleryPages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintGalleryPages.swift; sourceTree = "<group>"; };
 		2383F8674E83D082D01678C4 /* VoiceCallLockScreenCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCallLockScreenCardView.swift; sourceTree = "<group>"; };
 		23C319198668245031F67A72 /* ConversationComposerTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationComposerTextView.swift; sourceTree = "<group>"; };
 		2428533483DC84498BFC1574 /* TypingIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypingIndicator.swift; sourceTree = "<group>"; };
@@ -1398,6 +1403,7 @@
 		3DBDAB0C7FA46B14274EAF0A /* WatchProjectionTests+Fixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WatchProjectionTests+Fixtures.swift"; sourceTree = "<group>"; };
 		3E486A3290F7DDE5105AEF37 /* AgentBuddyLiveActivityBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentBuddyLiveActivityBundle.swift; sourceTree = "<group>"; };
 		3E4BFA065C45441349BA8F97 /* DiscoveryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoveryView.swift; sourceTree = "<group>"; };
+		3E74492FC688AE785605B528 /* MintGalleryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MintGalleryView.swift; sourceTree = "<group>"; };
 		3F5AEF81CFB781D3521CB9D9 /* PairBLE.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairBLE.swift; sourceTree = "<group>"; };
 		3F5C9109A04A6118BEFEE0E1 /* AmbientSuggestionsList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientSuggestionsList.swift; sourceTree = "<group>"; };
 		3F65B006082E4F610D14E32F /* ToolCallCardView+Sections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ToolCallCardView+Sections.swift"; sourceTree = "<group>"; };
@@ -2351,6 +2357,8 @@
 			children = (
 				6EAF317D3F3648E458B4C13A /* AgentBuddyPreviewData+Factories.swift */,
 				31E433142DE82121B956CA39 /* AgentBuddyPreviewScene.swift */,
+				237BE2596DA6D6CA147A0E6F /* MintGalleryPages.swift */,
+				3E74492FC688AE785605B528 /* MintGalleryView.swift */,
 				B60B5176C9A23E0E7BC76A41 /* PreviewSupport.swift */,
 			);
 			path = Previews;
@@ -3689,6 +3697,8 @@
 				6C2513DE8223F4C426A8518F /* MessageRecorder.swift in Sources */,
 				08FA6F4C07A5ECCF9C346409 /* MessageRenderCache.swift in Sources */,
 				44B4EBFDF6F47F68C631674F /* MinigameOverlayView.swift in Sources */,
+				2EA906500F6ABC3AA4B2A8D1 /* MintGalleryPages.swift in Sources */,
+				10C61ED6988FFEC605B901E1 /* MintGalleryView.swift in Sources */,
 				1C8F80E2EAD09860943FA8CD /* MobilePreferencesDirectory.swift in Sources */,
 				6AD5D97918208B0941D86A73 /* ModelPickerComponents.swift in Sources */,
 				1669FA8A207899A894FC2816 /* ModelPickerSupport.swift in Sources */,
@@ -4133,6 +4143,8 @@
 				521202A71E42AB39D8333232 /* MessageRecorder.swift in Sources */,
 				C1BE940B0C7C39A07F5A188E /* MessageRenderCache.swift in Sources */,
 				F8C882A0A96DE80184B56A52 /* MinigameOverlayView.swift in Sources */,
+				DBC712330274260D13BF77B4 /* MintGalleryPages.swift in Sources */,
+				4DD087D8A69AC667E51C1315 /* MintGalleryView.swift in Sources */,
 				5CF5A35715F7E40985374567 /* MobilePreferencesDirectory.swift in Sources */,
 				4D13F131DE494F8AA7266DEC /* ModelPickerComponents.swift in Sources */,
 				05FA502839F7F99758D37093 /* ModelPickerSupport.swift in Sources */,

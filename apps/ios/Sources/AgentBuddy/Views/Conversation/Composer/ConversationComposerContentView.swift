@@ -17,6 +17,10 @@ struct ConversationComposerContentView: View {
     let rateLimits: RateLimitSnapshot?
     let contextPercent: Int64?
     let isTurnActive: Bool
+    let isStopping: Bool
+    let isConnected: Bool
+    let isSubmitting: Bool
+    let placeholder: LocalizedStringKey
     let showModeChip: Bool
     let voiceManager: VoiceTranscriptionManager
     let allowsVoiceInput: Bool
@@ -55,6 +59,10 @@ struct ConversationComposerContentView: View {
         rateLimits: RateLimitSnapshot?,
         contextPercent: Int64?,
         isTurnActive: Bool,
+        isStopping: Bool = false,
+        isConnected: Bool = true,
+        isSubmitting: Bool = false,
+        placeholder: LocalizedStringKey = "Add details, or change direction…",
         showModeChip: Bool = true,
         voiceManager: VoiceTranscriptionManager,
         allowsVoiceInput: Bool = true,
@@ -92,6 +100,10 @@ struct ConversationComposerContentView: View {
         self.rateLimits = rateLimits
         self.contextPercent = contextPercent
         self.isTurnActive = isTurnActive
+        self.isStopping = isStopping
+        self.isConnected = isConnected
+        self.isSubmitting = isSubmitting
+        self.placeholder = placeholder
         self.showModeChip = showModeChip
         self.voiceManager = voiceManager
         self.allowsVoiceInput = allowsVoiceInput
@@ -125,15 +137,18 @@ struct ConversationComposerContentView: View {
                             .resizable()
                             .scaledToFill()
                             .frame(width: 60, height: 60)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .clipShape(RoundedRectangle(cornerRadius: BuddyRadius.control, style: .continuous))
 
                         Button(action: onClearAttachment) {
                             Image(systemName: "xmark.circle.fill")
-                                .agentBuddyFont(.body)
-                                .foregroundColor(.white)
-                                .background(Circle().fill(Color.black.opacity(0.6)))
+                                .font(.system(size: 20))
+                                .symbolRenderingMode(.palette)
+                                .foregroundStyle(AgentBuddyTheme.onAction, AgentBuddyTheme.action)
+                                .frame(width: 32, height: 32)
+                                .contentShape(Rectangle())
                         }
-                        .offset(x: 4, y: -4)
+                        .accessibilityLabel(Text("Remove image"))
+                        .offset(x: 10, y: -10)
                     }
 
                     Spacer()
@@ -209,6 +224,16 @@ struct ConversationComposerContentView: View {
                     .padding(.top, 6)
                 }
 
+                if !isConnected {
+                    BuddyBanner(
+                        tone: .warning,
+                        message: Text("Connection lost. Task status will sync when the host is back; your draft is kept."),
+                        systemImage: "wifi.slash"
+                    )
+                    .padding(.horizontal, BuddySpacing.md)
+                    .padding(.top, BuddySpacing.xs)
+                }
+
                 ConversationComposerEntryRowView(
                     showAttachMenu: $showAttachMenu,
                     inputText: $inputText,
@@ -218,6 +243,10 @@ struct ConversationComposerContentView: View {
                     isTurnActive: isTurnActive,
                     hasAttachment: attachedImage != nil || !attachedFiles.isEmpty,
                     allowsVoiceInput: allowsVoiceInput,
+                    isStopping: isStopping,
+                    isConnected: isConnected,
+                    isSubmitting: isSubmitting,
+                    placeholder: placeholder,
                     onPasteImage: onPasteImage,
                     onSendText: onSendText,
                     onStopRecording: onStopRecording,
@@ -247,7 +276,7 @@ private struct ConversationComposerFileChipStrip: View {
                     HStack(spacing: 5) {
                         Image(systemName: "doc")
                             .agentBuddyFont(size: 10, weight: .semibold)
-                            .foregroundStyle(AgentBuddyTheme.accent)
+                            .foregroundStyle(AgentBuddyTheme.textSecondary)
                         VStack(alignment: .leading, spacing: 1) {
                             Text(file.label)
                                 .agentBuddyFont(.caption, weight: .semibold)
@@ -274,8 +303,8 @@ private struct ConversationComposerFileChipStrip: View {
                     .padding(.horizontal, 8)
                     .padding(.vertical, 5)
                     .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(AgentBuddyTheme.surfaceLight.opacity(0.72))
+                        RoundedRectangle(cornerRadius: BuddyRadius.control, style: .continuous)
+                            .fill(AgentBuddyTheme.surfaceSoft)
                     )
                 }
             }
@@ -297,7 +326,7 @@ private struct ConversationComposerPluginChipStrip: View {
                             .foregroundStyle(AgentBuddyTheme.accent)
                         Text(plugin.displayTitle)
                             .agentBuddyFont(.caption, weight: .semibold)
-                            .foregroundStyle(AgentBuddyTheme.accent)
+                            .foregroundStyle(AgentBuddyTheme.textPrimary)
                             .lineLimit(1)
                         Button {
                             onRemove(plugin)
@@ -313,10 +342,7 @@ private struct ConversationComposerPluginChipStrip: View {
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(AgentBuddyTheme.accent.opacity(0.12))
-                    )
+                    .background(Capsule().fill(AgentBuddyTheme.surfaceSoft))
                 }
             }
         }

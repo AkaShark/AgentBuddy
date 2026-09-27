@@ -58,6 +58,9 @@ struct ConversationInputBar: View {
     @State var pluginLoadingCwds: Set<String> = []
     @State var pluginMentionSelections: [PluginMentionSelection] = []
     @State var voiceManager = VoiceTranscriptionManager()
+    /// True from the Stop tap until the snapshot reports the turn ended, so
+    /// the composer shows "Stopping…" and blocks a second stop.
+    @State var isStopping = false
     @State var showMicPermissionAlert = false
     @State private var hasLoggedFirstFocus = false
     @State private var hasLoggedKeyboardShown = false
@@ -153,6 +156,9 @@ struct ConversationInputBar: View {
         .onChange(of: inputText) { _, next in
             scheduleComposerPopupRefresh(for: next)
         }
+        .onChange(of: isTurnActive) { _, active in
+            if !active { isStopping = false }
+        }
         .onChange(of: snapshot.composerPrefillRequest?.id) { _, _ in
             guard let prefill = snapshot.composerPrefillRequest else { return }
             inputText = prefill.text
@@ -205,6 +211,8 @@ struct ConversationInputBar: View {
                 rateLimits: snapshot.rateLimits,
                 contextPercent: contextPercent(),
                 isTurnActive: isTurnActive,
+                isStopping: isStopping,
+                isConnected: snapshot.isConnected,
                 showModeChip: showModeChip,
                 voiceManager: voiceManager,
                 showAttachMenu: $showAttachMenu,

@@ -74,6 +74,7 @@ struct ConversationDestinationScreen: View {
                         screenModel.requestMinigame()
                     }
                 )
+                .environment(\.conversationPartnerLabel, conversationThread.agentRuntimeKind.displayLabel)
                 .onAppear {
                     bindScreenModel(for: conversationThread)
                 }
