@@ -37,7 +37,7 @@ data class TranscriptTurn(
                 when (val content = it.content) {
                     is HydratedConversationItemContent.Assistant -> content.v1.text
                     is HydratedConversationItemContent.CodeReview ->
-                        content.v1.findings.firstOrNull()?.title ?: "Code review"
+                        content.v1.findings.firstOrNull()?.title ?: "代码审查"
                     else -> null
                 }
             }
