@@ -15,7 +15,7 @@ if [[ -z "$VERSION" ]]; then
     exit 1
 fi
 
-REPO="huangguang1999/baozi-ish"
+REPO="dnakov/litter-ish"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ANDROID_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 ASSETS_DIR="$ANDROID_DIR/app/src/main/assets"
