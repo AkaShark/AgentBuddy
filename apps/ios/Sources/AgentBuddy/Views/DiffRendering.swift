@@ -88,7 +88,7 @@ private func syntaxHighlightedDiffAttributedString(
     fontSize: CGFloat,
     colorScheme: ColorScheme
 ) -> NSAttributedString {
-    let monoFont = UIFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+    let monoFont = AgentBuddyFont.uiMonoFont(size: fontSize)
     let result = NSMutableAttributedString()
 
     for rawLine in diff.split(separator: "\n", omittingEmptySubsequences: false) {
@@ -163,6 +163,8 @@ private enum DiffSyntaxLineKind {
         }
     }
 
+    /// Additions and deletions keep their "+" / "-" line markers, so the change
+    /// type never depends on colour alone.
     var foregroundColor: UIColor {
         switch self {
         case .addition:
@@ -170,26 +172,23 @@ private enum DiffSyntaxLineKind {
         case .deletion:
             return UIColor(AgentBuddyTheme.danger)
         case .hunk:
-            return UIColor(AgentBuddyTheme.accentStrong)
+            return UIColor(AgentBuddyTheme.link)
         case .metadata:
             return UIColor(AgentBuddyTheme.textSecondary)
         case .context:
-            return UIColor(AgentBuddyTheme.textBody)
+            return UIColor(AgentBuddyTheme.textPrimary)
         }
     }
 
+    /// The code surface behind the diff supplies the neutral fill.
     var backgroundColor: UIColor {
         switch self {
         case .addition:
-            return UIColor(AgentBuddyTheme.success).withAlphaComponent(0.12)
+            return UIColor(AgentBuddyTheme.successSurface)
         case .deletion:
-            return UIColor(AgentBuddyTheme.danger).withAlphaComponent(0.12)
-        case .hunk:
-            return UIColor(AgentBuddyTheme.accentStrong).withAlphaComponent(0.12)
-        case .metadata:
-            return UIColor(AgentBuddyTheme.surface).withAlphaComponent(0.72)
-        case .context:
-            return UIColor(AgentBuddyTheme.codeBackground).withAlphaComponent(0.72)
+            return UIColor(AgentBuddyTheme.dangerSurface)
+        case .hunk, .metadata, .context:
+            return .clear
         }
     }
 }

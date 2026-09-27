@@ -1,12 +1,17 @@
 import SwiftUI
 import UIKit
 
+/// Full-screen editor for long drafts. Sending follows the same rules as the
+/// inline composer: `isSendEnabled` is false while offline, submitting or
+/// recording, and the draft is kept.
 struct ConversationComposerExpandedView: View {
     @Binding var inputText: String
     @Binding var isPresented: Bool
     let onPasteImage: (UIImage) -> Void
     let onSend: () -> Void
     let hasAttachment: Bool
+    var isSendEnabled = true
+    var isConnected = true
 
     // Start unfocused so the `.task` below forces a false→true transition,
     // which is what drives `ConversationComposerTextView`'s coordinator to
@@ -15,9 +20,11 @@ struct ConversationComposerExpandedView: View {
     // fullScreenCover transition by the time `syncFocus` runs.
     @State private var isFocused = false
 
-    private var canSend: Bool {
+    private var hasContent: Bool {
         !inputText.trimmingCharacters(in: .whitespaces).isEmpty || hasAttachment
     }
+
+    private var canSend: Bool { hasContent && isSendEnabled }
 
     var body: some View {
         NavigationStack {
@@ -28,21 +35,32 @@ struct ConversationComposerExpandedView: View {
                     onPasteImage: onPasteImage,
                     unboundedHeight: true
                 )
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
+                .padding(.horizontal, BuddySpacing.xs)
+                .padding(.vertical, BuddySpacing.xxs)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 if inputText.isEmpty {
                     Text("Message AgentBuddy...")
-                        .font(AgentBuddyFont.styled(size: 17))
-                        .foregroundColor(AgentBuddyTheme.textMuted)
-                        .padding(.leading, 24)
-                        .padding(.top, 14)
+                        .buddyText(.body)
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
+                        .padding(.leading, BuddySpacing.lg)
+                        .padding(.top, BuddySpacing.md)
                         .allowsHitTesting(false)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(AgentBuddyTheme.backgroundGradient.ignoresSafeArea())
+            .background(AgentBuddyTheme.surface.ignoresSafeArea())
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if !isConnected {
+                    BuddyBanner(
+                        tone: .warning,
+                        message: Text("Connection lost. Task status will sync when the host is back; your draft is kept."),
+                        systemImage: "wifi.slash"
+                    )
+                    .padding(.horizontal, BuddySpacing.md)
+                    .padding(.vertical, BuddySpacing.xs)
+                }
+            }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -50,19 +68,26 @@ struct ConversationComposerExpandedView: View {
                         isPresented = false
                     } label: {
                         Image(systemName: "arrow.down.right.and.arrow.up.left")
-                            .font(AgentBuddyFont.styled(size: 15, weight: .semibold))
-                            .foregroundColor(AgentBuddyTheme.textPrimary)
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(AgentBuddyTheme.textPrimary)
+                            .frame(width: BuddySize.minHitTarget, height: BuddySize.minHitTarget)
+                            .contentShape(Rectangle())
                     }
                     .accessibilityLabel("Collapse composer")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button {
+                        guard canSend else { return }
                         onSend()
                         isPresented = false
                     } label: {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.system(size: 26))
-                            .foregroundColor(canSend ? AgentBuddyTheme.accent : AgentBuddyTheme.textMuted)
+                        Image(systemName: "arrow.up")
+                            .font(.system(size: 17, weight: .bold))
+                            .foregroundStyle(canSend ? AgentBuddyTheme.onAction : AgentBuddyTheme.onDisabled)
+                            .frame(width: 36, height: 36)
+                            .background(canSend ? AgentBuddyTheme.action : AgentBuddyTheme.disabled, in: Circle())
+                            .frame(width: BuddySize.minHitTarget, height: BuddySize.minHitTarget)
+                            .contentShape(Rectangle())
                     }
                     .disabled(!canSend)
                     .accessibilityLabel("Send")

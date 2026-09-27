@@ -1,5 +1,7 @@
 import SwiftUI
 
+/// Project (host + folder) picker sheet. Every row shows its host so projects
+/// with the same folder name on different computers stay distinguishable.
 struct ProjectPickerSheet: View {
     let projects: [AppProject]
     let serverNamesById: [String: String]
@@ -23,134 +25,99 @@ struct ProjectPickerSheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                search
-                Divider().opacity(0.3)
-                list
+            ScrollView {
+                VStack(alignment: .leading, spacing: BuddySpacing.md) {
+                    search
+                    if filtered.isEmpty {
+                        emptyState
+                    } else {
+                        VStack(spacing: 0) {
+                            ForEach(Array(filtered.enumerated()), id: \.element.id) { index, project in
+                                if index > 0 { BuddyDivider() }
+                                row(for: project)
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, BuddySpacing.xl)
+                .padding(.top, BuddySpacing.xs)
+                .padding(.bottom, BuddySpacing.xl)
             }
-            .background(AgentBuddyTheme.backgroundGradient.ignoresSafeArea())
+            .buddyPageBackground()
             .navigationTitle("Projects")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Close") { dismiss() }
-                        .foregroundStyle(AgentBuddyTheme.textSecondary)
+                        .foregroundStyle(AgentBuddyTheme.link)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        onCreateNew()
-                    } label: {
-                        Label("New Project", systemImage: "plus")
-                            .foregroundStyle(AgentBuddyTheme.accent)
+                    Button(action: onCreateNew) {
+                        Label("New project", systemImage: "plus")
                     }
+                    .foregroundStyle(AgentBuddyTheme.link)
                 }
             }
         }
     }
 
     private var search: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: BuddySpacing.xs) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(AgentBuddyTheme.textMuted)
+                .foregroundStyle(AgentBuddyTheme.textSecondary)
+                .accessibilityHidden(true)
             TextField("Search projects", text: $query)
-                .agentBuddyFont(.body)
+                .buddyText(.body)
                 .foregroundStyle(AgentBuddyTheme.textPrimary)
-                .tint(AgentBuddyTheme.accent)
+                .tint(AgentBuddyTheme.focus)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
             if !query.isEmpty {
                 Button { query = "" } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(AgentBuddyTheme.textMuted)
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
+                        .frame(width: BuddySize.minHitTarget, height: BuddySize.minHitTarget)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(Text("Clear search"))
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-    }
-
-    @ViewBuilder
-    private var list: some View {
-        if filtered.isEmpty {
-            emptyState
-        } else {
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    ForEach(filtered, id: \.id) { project in
-                        row(for: project)
-                        Divider().opacity(0.15)
-                    }
-                }
-            }
+        .padding(.leading, BuddySpacing.md)
+        .frame(minHeight: BuddySize.control)
+        .background(AgentBuddyTheme.surface, in: RoundedRectangle(cornerRadius: BuddyRadius.button, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: BuddyRadius.button, style: .continuous)
+                .strokeBorder(AgentBuddyTheme.borderControl, lineWidth: 1)
         }
     }
 
     private func row(for project: AppProject) -> some View {
-        Button {
+        let name = projectDefaultLabel(cwd: project.cwd)
+        let path = PathDisplay.display(project.cwd, isLocal: appModel.isLocalServer(serverId: project.serverId))
+        let detail = [serverNamesById[project.serverId], path].compactMap { $0 }.joined(separator: " · ")
+        return Button {
             onSelect(project)
             dismiss()
         } label: {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "folder")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(AgentBuddyTheme.textSecondary)
-                    .frame(width: 22, alignment: .center)
-                    .padding(.top, 2)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(projectDefaultLabel(cwd: project.cwd))
-                        .agentBuddyFont(.body, weight: .semibold)
-                        .foregroundStyle(AgentBuddyTheme.textPrimary)
-                        .lineLimit(1)
-                    HStack(spacing: 6) {
-                        if let serverName = serverNamesById[project.serverId] {
-                            Text(serverName)
-                                .foregroundStyle(AgentBuddyTheme.accent.opacity(0.75))
-                        }
-                        Text(PathDisplay.display(project.cwd, isLocal: appModel.isLocalServer(serverId: project.serverId)))
-                            .foregroundStyle(AgentBuddyTheme.textMuted)
-                    }
-                    .agentBuddyMonoFont(size: 11, weight: .regular)
-                    .lineLimit(1)
-                }
-
-                Spacer(minLength: 8)
+            BuddyListRow(title: Text(verbatim: name), subtitle: Text(verbatim: detail)) {
+                BuddyIconTile(content: .initial(name.first.map { String($0).uppercased() } ?? "#"))
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .contentShape(Rectangle())
+            .foregroundStyle(AgentBuddyTheme.textSecondary)
         }
         .buttonStyle(.plain)
     }
 
     private var emptyState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "folder.badge.plus")
-                .font(.system(size: 32, weight: .light))
-                .foregroundStyle(AgentBuddyTheme.textMuted)
-            Text("No projects yet")
-                .agentBuddyFont(.body, weight: .medium)
-                .foregroundStyle(AgentBuddyTheme.textSecondary)
-            Text("Tap + to pick a directory and start your first thread.")
-                .agentBuddyFont(.footnote)
-                .foregroundStyle(AgentBuddyTheme.textMuted)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
-            Button {
-                onCreateNew()
-            } label: {
-                Text("New Project")
-                    .agentBuddyFont(.footnote, weight: .semibold)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(Capsule().fill(AgentBuddyTheme.accent.opacity(0.15)))
-                    .foregroundStyle(AgentBuddyTheme.accent)
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 4)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.vertical, 60)
+        BuddyEmptyState(
+            systemImage: query.isEmpty ? "folder.badge.plus" : "magnifyingglass",
+            title: query.isEmpty ? "No projects yet" : "No matching projects",
+            message: query.isEmpty
+                ? "Pick a folder on one of your hosts to create your first project."
+                : "Try another name, host or path, or open a new folder.",
+            actionTitle: "New project",
+            actionSystemImage: "plus",
+            actionKind: query.isEmpty ? .primary : .secondary,
+            action: onCreateNew
+        )
     }
 }

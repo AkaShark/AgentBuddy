@@ -6,17 +6,14 @@ struct AppearanceSettingsView: View {
     @AppStorage("conversationTextSizeStep") private var textSizeStep = ConversationTextSize.large.rawValue
 
     var body: some View {
-        ZStack {
-            AgentBuddyTheme.backgroundGradient.ignoresSafeArea()
-            Form {
-                appearanceModeSection
-                fontSizeSection
-                conversationPreviewSection
-                lightThemeSection
-                darkThemeSection
-            }
-            .scrollContentBackground(.hidden)
+        Form {
+            appearanceModeSection
+            fontSizeSection
+            conversationPreviewSection
+            lightThemeSection
+            darkThemeSection
         }
+        .settingsMintList()
         .navigationTitle("Appearance")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $activeThemePicker) { pickerKind in
@@ -29,6 +26,7 @@ struct AppearanceSettingsView: View {
             }
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
+            .buddySheetStyle()
         }
     }
 
@@ -48,14 +46,15 @@ struct AppearanceSettingsView: View {
                 }
             }
             .pickerStyle(.segmented)
-            .tint(AgentBuddyTheme.accent)
-            .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+            .tint(AgentBuddyTheme.action)
+            .padding(.vertical, BuddySpacing.xxs)
+            .settingsMintRow()
         } header: {
             Text("Mode")
-                .foregroundColor(AgentBuddyTheme.textSecondary)
+                .settingsMintHeader()
         } footer: {
             Text("Match the device setting, or keep AgentBuddy fixed in light or dark mode.")
-                .foregroundColor(AgentBuddyTheme.textMuted)
+                .settingsMintFooter()
         }
     }
 
@@ -63,21 +62,23 @@ struct AppearanceSettingsView: View {
 
     private var fontSizeSection: some View {
         Section {
-            VStack(spacing: 12) {
+            VStack(spacing: BuddySpacing.sm) {
                 HStack {
                     Text("Font Size")
-                        .agentBuddyFont(.subheadline)
-                        .foregroundColor(AgentBuddyTheme.textPrimary)
+                        .buddyText(.body)
+                        .foregroundStyle(AgentBuddyTheme.textPrimary)
                     Spacer()
                     Text(ConversationTextSize.clamped(rawValue: textSizeStep).label)
-                        .agentBuddyFont(.subheadline)
-                        .foregroundColor(AgentBuddyTheme.textSecondary)
+                        .buddyText(.label)
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
                 }
 
-                HStack(spacing: 6) {
-                    Text("A")
+                HStack(spacing: BuddySpacing.xs) {
+                    // Fixed sizes on purpose: the two glyphs show the scale ends.
+                    Text(verbatim: "A")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(AgentBuddyTheme.textMuted)
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
+                        .accessibilityHidden(true)
 
                     Slider(
                         value: Binding(
@@ -87,21 +88,24 @@ struct AppearanceSettingsView: View {
                         in: Double(ConversationTextSize.tiny.rawValue)...Double(ConversationTextSize.huge.rawValue),
                         step: 1
                     )
-                    .tint(AgentBuddyTheme.accent)
+                    .tint(AgentBuddyTheme.action)
+                    .accessibilityLabel(Text("Font Size"))
+                    .accessibilityValue(Text(ConversationTextSize.clamped(rawValue: textSizeStep).label))
 
-                    Text("A")
+                    Text(verbatim: "A")
                         .font(.system(size: 20, weight: .medium))
-                        .foregroundColor(AgentBuddyTheme.textMuted)
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
+                        .accessibilityHidden(true)
                 }
             }
-            .padding(.vertical, 4)
-            .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+            .padding(.vertical, BuddySpacing.xs)
+            .settingsMintRow()
         } header: {
             Text("Font Size")
-                .foregroundColor(AgentBuddyTheme.textSecondary)
+                .settingsMintHeader()
         } footer: {
             Text("Pinch in conversations to adjust, or use this slider. Applies across the app.")
-                .foregroundColor(AgentBuddyTheme.textMuted)
+                .settingsMintFooter()
         }
     }
 
@@ -109,7 +113,7 @@ struct AppearanceSettingsView: View {
 
     private var conversationPreviewSection: some View {
         Section {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: BuddySpacing.xs) {
                 UserBubble(text: "Hey clanker, why is prod on fire", compact: true)
 
                 ToolCallCardView(model: ToolCallCardModel(
@@ -136,14 +140,14 @@ struct AppearanceSettingsView: View {
 
                 UserBubble(text: "That was you, clanker", compact: true)
             }
-            .padding(.vertical, 6)
+            .padding(.vertical, BuddySpacing.sm)
             .environment(\.textScale, ConversationTextSize.clamped(rawValue: textSizeStep).scale)
             .id(themeManager.themeVersion)
-            .listRowBackground(AgentBuddyTheme.backgroundGradient)
-            .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12))
+            .listRowBackground(AgentBuddyTheme.background)
+            .listRowInsets(EdgeInsets(top: 0, leading: BuddySpacing.sm, bottom: 0, trailing: BuddySpacing.sm))
         } header: {
             Text("Preview")
-                .foregroundColor(AgentBuddyTheme.textSecondary)
+                .settingsMintHeader()
         }
     }
 
@@ -158,7 +162,7 @@ struct AppearanceSettingsView: View {
             )
         } header: {
             Text("Light theme")
-                .foregroundColor(AgentBuddyTheme.textSecondary)
+                .settingsMintHeader()
         }
     }
 
@@ -173,7 +177,7 @@ struct AppearanceSettingsView: View {
             )
         } header: {
             Text("Dark theme")
-                .foregroundColor(AgentBuddyTheme.textSecondary)
+                .settingsMintHeader()
         }
     }
 
@@ -189,9 +193,10 @@ struct AppearanceSettingsView: View {
             activeThemePicker = pickerKind
         } label: {
             ThemePickerRow(entry: selected, trailingAccessory: .chevron)
+                .frame(minHeight: BuddySize.minHitTarget)
         }
         .buttonStyle(.plain)
-        .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+        .settingsMintRow()
     }
 
     private func themes(for pickerKind: ThemePickerKind) -> [ThemeIndexEntry] {
@@ -235,223 +240,6 @@ private enum ThemePickerKind: String, Identifiable {
         case .dark:
             "Dark Theme"
         }
-    }
-}
-
-private enum ThemePickerTrailingAccessory {
-    case none
-    case chevron
-    case checkmark
-}
-
-private struct ThemePickerRow: View {
-    let entry: ThemeIndexEntry?
-    let trailingAccessory: ThemePickerTrailingAccessory
-
-    var body: some View {
-        HStack(spacing: 10) {
-            ThemePreviewBadge(
-                backgroundHex: entry?.backgroundHex ?? "#000000",
-                foregroundHex: entry?.foregroundHex ?? "#FFFFFF",
-                accentHex: entry?.accentHex ?? "#00FF00"
-            )
-
-            Text(entry?.name ?? "Unknown Theme")
-                .agentBuddyFont(.subheadline)
-                .foregroundColor(AgentBuddyTheme.textPrimary)
-                .lineLimit(1)
-
-            Spacer(minLength: 12)
-
-            switch trailingAccessory {
-            case .none:
-                EmptyView()
-            case .chevron:
-                Image(systemName: "chevron.up.chevron.down")
-                    .agentBuddyFont(size: 11)
-                    .foregroundColor(AgentBuddyTheme.textMuted)
-            case .checkmark:
-                Image(systemName: "checkmark")
-                    .agentBuddyFont(size: 12, weight: .semibold)
-                    .foregroundColor(AgentBuddyTheme.accent)
-            }
-        }
-        .contentShape(Rectangle())
-    }
-}
-
-private struct ThemePickerSheet: View {
-    let title: String
-    let themes: [ThemeIndexEntry]
-    let selectedSlug: String
-    let onSelect: (String) -> Void
-
-    @Environment(\.dismiss) private var dismiss
-    @State private var searchQuery = ""
-
-    private var trimmedSearchQuery: String {
-        searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private var filteredThemes: [ThemeIndexEntry] {
-        guard !trimmedSearchQuery.isEmpty else { return themes }
-        return themes.filter { entry in
-            entry.name.localizedCaseInsensitiveContains(trimmedSearchQuery) ||
-            entry.slug.localizedCaseInsensitiveContains(trimmedSearchQuery)
-        }
-    }
-
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                AgentBuddyTheme.backgroundGradient.ignoresSafeArea()
-
-                VStack(spacing: 12) {
-                    searchField
-
-                    if filteredThemes.isEmpty {
-                        emptyState
-                    } else {
-                        ScrollView {
-                            LazyVStack(spacing: 10) {
-                                ForEach(filteredThemes) { entry in
-                                    Button {
-                                        onSelect(entry.slug)
-                                        dismiss()
-                                    } label: {
-                                        ThemePickerRow(
-                                            entry: entry,
-                                            trailingAccessory: entry.slug == selectedSlug ? .checkmark : .none
-                                        )
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 11)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .background(AgentBuddyTheme.surface.opacity(0.72))
-                                        .overlay {
-                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                                .stroke(
-                                                    entry.slug == selectedSlug
-                                                        ? AgentBuddyTheme.accent.opacity(0.6)
-                                                        : AgentBuddyTheme.border.opacity(0.85),
-                                                    lineWidth: 1
-                                                )
-                                        }
-                                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 16)
-                        }
-                    }
-                }
-                .padding(.top, 8)
-            }
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                    .foregroundColor(AgentBuddyTheme.accent)
-                }
-            }
-        }
-    }
-
-    private var searchField: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundColor(AgentBuddyTheme.textMuted)
-                .agentBuddyFont(size: 14, weight: .medium)
-
-            TextField("Search themes", text: $searchQuery)
-                .agentBuddyFont(.subheadline)
-                .foregroundColor(AgentBuddyTheme.textPrimary)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled(true)
-
-            if !searchQuery.isEmpty {
-                Button {
-                    searchQuery = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(AgentBuddyTheme.textMuted)
-                        .agentBuddyFont(size: 14)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(AgentBuddyTheme.surface.opacity(0.55))
-        .overlay {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(AgentBuddyTheme.border.opacity(0.85), lineWidth: 1)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .padding(.horizontal, 16)
-    }
-
-    private var emptyState: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "magnifyingglass")
-                .agentBuddyFont(size: 18, weight: .medium)
-                .foregroundColor(AgentBuddyTheme.textMuted)
-
-            Text("No matching themes")
-                .agentBuddyFont(.subheadline)
-                .foregroundColor(AgentBuddyTheme.textPrimary)
-
-            if !trimmedSearchQuery.isEmpty {
-                Text(trimmedSearchQuery)
-                    .agentBuddyFont(.caption)
-                    .foregroundColor(AgentBuddyTheme.textSecondary)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .padding(.top, 48)
-        .padding(.horizontal, 24)
-    }
-}
-
-// MARK: - Theme Preview Badge
-
-struct ThemePreviewBadge: View {
-    let backgroundHex: String
-    let foregroundHex: String
-    let accentHex: String
-
-    var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            Text("Aa")
-                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                .foregroundColor(Color(hex: foregroundHex))
-                .frame(width: 28, height: 22)
-                .background(
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .fill(Color(hex: backgroundHex))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .stroke(Color.gray.opacity(0.3), lineWidth: 0.5)
-                )
-            Circle()
-                .fill(Color(hex: accentHex))
-                .frame(width: 6, height: 6)
-                .offset(x: 1, y: 1)
-        }
-    }
-
-    @MainActor
-    static func renderToImage(backgroundHex: String, foregroundHex: String, accentHex: String) -> UIImage {
-        let badge = ThemePreviewBadge(backgroundHex: backgroundHex, foregroundHex: foregroundHex, accentHex: accentHex)
-        let renderer = ImageRenderer(content: badge)
-        renderer.scale = UIScreen.main.scale
-        guard let cgImage = renderer.cgImage else { return UIImage() }
-        return UIImage(cgImage: cgImage).withRenderingMode(.alwaysOriginal)
     }
 }
 

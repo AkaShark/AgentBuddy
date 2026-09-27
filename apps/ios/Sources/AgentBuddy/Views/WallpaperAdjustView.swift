@@ -35,20 +35,13 @@ struct WallpaperAdjustView: View {
             // Cancel button (top-left)
             VStack {
                 HStack {
-                    Button {
+                    WallpaperFloatingPillButton(title: "Cancel") {
                         onDone?()
-                    } label: {
-                        Text("Cancel")
-                            .agentBuddyFont(size: 15, weight: .medium)
-                            .foregroundStyle(AgentBuddyTheme.textPrimary)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .modifier(GlassRectModifier(cornerRadius: 10))
                     }
                     Spacer()
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
+                .padding(.horizontal, BuddySpacing.md)
+                .padding(.top, BuddySpacing.xs)
                 Spacer()
             }
         }
@@ -125,29 +118,22 @@ struct WallpaperAdjustView: View {
     // MARK: - Sample Bubbles
 
     private var sampleBubbles: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: BuddySpacing.sm) {
             Spacer()
             HStack {
-                Spacer()
-                Text("Refactor the auth middleware")
-                    .agentBuddyFont(size: 14)
-                    .foregroundStyle(AgentBuddyTheme.textPrimary)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .modifier(GlassRectModifier(cornerRadius: 14, tint: AgentBuddyTheme.accent.opacity(0.3)))
+                Spacer(minLength: BuddySpacing.xxxl)
+                WallpaperSampleUserBubble(text: "Refactor the auth middleware")
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, BuddySpacing.md)
 
             HStack {
                 Text("I'll review the auth middleware and refactor it for better separation of concerns.")
-                    .agentBuddyFont(size: 14)
+                    .buddyText(.body)
                     .foregroundStyle(AgentBuddyTheme.textPrimary)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .modifier(GlassRectModifier(cornerRadius: 14))
-                Spacer()
+                    .wallpaperSampleAssistantCard()
+                Spacer(minLength: 0)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, BuddySpacing.md)
 
             Spacer()
         }
@@ -156,84 +142,73 @@ struct WallpaperAdjustView: View {
     // MARK: - Controls Card
 
     private var controlsCard: some View {
-        VStack(spacing: 16) {
-            RoundedRectangle(cornerRadius: 2)
-                .fill(AgentBuddyTheme.textMuted.opacity(0.4))
-                .frame(width: 36, height: 4)
-                .padding(.top, 12)
+        VStack(spacing: BuddySpacing.md) {
+            WallpaperPanelGrabber()
+                .padding(.top, BuddySpacing.sm)
 
             // Toggles
-            HStack(spacing: 24) {
+            HStack(spacing: BuddySpacing.xl) {
                 toggleOption(label: "Blurred", isOn: $isBlurred)
                 toggleOption(label: "Motion", isOn: $motionEnabled)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, BuddySpacing.md)
 
             // Brightness slider
-            HStack(spacing: 12) {
+            HStack(spacing: BuddySpacing.sm) {
                 Image(systemName: "sun.min")
-                    .font(.system(size: 14))
-                    .foregroundStyle(AgentBuddyTheme.textMuted)
+                    .font(.system(size: 17))
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
+                    .accessibilityHidden(true)
                 Slider(value: $brightness, in: 0.2...1.0)
-                    .tint(AgentBuddyTheme.accent)
+                    .tint(AgentBuddyTheme.action)
                 Image(systemName: "sun.max")
-                    .font(.system(size: 14))
+                    .font(.system(size: 17))
                     .foregroundStyle(AgentBuddyTheme.textPrimary)
+                    .accessibilityHidden(true)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, BuddySpacing.md)
 
-            // Apply buttons
-            VStack(spacing: 10) {
+            // Apply buttons: the thread scope is the primary action when present.
+            VStack(spacing: BuddySpacing.sm) {
                 if let threadKey {
-                    Button {
+                    BuddyButton("Apply for This Thread") {
                         applyWallpaper(scope: .thread(threadKey))
-                    } label: {
-                        Text("Apply for This Thread")
-                            .agentBuddyFont(size: 15, weight: .semibold)
-                            .foregroundStyle(AgentBuddyTheme.textOnAccent)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(AgentBuddyTheme.accent)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                 }
 
                 if let resolvedServerId {
-                    Button {
+                    BuddyButton("Apply for This Server", kind: threadKey == nil ? .primary : .secondary) {
                         applyWallpaper(scope: .server(resolvedServerId))
-                    } label: {
-                        Text("Apply for This Server")
-                            .agentBuddyFont(size: 15, weight: .medium)
-                            .foregroundStyle(AgentBuddyTheme.textPrimary)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .modifier(GlassRectModifier(cornerRadius: 12))
                     }
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, BuddySpacing.md)
 
-            Spacer().frame(height: 16)
+            Spacer().frame(height: BuddySpacing.md)
         }
-        .background(
-            UnevenRoundedRectangle(topLeadingRadius: 20, topTrailingRadius: 20)
-                .fill(AgentBuddyTheme.surface.opacity(0.95))
-        )
+        .wallpaperBottomPanel()
     }
 
-    private func toggleOption(label: String, isOn: Binding<Bool>) -> some View {
+    /// Checkbox-style option: the symbol shape (filled check vs. empty square)
+    /// and the selected trait carry the state, not just the colour.
+    private func toggleOption(label: LocalizedStringKey, isOn: Binding<Bool>) -> some View {
         Button {
             isOn.wrappedValue.toggle()
         } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: BuddySpacing.xs) {
                 Image(systemName: isOn.wrappedValue ? "checkmark.square.fill" : "square")
-                    .font(.system(size: 18))
-                    .foregroundStyle(isOn.wrappedValue ? AgentBuddyTheme.accent : AgentBuddyTheme.textMuted)
+                    .font(.system(size: 20))
+                    .foregroundStyle(isOn.wrappedValue ? AgentBuddyTheme.action : AgentBuddyTheme.borderControl)
+                    .accessibilityHidden(true)
                 Text(label)
-                    .agentBuddyFont(size: 14)
+                    .buddyText(.label)
                     .foregroundStyle(AgentBuddyTheme.textPrimary)
             }
+            .frame(minHeight: BuddySize.minHitTarget)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isOn.wrappedValue ? .isSelected : [])
     }
 
     // MARK: - Apply

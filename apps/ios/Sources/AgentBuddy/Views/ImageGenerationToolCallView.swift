@@ -9,13 +9,6 @@ struct ImageGenerationToolCallView: View {
     @State private var expanded: Bool
     @State private var promptExpanded = false
     @State private var showShareSheet = false
-    /// Header row (icon + summary). A half-step smaller than body so tool
-    /// calls read as secondary to assistant messages.
-    private let summaryFontSize: CGFloat = 13
-    /// Expanded content size — matches the bash/command output size
-    /// (`ConversationCommandOutputViewport` renders at 12pt) so tool-call
-    /// details share a typographic baseline with terminal output.
-    private let contentFontSize: CGFloat = 12
 
     init(
         data: ConversationImageGenerationData,
@@ -31,24 +24,20 @@ struct ImageGenerationToolCallView: View {
             header
 
             if expanded {
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: BuddySpacing.sm) {
                     imagePreview
                     if let prompt = data.revisedPrompt, !prompt.isEmpty {
                         promptBlock(prompt)
                     }
                 }
-                .padding(.top, 6)
+                .padding(.top, BuddySpacing.xxs)
+                .padding(.bottom, BuddySpacing.sm)
                 .transition(.sectionReveal)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
-        .background(AgentBuddyTheme.surface)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(AgentBuddyTheme.border, lineWidth: 0.5)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(.horizontal, BuddySpacing.md)
+        .padding(.vertical, BuddySpacing.xxs)
+        .timelineDetailCard()
         .animation(.spring(duration: 0.32, bounce: 0.12), value: expanded)
         .onChange(of: externalExpanded) { _, newValue in
             if let newValue, newValue != expanded {
@@ -60,30 +49,22 @@ struct ImageGenerationToolCallView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "sparkles")
-                .agentBuddyFont(size: 12, weight: .semibold)
-                .foregroundColor(AgentBuddyTheme.accent)
+        HStack(spacing: BuddySpacing.sm) {
+            TimelineStatusGlyph(status: data.status.toolCallStatus, fallbackSystemImage: "sparkles")
 
-            Text(summary)
-                .agentBuddyFont(size: summaryFontSize)
-                .foregroundColor(AgentBuddyTheme.textSystem)
+            Text(verbatim: summary)
+                .buddyText(.label)
+                .foregroundStyle(AgentBuddyTheme.textPrimary)
                 .lineLimit(1)
                 .truncationMode(.middle)
 
-            Spacer()
+            Spacer(minLength: BuddySpacing.xs)
 
-            if data.isInProgress {
-                ProgressView()
-                    .controlSize(.mini)
-                    .tint(AgentBuddyTheme.accent)
-            }
-
-            Image(systemName: expanded ? "chevron.up" : "chevron.down")
-                .agentBuddyFont(size: 11, weight: .medium)
-                .foregroundColor(AgentBuddyTheme.textMuted)
+            TimelineDisclosureChevron(expanded: expanded)
         }
+        .frame(minHeight: BuddySize.minHitTarget)
         .contentShape(Rectangle())
+        .accessibilityAddTraits(.isButton)
         .onTapGesture {
             withAnimation(.easeInOut(duration: 0.2)) {
                 expanded.toggle()
@@ -93,9 +74,9 @@ struct ImageGenerationToolCallView: View {
 
     private var summary: String {
         switch data.status {
-        case .completed: return "Generated image"
-        case .failed: return "Image generation failed"
-        default: return "Generating image…"
+        case .completed: return String(localized: "Generated image")
+        case .failed: return String(localized: "Image generation failed")
+        default: return String(localized: "Generating image…")
         }
     }
 
@@ -121,10 +102,10 @@ struct ImageGenerationToolCallView: View {
                         .resizable()
                         .scaledToFit()
                         .frame(maxWidth: .infinity)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: BuddyRadius.control, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(AgentBuddyTheme.border.opacity(0.4), lineWidth: 0.5)
+                            RoundedRectangle(cornerRadius: BuddyRadius.control, style: .continuous)
+                                .strokeBorder(AgentBuddyTheme.border, lineWidth: 1)
                         )
                         .draggable(Image(uiImage: ui)) {
                             Image(uiImage: ui)
@@ -159,11 +140,9 @@ struct ImageGenerationToolCallView: View {
     }
 
     private func promptBlock(_ prompt: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                Text("REVISED PROMPT")
-                    .agentBuddyFont(.caption2, weight: .bold)
-                    .foregroundColor(AgentBuddyTheme.textSecondary)
+        VStack(alignment: .leading, spacing: BuddySpacing.xxs) {
+            HStack(spacing: BuddySpacing.xs) {
+                TimelineSectionLabel("Revised prompt")
                 Spacer()
                 if shouldShowPromptToggle(prompt) {
                     Button {
@@ -172,41 +151,35 @@ struct ImageGenerationToolCallView: View {
                         }
                     } label: {
                         Text(promptExpanded ? "Show less" : "Show more")
-                            .agentBuddyFont(.caption2, weight: .medium)
-                            .foregroundColor(AgentBuddyTheme.accent)
+                            .timelineLinkAction()
                     }
                     .buttonStyle(.plain)
                 }
             }
 
             Text(promptExpanded ? prompt : collapsedPreview(prompt))
-                .agentBuddyFont(size: contentFontSize)
-                .foregroundColor(AgentBuddyTheme.textSecondary)
+                .buddyText(.label, weight: .regular)
+                .foregroundStyle(AgentBuddyTheme.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(10)
+                .padding(BuddySpacing.sm)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(AgentBuddyTheme.codeBackground.opacity(0.82))
-                )
+                .timelineCodeSurface()
         }
     }
 
-    private func placeholderTile(icon: String, message: String, tone: Color) -> some View {
-        VStack(spacing: 8) {
+    private func placeholderTile(icon: String, message: LocalizedStringKey, tone: Color) -> some View {
+        VStack(spacing: BuddySpacing.xs) {
             Image(systemName: icon)
-                .agentBuddyFont(size: 24, weight: .medium)
-                .foregroundColor(tone)
+                .font(.system(size: 24, weight: .medium))
+                .foregroundStyle(tone)
+                .accessibilityHidden(true)
             Text(message)
-                .agentBuddyFont(.caption)
-                .foregroundColor(tone)
+                .buddyText(.label, weight: .regular)
+                .foregroundStyle(tone)
         }
         .frame(maxWidth: .infinity, alignment: .center)
-        .padding(.vertical, 32)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(AgentBuddyTheme.codeBackground.opacity(0.82))
-        )
+        .padding(.vertical, BuddySpacing.xxl)
+        .timelineCodeSurface()
     }
 
     private func shouldShowPromptToggle(_ prompt: String) -> Bool {
@@ -226,44 +199,40 @@ private struct ImageGenerationLoadingTile: View {
     @State private var pulse = false
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: BuddySpacing.sm) {
             ZStack {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(AgentBuddyTheme.accent.opacity(pulse ? 0.18 : 0.08))
+                RoundedRectangle(cornerRadius: BuddyRadius.control, style: .continuous)
+                    .fill(AgentBuddyTheme.brand)
                     .frame(width: 48, height: 48)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(AgentBuddyTheme.accent.opacity(0.32), lineWidth: 0.5)
-                    )
+                    .opacity(pulse ? 1 : 0.7)
 
                 Image(systemName: "sparkles")
-                    .agentBuddyFont(size: 19, weight: .semibold)
-                    .foregroundColor(AgentBuddyTheme.accent)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(AgentBuddyTheme.onBrand)
                     .scaleEffect(pulse ? 1.06 : 0.96)
             }
+            .accessibilityHidden(true)
 
-            VStack(spacing: 5) {
+            VStack(spacing: BuddySpacing.xs) {
                 Text("Generating image")
-                    .agentBuddyFont(.caption, weight: .semibold)
-                    .foregroundColor(AgentBuddyTheme.textSystem)
+                    .buddyText(.label)
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
 
                 HStack(spacing: 5) {
                     ForEach(0..<3, id: \.self) { index in
                         Capsule()
-                            .fill(AgentBuddyTheme.accent.opacity(0.42))
+                            .fill(AgentBuddyTheme.borderControl)
                             .frame(width: index == 1 ? 42 : 28, height: 4)
                             .opacity(pulse ? 1.0 - Double(index) * 0.18 : 0.38 + Double(index) * 0.16)
                     }
                 }
                 .frame(height: 8)
+                .accessibilityHidden(true)
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 28)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(AgentBuddyTheme.codeBackground.opacity(0.82))
-        )
+        .padding(.vertical, BuddySpacing.xl)
+        .timelineCodeSurface()
         .task {
             guard !reduceMotion else { return }
             withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {

@@ -1,8 +1,7 @@
 import SwiftUI
 
-/// Capsule voice button matching the `+` and search buttons in
-/// `HomeBottomBar`. Size and glass treatment are identical; only the icon
-/// and its tint change to reflect realtime voice state.
+/// Floating realtime-voice button (iPad/Mac split view). A 44pt surface circle
+/// whose icon and outline tint reflect the voice session state.
 struct HomeVoiceOrbButton: View {
     let session: VoiceSessionState?
     let isAvailable: Bool
@@ -42,7 +41,7 @@ struct HomeVoiceOrbButton: View {
         guard let phase else { return AgentBuddyTheme.textSecondary }
         switch phase {
         case .connecting, .listening:
-            return AgentBuddyTheme.accent
+            return AgentBuddyTheme.link
         case .speaking, .thinking, .handoff:
             return AgentBuddyTheme.warning
         case .error:
@@ -51,11 +50,11 @@ struct HomeVoiceOrbButton: View {
     }
 
     private var strokeColor: Color {
-        isActive ? iconColor.opacity(0.5) : AgentBuddyTheme.textMuted.opacity(0.3)
+        isActive ? iconColor : AgentBuddyTheme.border
     }
 
     private var strokeWidth: CGFloat {
-        isActive ? 0.8 : 0.6
+        isActive ? 1.5 : 1
     }
 
     var body: some View {
@@ -72,10 +71,11 @@ struct HomeVoiceOrbButton: View {
                 }
             }
             .frame(width: buttonSize, height: buttonSize)
+            .background(AgentBuddyTheme.surface, in: Capsule(style: .continuous))
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .modifier(GlassCapsuleModifier(interactive: true))
+        .shadow(color: AgentBuddyTheme.floatingShadow, radius: 12, y: 4)
         .overlay(
             Capsule(style: .continuous)
                 .stroke(strokeColor, lineWidth: strokeWidth)
@@ -84,6 +84,5 @@ struct HomeVoiceOrbButton: View {
         .disabled(isDisabled)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityHint("Starts a local realtime voice conversation.")
-        .coachmarkAnchor(.voice)
     }
 }

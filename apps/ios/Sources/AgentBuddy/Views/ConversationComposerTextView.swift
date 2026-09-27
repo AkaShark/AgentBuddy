@@ -39,7 +39,7 @@ struct ConversationComposerTextView: UIViewRepresentable {
         textView.delegate = context.coordinator
         textView.backgroundColor = .clear
         textView.tintColor = UIColor(AgentBuddyTheme.accent)
-        textView.textContainerInset = UIEdgeInsets(top: 11, left: 16, bottom: 11, right: 12)
+        textView.textContainerInset = UIEdgeInsets(top: 10, left: 4, bottom: 10, right: 4)
         textView.textContainer.lineFragmentPadding = 0
         textView.autocorrectionType = .default
         textView.autocapitalizationType = .sentences

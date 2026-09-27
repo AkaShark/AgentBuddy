@@ -42,7 +42,8 @@ enum AgentBuddyPalette {
 
     /// Whether the user prefers monospaced font. Reads from the shared App Group.
     static var isMono: Bool {
-        let raw = shared?.string(forKey: "fontFamily") ?? "mono"
+        // Mirrors FontFamilyOption.defaultOption (not visible to the widget target).
+        let raw = shared?.string(forKey: "fontFamily") ?? "system"
         return raw == "mono"
     }
 

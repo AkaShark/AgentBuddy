@@ -8,7 +8,7 @@ struct CrossServerToolResultView: View {
 
     var body: some View {
         if let payload = decode() {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: BuddySpacing.xs) {
                 switch payload {
                 case .servers(let items):
                     if items.isEmpty {
@@ -41,8 +41,11 @@ struct CrossServerToolResultView: View {
         }
     }
 
-    private func emptyRow(_ text: String) -> some View {
-        Text(text).agentBuddyFont(.caption).foregroundColor(AgentBuddyTheme.textMuted).padding(.vertical, 4)
+    private func emptyRow(_ text: LocalizedStringKey) -> some View {
+        Text(text)
+            .buddyText(.label, weight: .regular)
+            .foregroundStyle(AgentBuddyTheme.textSecondary)
+            .padding(.vertical, BuddySpacing.xxs)
     }
 
     // MARK: - Decoding
@@ -135,24 +138,19 @@ struct SessionServerCardRow: View {
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            Image(systemName: icon)
-                .agentBuddyFont(size: 16, weight: .medium)
-                .foregroundColor(AgentBuddyTheme.accent)
-                .frame(width: 28, height: 28)
-                .background(AgentBuddyTheme.accent.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+        HStack(alignment: .center, spacing: BuddySpacing.sm) {
+            BuddyIconTile(content: .symbol(icon), size: 36)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .agentBuddyFont(.subheadline)
-                    .foregroundColor(AgentBuddyTheme.textPrimary)
+                    .buddyText(.label, weight: .semibold)
+                    .foregroundStyle(AgentBuddyTheme.textPrimary)
                     .lineLimit(1)
 
                 if !subtitle.isEmpty {
                     Text(subtitle)
-                        .agentBuddyFont(.caption)
-                        .foregroundColor(AgentBuddyTheme.textMuted)
+                        .buddyText(.caption)
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
                         .lineLimit(1)
                 }
             }
@@ -163,41 +161,35 @@ struct SessionServerCardRow: View {
             case .none:
                 EmptyView()
             case .status(let connected):
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(connected ? AgentBuddyTheme.accent : AgentBuddyTheme.textMuted.opacity(0.5))
-                        .frame(width: 8, height: 8)
-                    Text(connected ? "Connected" : "Offline")
-                        .agentBuddyFont(.caption)
-                        .foregroundColor(AgentBuddyTheme.textMuted)
-                }
+                BuddyConnectionPill(
+                    state: connected ? .connected : .disconnected,
+                    title: Text(connected ? "Connected" : "Offline"),
+                    filled: false
+                )
             case .statusLabel(let label, let color):
                 HStack(spacing: 6) {
                     Circle()
                         .fill(color)
                         .frame(width: 8, height: 8)
+                        .accessibilityHidden(true)
                     Text(label)
-                        .agentBuddyFont(.caption)
-                        .foregroundColor(AgentBuddyTheme.textMuted)
+                        .buddyText(.caption)
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
                 }
             case .badge(let text):
                 Text(text)
-                    .agentBuddyFont(.caption, weight: .semibold)
-                    .foregroundColor(AgentBuddyTheme.accent)
+                    .buddyText(.caption, weight: .semibold)
+                    .foregroundStyle(AgentBuddyTheme.link)
             case .chevron:
                 Image(systemName: "chevron.right")
-                    .agentBuddyFont(size: 12, weight: .semibold)
-                    .foregroundColor(AgentBuddyTheme.textMuted)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
+                    .accessibilityHidden(true)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(AgentBuddyTheme.surface.opacity(0.6))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(AgentBuddyTheme.border.opacity(0.7), lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .padding(.horizontal, BuddySpacing.md)
+        .padding(.vertical, BuddySpacing.sm)
+        .buddyCard(.surface, radius: BuddyRadius.detailCard, padding: nil)
     }
 }

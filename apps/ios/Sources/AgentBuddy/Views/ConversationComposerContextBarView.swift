@@ -6,7 +6,7 @@ struct ConversationComposerContextBarView: View {
     let contextPercent: Int64?
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: BuddySpacing.sm) {
             if let primary = rateLimits?.primary {
                 RateLimitBadgeView(
                     label: formatWindowLabel(primary),
@@ -22,17 +22,24 @@ struct ConversationComposerContextBarView: View {
             }
 
             if let contextPercent {
-                ContextBadgeView(
-                    percent: Int(contextPercent),
-                    tint: contextTint(percent: contextPercent)
-                )
+                HStack(spacing: BuddySpacing.xxs) {
+                    Text("Context")
+                        .buddyText(.caption)
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
+                    ContextBadgeView(
+                        percent: Int(contextPercent),
+                        tint: contextTint(percent: contextPercent)
+                    )
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text("Context: \(Int(contextPercent))% left"))
             }
         }
         // Keep the composer chrome height stable even when no badges are available.
-        .frame(maxWidth: .infinity, minHeight: 16, alignment: .trailing)
-        .padding(.horizontal, 12)
-        .padding(.top, -2)
-        .padding(.trailing, AgentBuddyPlatform.isRegularSurface(horizontalSizeClass: horizontalSizeClass) ? 12 : 40)
+        .frame(maxWidth: .infinity, minHeight: 18, alignment: .trailing)
+        .padding(.horizontal, BuddySpacing.sm)
+        .padding(.top, 2)
+        .padding(.trailing, AgentBuddyPlatform.isRegularSurface(horizontalSizeClass: horizontalSizeClass) ? BuddySpacing.sm : 40)
     }
 
     private func normalizedPercent(_ raw: Int32) -> Int {
@@ -51,7 +58,7 @@ struct ConversationComposerContextBarView: View {
         switch percent {
         case ...15: return AgentBuddyTheme.danger
         case ...35: return AgentBuddyTheme.warning
-        default: return AgentBuddyTheme.success
+        default: return AgentBuddyTheme.textSecondary
         }
     }
 }

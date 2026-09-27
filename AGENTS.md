@@ -3,6 +3,8 @@
 ## Project Structure & Module Organization
 - `apps/ios/Sources/AgentBuddy/` contains the iOS app code.
 - `apps/ios/Sources/AgentBuddy/Views/` holds SwiftUI screens, `Models/` contains app state/session logic, and `Bridge/` contains the generated UniFFI Swift plus thin Swift/ObjC glue.
+- `apps/ios/Sources/AgentBuddy/App/` holds the app entry, `AppDelegate` (notifications, splash), `ContentView`, and `App/HomeNavigation/` (routes, destinations and task/host/conversation actions split by responsibility).
+- `apps/ios/Sources/AgentBuddy/DesignSystem/` holds the Mint design system: `Tokens/` (semantic colour roles on `AgentBuddyTheme`, `BuddySpacing`/`BuddyRadius`/`BuddySize`, `.buddyText(_:)` type scale) and `Components/` (`BuddyButton`, `BuddyIconButton`, status pills, cards/chips, list rows, empty state/banner/sheet style). New or restyled iOS UI should use these instead of raw colours, fonts or sizes. Keep every Swift file at or under 500 lines.
 - `apps/android/app/src/main/java/com/akashark/agentbuddy/android/ui/` contains Android Compose shell/screens.
 - `apps/android/app/src/main/java/com/akashark/agentbuddy/android/state/` contains Android app state (`AppModel.kt`), lifecycle/voice controllers, and platform stores (saved servers/threads/apps, SSH credentials). Transport and SSH run in Rust.
 - `apps/android/core/bridge/` contains Android UniFFI bootstrap (`UniffiInit.kt`, which also loads the legacy `codex_bridge` JNI lib), the Ghostty renderer JNI bridge, and per-ABI `jniLibs/`.
@@ -19,7 +21,7 @@
 - `apps/ios/project.yml` is the source of truth for project generation; regenerate `apps/ios/AgentBuddy.xcodeproj` instead of hand-editing project files.
 
 ## Architecture
-- **iOS root layout:** `ContentView` (in `AgentBuddyApp.swift`) is a `ZStack` of the theme background, `HomeNavigationView` (the primary `NavigationStack`: home dashboard → conversation), and floating overlays (e.g. the pet overlay). There is no sidebar overlay; `HeaderView` is only the principal toolbar item on the conversation screen.
+- **iOS root layout:** `ContentView` (`App/ContentView.swift`) is a `ZStack` of the theme background, `HomeNavigationView` (the primary `NavigationStack`: home shell → conversation), and floating overlays (pet overlay, pending-approval banner). The phone home is `HomeShellView` (`Views/HomeShell/`) with Tasks / Projects / Hosts tabs and a bottom new-task pill; on iPad/Catalyst the same shell renders as the `NavigationSplitView` sidebar. `HeaderView` is only the principal toolbar item on the conversation screen. Approvals render through `Views/Approvals/` (`ApprovalCoordinator` holds UI-only submitting/failure/outcome state; decisions still go to `store.respondToApproval`). The DEBUG state gallery (`Views/Previews/MintGalleryView.swift`, launch with `--mint-gallery=<page>` and optional `--mint-dark`) renders screens from fixtures for on-device screenshots.
 - **iOS state management:** `AppStore` (Rust, via UniFFI) is the canonical runtime state owner. `AppModel` is the thin Swift observation shell over Rust snapshots and updates. `AppState` is UI-only state.
 - **iOS server flow:** discovery and SSH are separate utility bridges; thread/session/account operations come from generated Rust RPC plus store updates.
 - **Android root layout:** `AgentBuddyApp()` in `ui/AgentBuddyApp.kt` is the Compose entry (hosted by `MainActivity`); `state/AppModel.kt` is the thin observation shell over Rust `AppStore` snapshots and updates.
@@ -202,7 +204,7 @@ Incremental policy:
 ## Coding Style & Naming Conventions
 - Swift style follows standard Xcode defaults: 4-space indentation, `UpperCamelCase` for types, `lowerCamelCase` for properties/functions.
 - Kotlin style follows standard Android/Kotlin conventions: 4-space indentation, `UpperCamelCase` types, `lowerCamelCase` members.
-- Theming is JSON-driven: ~80 themes in `apps/ios/Sources/AgentBuddy/Resources/Themes/` (also packaged as Android assets), defaults `agentbuddy-dark` / `agentbuddy-light` (`ThemeManager`). The mono font is bundled Berkeley Mono with an `SFMono-Regular` fallback. Use theme colors instead of hardcoded values.
+- Theming is JSON-driven: ~80 themes in `apps/ios/Sources/AgentBuddy/Resources/Themes/` (also packaged as Android assets). Defaults are `agentbuddy-mint-light` / `agentbuddy-mint-dark` (`ThemeManager`); they only apply when the user has not picked a theme. Mint themes carry extra `agentbuddy.*` semantic keys (brand, onBrand, borderControl, focus, success/warning/danger surfaces, disabled); other themes get them through fallbacks in `ResolvedTheme`. The default font family is the system font; the bundled Berkeley Mono (with `SFMono-Regular` fallback) remains selectable and is always used for code. Use semantic theme roles instead of hardcoded values. The iOS Mint migration record is `docs/design/ios-mint-ui-migration.md`.
 - Keep concurrency boundaries explicit (`actor`, `@MainActor`) and avoid cross-actor mutable state.
 - Group iOS files by layer (`Views`, `Models`, `Bridge`) and Android files by module (`app/ui`, `app/state`, `core/*`).
 - No repository-local SwiftLint/SwiftFormat config is currently committed; keep formatting consistent with existing files.

@@ -1,0 +1,219 @@
+import SwiftUI
+
+// MARK: - Debug Overlay
+
+struct ConversationDebugButton: View {
+    let topInset: CGFloat
+    let activeThreadKey: ThreadKey
+    @Environment(AppModel.self) private var appModel
+    @State private var showPopover = false
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Button {
+                showPopover.toggle()
+            } label: {
+                Image(systemName: "ant")
+                    .agentBuddyFont(size: 12, weight: .semibold)
+                    .foregroundColor(AgentBuddyTheme.accent)
+                    .padding(6)
+                    .background(
+                        Circle()
+                            .fill(AgentBuddyTheme.surface.opacity(0.85))
+                            .background(Circle().fill(.ultraThinMaterial))
+                    )
+            }
+            .buttonStyle(.plain)
+
+            if DebugSettings.shared.enabled {
+                if MessageRecorder.shared.isRecording {
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 8, height: 8)
+                        .modifier(PulseModifier())
+                }
+                if MessageRecorder.shared.isReplaying {
+                    Image(systemName: "play.fill")
+                        .agentBuddyFont(size: 8, weight: .semibold)
+                        .foregroundColor(AgentBuddyTheme.accent)
+                }
+            }
+        }
+        .padding(.leading, 16)
+        .padding(.top, topInset + 12)
+        .popover(isPresented: $showPopover) {
+            DebugPopoverContent(activeThreadKey: activeThreadKey)
+                .environment(appModel)
+                .presentationCompactAdaptation(.popover)
+        }
+    }
+}
+
+private struct PulseModifier: ViewModifier {
+    @State private var pulse = false
+    func body(content: Content) -> some View {
+        content
+            .opacity(pulse ? 0.3 : 1.0)
+            .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: pulse)
+            .onAppear { pulse = true }
+    }
+}
+
+private struct DebugPopoverContent: View {
+    @Environment(AppModel.self) private var appModel
+    let activeThreadKey: ThreadKey
+    @State private var debugSettings = DebugSettings.shared
+    @State private var recorder = MessageRecorder.shared
+    @State private var recordings: [URL] = []
+
+    var body: some View {
+        ScrollView {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Debug")
+                .agentBuddyFont(.subheadline, weight: .semibold)
+                .foregroundColor(AgentBuddyTheme.textPrimary)
+
+            Toggle(isOn: Binding(
+                get: { debugSettings.disableMarkdown },
+                set: { debugSettings.disableMarkdown = $0 }
+            )) {
+                Text("Disable Markdown")
+                    .agentBuddyFont(.caption)
+                    .foregroundColor(AgentBuddyTheme.textPrimary)
+            }
+            .tint(AgentBuddyTheme.accent)
+
+            Toggle(isOn: Binding(
+                get: { debugSettings.showTurnMetrics },
+                set: { debugSettings.showTurnMetrics = $0 }
+            )) {
+                Text("Turn Metrics")
+                    .agentBuddyFont(.caption)
+                    .foregroundColor(AgentBuddyTheme.textPrimary)
+            }
+            .tint(AgentBuddyTheme.accent)
+
+            if debugSettings.enabled {
+                Divider().background(AgentBuddyTheme.border)
+
+                // MARK: Recording controls
+                Text("Recording")
+                    .agentBuddyFont(.caption, weight: .semibold)
+                    .foregroundColor(AgentBuddyTheme.textPrimary)
+
+                HStack(spacing: 8) {
+                    if recorder.isRecording {
+                        Button {
+                            recorder.stopRecording(store: appModel.store)
+                            recordings = recorder.listRecordings()
+                        } label: {
+                            Label("Stop", systemImage: "stop.fill")
+                                .agentBuddyFont(.caption, weight: .medium)
+                                .foregroundColor(.red)
+                        }
+                        .buttonStyle(.plain)
+                    } else if recorder.isReplaying {
+                        Button {
+                            recorder.stopReplay()
+                        } label: {
+                            Label("Stop", systemImage: "stop.fill")
+                                .agentBuddyFont(.caption, weight: .medium)
+                                .foregroundColor(.orange)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        Button {
+                            recorder.startRecording(store: appModel.store)
+                        } label: {
+                            Label("Record", systemImage: "record.circle")
+                                .agentBuddyFont(.caption, weight: .medium)
+                                .foregroundColor(.red)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                if !recordings.isEmpty && !recorder.isRecording && !recorder.isReplaying {
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(recordings, id: \.absoluteString) { url in
+                            HStack {
+                                Button {
+                                    recorder.startReplay(url: url, store: appModel.store, targetKey: activeThreadKey)
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "play.fill")
+                                            .agentBuddyFont(size: 9, weight: .semibold)
+                                        Text(url.deletingPathExtension().lastPathComponent)
+                                            .agentBuddyFont(.caption2)
+                                            .lineLimit(1)
+                                    }
+                                    .foregroundColor(AgentBuddyTheme.accent)
+                                }
+                                .buttonStyle(.plain)
+
+                                Spacer()
+
+                                Button {
+                                    recorder.deleteRecording(url: url)
+                                    recordings = recorder.listRecordings()
+                                } label: {
+                                    Image(systemName: "xmark")
+                                        .agentBuddyFont(size: 9, weight: .semibold)
+                                        .foregroundColor(AgentBuddyTheme.textSecondary)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(16)
+        }
+        .frame(width: 260)
+        .frame(maxHeight: 500)
+        .background(AgentBuddyTheme.surface)
+        .onAppear { recordings = recorder.listRecordings() }
+    }
+}
+
+private struct TurnDebugOverlay: ViewModifier {
+    let turnId: String
+
+    // Debug is already gated at the call site via `.turnDebugOverlay(turnId:)`,
+    // so this modifier only runs when debug overlays should actually render —
+    // no inner if/else branch means SwiftUI no longer has to diff a
+    // `_ConditionalContent<Modified, Content>` per turn on every body eval.
+    func body(content: Content) -> some View {
+        content
+            .overlay(
+                GeometryReader { geo in
+                    VStack(alignment: .leading) {
+                        Text("\(turnId.prefix(8)) h=\(Int(geo.size.height)) y=\(Int(geo.frame(in: .global).minY))")
+                            .font(.system(size: 9, weight: .bold, design: .monospaced))
+                            .foregroundColor(.red)
+                            .padding(2)
+                            .background(.black.opacity(0.7))
+                        Spacer()
+                    }
+                }
+            )
+            .border(Color.red.opacity(0.3), width: 1)
+    }
+}
+
+extension View {
+    /// Applies `TurnDebugOverlay` only when debug settings opt into turn
+    /// metrics. Reading the flag here — rather than inside the modifier's
+    /// body — means the overlay node doesn't participate in the view tree
+    /// at all for the common (debug-off) case, saving per-turn per-diff
+    /// modifier evaluation cost.
+    @ViewBuilder
+    func turnDebugOverlay(turnId: String) -> some View {
+        if DebugSettings.shared.enabled && DebugSettings.shared.showTurnMetrics {
+            self.modifier(TurnDebugOverlay(turnId: turnId))
+        } else {
+            self
+        }
+    }
+}

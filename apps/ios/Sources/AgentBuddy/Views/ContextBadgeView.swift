@@ -1,32 +1,30 @@
 import SwiftUI
 
+/// Remaining-capacity meter: a short bar plus the percentage as text, so the
+/// value never depends on colour alone.
 struct ContextBadgeView: View, Equatable {
     let percent: Int
     let tint: Color
 
-    private let cornerRadius: CGFloat = 3.5
-    private let strokeWidth: CGFloat = 1.2
-    private let inset: CGFloat = 1.5
+    private var clamped: Int { min(max(percent, 0), 100) }
 
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .stroke(tint.opacity(0.4), lineWidth: strokeWidth)
+        HStack(spacing: BuddySpacing.xxs) {
+            Capsule()
+                .fill(AgentBuddyTheme.surfaceSoft)
+                .frame(width: 22, height: 6)
+                .overlay(alignment: .leading) {
+                    Capsule()
+                        .fill(tint)
+                        .frame(width: 22 * CGFloat(clamped) / 100.0, height: 6)
+                }
+                .accessibilityHidden(true)
 
-            GeometryReader { geo in
-                let inner = geo.size.width - (inset + strokeWidth) * 2
-                RoundedRectangle(cornerRadius: max(0, cornerRadius - inset))
-                    .fill(tint.opacity(0.25))
-                    .frame(width: max(0, inner * CGFloat(percent) / 100.0))
-                    .padding(.leading, inset + strokeWidth / 2)
-                    .frame(maxHeight: .infinity, alignment: .center)
-            }
-            .padding(.vertical, inset + strokeWidth / 2)
-
-            Text("\(percent)")
-                .font(AgentBuddyFont.monospaced(size: 9.5, weight: .heavy))
-                .foregroundColor(tint)
+            Text(verbatim: "\(clamped)%")
+                .buddyText(.caption, weight: .semibold)
+                .monospacedDigit()
+                .foregroundStyle(tint)
         }
-        .frame(width: 35, height: 16)
+        .fixedSize()
     }
 }

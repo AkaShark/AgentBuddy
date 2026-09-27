@@ -22,6 +22,7 @@ struct ThreadSearchResultsView: View {
     /// lineage's root `ThreadKey`. Empty by default — clusters render
     /// collapsed.
     @State private var expandedClusters: Set<ThreadKey> = []
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var filtered: [HomeDashboardRecentSession] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -64,50 +65,53 @@ struct ThreadSearchResultsView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 0) {
+            LazyVStack(alignment: .leading, spacing: 0) {
                 Color.clear.frame(height: contentInsets.top)
                 runtimeFilterRow
                 if isLoading {
-                    HStack(spacing: 8) {
-                        ProgressView().controlSize(.small).tint(AgentBuddyTheme.accent)
-                        Text("Loading threads…")
-                            .agentBuddyFont(.footnote)
-                            .foregroundStyle(AgentBuddyTheme.textMuted)
+                    HStack(spacing: BuddySpacing.sm) {
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(AgentBuddyTheme.textSecondary)
+                        Text("Loading tasks…")
+                            .buddyText(.label, weight: .regular)
+                            .foregroundStyle(AgentBuddyTheme.textSecondary)
                     }
-                    .padding(.vertical, 24)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, BuddySpacing.xl)
+                    .accessibilityElement(children: .combine)
                 } else if filtered.isEmpty {
-                    Text(sessions.isEmpty ? "No threads yet" : "No matches")
-                        .agentBuddyFont(.footnote)
-                        .foregroundStyle(AgentBuddyTheme.textMuted)
-                        .padding(.vertical, 24)
+                    emptyState
+                        .padding(.top, BuddySpacing.xs)
                 } else {
-                    ForEach(clusters) { cluster in
-                        if cluster.members.count == 1, let only = cluster.members.first {
-                            ThreadSearchRow(
-                                session: only,
-                                isPinned: pinnedThreadKeys.contains(SavedThreadsStore.PinnedKey(threadKey: only.key)),
-                                onAdd: { onAdd(only) },
-                                onRemove: { onRemove(only) }
-                            )
-                            Divider().opacity(0.2)
-                        } else {
-                            ThreadSearchClusterRow(
-                                cluster: cluster,
-                                pinnedThreadKeys: pinnedThreadKeys,
-                                isExpanded: expandedClusters.contains(cluster.rootKey),
-                                onToggleExpanded: {
-                                    withAnimation(.easeInOut(duration: 0.2)) {
-                                        if expandedClusters.contains(cluster.rootKey) {
-                                            expandedClusters.remove(cluster.rootKey)
-                                        } else {
-                                            expandedClusters.insert(cluster.rootKey)
+                    ForEach(Array(clusters.enumerated()), id: \.element.id) { index, cluster in
+                        VStack(alignment: .leading, spacing: 0) {
+                            if index > 0 { BuddyDivider() }
+                            if cluster.members.count == 1, let only = cluster.members.first {
+                                ThreadSearchRow(
+                                    session: only,
+                                    isPinned: pinnedThreadKeys.contains(SavedThreadsStore.PinnedKey(threadKey: only.key)),
+                                    onAdd: { onAdd(only) },
+                                    onRemove: { onRemove(only) }
+                                )
+                            } else {
+                                ThreadSearchClusterRow(
+                                    cluster: cluster,
+                                    pinnedThreadKeys: pinnedThreadKeys,
+                                    isExpanded: expandedClusters.contains(cluster.rootKey),
+                                    onToggleExpanded: {
+                                        withAnimation(BuddyMotion.animation(.state, reduceMotion: reduceMotion)) {
+                                            if expandedClusters.contains(cluster.rootKey) {
+                                                expandedClusters.remove(cluster.rootKey)
+                                            } else {
+                                                expandedClusters.insert(cluster.rootKey)
+                                            }
                                         }
-                                    }
-                                },
-                                onPin: onAdd,
-                                onUnpin: onRemove
-                            )
-                            Divider().opacity(0.2)
+                                    },
+                                    onPin: onAdd,
+                                    onUnpin: onRemove
+                                )
+                            }
                         }
                     }
                 }
@@ -124,45 +128,64 @@ struct ThreadSearchResultsView: View {
     private var runtimeFilterRow: some View {
         if runtimeKinds.count > 1 {
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    runtimeFilterPill(label: "All", kind: nil)
+                HStack(spacing: BuddySpacing.xs) {
+                    runtimeFilterPill(label: Text("All"), kind: nil)
                     ForEach(runtimeKinds, id: \.self) { kind in
-                        runtimeFilterPill(label: kind.titleDisplayLabel, kind: kind)
+                        runtimeFilterPill(label: Text(verbatim: kind.titleDisplayLabel), kind: kind)
                     }
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
+                .padding(.vertical, BuddySpacing.xxs)
             }
         }
     }
 
-    private func runtimeFilterPill(label: String, kind: AgentRuntimeKind?) -> some View {
-        let isActive = selectedRuntimeKind == kind
-        return Button {
+    private func runtimeFilterPill(label: Text, kind: AgentRuntimeKind?) -> some View {
+        Button {
             selectedRuntimeKind = kind
         } label: {
-            HStack(spacing: 6) {
-                if let kind {
-                    AgentIconView(kind: kind, size: 12)
-                } else {
-                    Image(systemName: "square.grid.2x2")
-                        .agentBuddyFont(size: 10, weight: .semibold)
-                }
-                Text(label)
-                    .lineLimit(1)
-            }
-            .agentBuddyFont(.caption)
-            .foregroundStyle(isActive ? AgentBuddyTheme.textOnAccent : AgentBuddyTheme.textSecondary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(isActive ? AgentBuddyTheme.accent : AgentBuddyTheme.surface.opacity(0.65))
-            .overlay(
-                Capsule()
-                    .stroke(isActive ? AgentBuddyTheme.accent : AgentBuddyTheme.border.opacity(0.7), lineWidth: 1)
+            SessionsFilterChip(
+                title: label,
+                systemImage: kind == nil ? "square.grid.2x2" : nil,
+                agentKind: kind,
+                isSelected: selectedRuntimeKind == kind
             )
-            .clipShape(Capsule())
         }
         .buttonStyle(.plain)
+    }
+
+    /// Empty results explain why and, when a partner filter hides tasks,
+    /// offer to show all partners.
+    @ViewBuilder
+    private var emptyState: some View {
+        if sessions.isEmpty {
+            BuddyEmptyState(
+                systemImage: "tray",
+                title: "No tasks yet",
+                message: "Tasks from your connected hosts show up here. Pull down to check again."
+            )
+        } else {
+            let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+            let message: LocalizedStringKey = trimmed.isEmpty
+                ? "No tasks from this partner yet."
+                : "No tasks match “\(trimmed)”. Try another word."
+            if selectedRuntimeKind != nil {
+                BuddyEmptyState(
+                    systemImage: "magnifyingglass",
+                    title: "No matching tasks",
+                    message: message,
+                    actionTitle: "Show all partners",
+                    actionSystemImage: "square.grid.2x2",
+                    actionKind: .secondary,
+                    action: { selectedRuntimeKind = nil }
+                )
+            } else {
+                BuddyEmptyState(
+                    systemImage: "magnifyingglass",
+                    title: "No matching tasks",
+                    message: message
+                )
+            }
+        }
     }
 }
 
@@ -174,49 +197,13 @@ private struct ThreadSearchRow: View {
 
     var body: some View {
         Button(action: { isPinned ? onRemove() : onAdd() }) {
-            HStack(alignment: .center, spacing: 10) {
-                ThreadSearchRuntimeIcon(kind: session.agentRuntimeKind)
-                VStack(alignment: .leading, spacing: 2) {
-                    FormattedText(text: session.sessionTitle, lineLimit: 1)
-                        .font(.custom(AgentBuddyFont.markdownFontName, size: 13))
-                        .fontWeight(.semibold)
-                        .foregroundStyle(AgentBuddyTheme.textPrimary)
-                    HStack(spacing: 4) {
-                        Text(session.serverDisplayName)
-                            .foregroundStyle(AgentBuddyTheme.accent.opacity(0.7))
-                        if let workspace = HomeDashboardSupport.workspaceLabel(for: session.cwd) {
-                            Text("\u{00b7}")
-                                .foregroundStyle(AgentBuddyTheme.textMuted.opacity(0.5))
-                            Text(workspace)
-                                .foregroundStyle(AgentBuddyTheme.textSecondary.opacity(0.8))
-                        }
-                        Text("\u{00b7}")
-                            .foregroundStyle(AgentBuddyTheme.textMuted.opacity(0.5))
-                        Text(relativeDate(Int64(session.updatedAt.timeIntervalSince1970)))
-                            .foregroundStyle(AgentBuddyTheme.textMuted.opacity(0.8))
-                    }
-                    .agentBuddyMonoFont(size: 10, weight: .regular)
-                    .lineLimit(1)
-                }
-                Spacer(minLength: 8)
-                Image(systemName: isPinned ? "checkmark.circle.fill" : "plus.circle")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(isPinned ? AgentBuddyTheme.accent : AgentBuddyTheme.textSecondary.opacity(0.7))
+            ThreadSearchRowContent(session: session, updatedAt: session.updatedAt) {
+                ThreadSearchPinIcon(isPinned: isPinned)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-    }
-}
-
-private struct ThreadSearchRuntimeIcon: View {
-    let kind: AgentRuntimeKind
-
-    var body: some View {
-        AgentIconView(kind: kind, size: 16)
-            .accessibilityLabel(kind.displayLabel)
+        .accessibilityValue(isPinned ? Text("On Home") : Text(verbatim: ""))
+        .accessibilityHint(Text(isPinned ? "Remove from Home" : "Add to Home"))
     }
 }
 
@@ -228,180 +215,4 @@ struct ThreadSearchCluster: Identifiable {
     let members: [HomeDashboardRecentSession]
 
     var id: ThreadKey { rootKey }
-}
-
-/// Cluster row that collapses N sibling threads into a single visual unit.
-/// Tapping the branches pill expands the children inline — each child has
-/// its own pin button, so the user can still pin a specific branch.
-private struct ThreadSearchClusterRow: View {
-    let cluster: ThreadSearchCluster
-    let pinnedThreadKeys: Set<SavedThreadsStore.PinnedKey>
-    let isExpanded: Bool
-    let onToggleExpanded: () -> Void
-    let onPin: (HomeDashboardRecentSession) -> Void
-    let onUnpin: (HomeDashboardRecentSession) -> Void
-
-    /// The cluster head represents the lineage's identity. Prefer the root
-    /// thread (the original) so the head reads stable: forks come and go,
-    /// the root is canonical. Fall back to the most-recent member when the
-    /// root isn't loaded into the snapshot.
-    private var head: HomeDashboardRecentSession? {
-        cluster.members.first(where: { $0.key == cluster.rootKey })
-            ?? cluster.members.first
-    }
-
-    /// Latest activity across the whole lineage — root or any fork. Used
-    /// for the head row's "Nh ago" so the head reflects whether the
-    /// lineage is fresh, even though its title is the (possibly older) root.
-    private var headLatestUpdatedAt: Date {
-        cluster.members.map(\.updatedAt).max() ?? Date(timeIntervalSince1970: 0)
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if let head { headRow(for: head) }
-            if isExpanded {
-                childrenList
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-        }
-        .background(isExpanded ? AgentBuddyTheme.surface.opacity(0.3) : Color.clear)
-    }
-
-    private func headRow(for session: HomeDashboardRecentSession) -> some View {
-        let isPinned = pinnedThreadKeys.contains(SavedThreadsStore.PinnedKey(threadKey: session.key))
-        return HStack(alignment: .center, spacing: 10) {
-            ThreadSearchRuntimeIcon(kind: session.agentRuntimeKind)
-            VStack(alignment: .leading, spacing: 2) {
-                FormattedText(text: session.sessionTitle, lineLimit: 1)
-                    .font(.custom(AgentBuddyFont.markdownFontName, size: 13))
-                    .fontWeight(.semibold)
-                    .foregroundStyle(AgentBuddyTheme.textPrimary)
-                HStack(spacing: 4) {
-                    Text(session.serverDisplayName)
-                        .foregroundStyle(AgentBuddyTheme.accent.opacity(0.7))
-                    if let workspace = HomeDashboardSupport.workspaceLabel(for: session.cwd) {
-                        Text("\u{00b7}").foregroundStyle(AgentBuddyTheme.textMuted.opacity(0.5))
-                        Text(workspace).foregroundStyle(AgentBuddyTheme.textSecondary.opacity(0.8))
-                    }
-                    Text("\u{00b7}").foregroundStyle(AgentBuddyTheme.textMuted.opacity(0.5))
-                    Text(relativeDate(Int64(headLatestUpdatedAt.timeIntervalSince1970)))
-                        .foregroundStyle(AgentBuddyTheme.textMuted.opacity(0.8))
-                }
-                .agentBuddyMonoFont(size: 10, weight: .regular)
-                .lineLimit(1)
-            }
-            Spacer(minLength: 6)
-            branchesPill
-            pinButton(isPinned: isPinned, size: 16) {
-                isPinned ? onUnpin(session) : onPin(session)
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .contentShape(Rectangle())
-    }
-
-    private var branchesPill: some View {
-        Button(action: onToggleExpanded) {
-            HStack(spacing: 4) {
-                Image(systemName: "arrow.triangle.branch")
-                    .agentBuddyFont(size: 9, weight: .semibold)
-                Text("\(cluster.members.count)")
-                    .agentBuddyMonoFont(size: 11, weight: .semibold)
-                    .foregroundStyle(AgentBuddyTheme.textPrimary)
-                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                    .agentBuddyFont(size: 8, weight: .semibold)
-            }
-            .foregroundStyle(AgentBuddyTheme.accent)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(
-                Capsule().fill(AgentBuddyTheme.accent.opacity(isExpanded ? 0.18 : 0.12))
-            )
-            .overlay(
-                Capsule().stroke(AgentBuddyTheme.accent.opacity(0.4), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(cluster.members.count) branches")
-    }
-
-    private var childrenList: some View {
-        // Skip the cluster's head — it's already shown by `headRow`. Showing
-        // it again in the branches list reads as a duplicate. The root and
-        // every other sibling stay visible so any branch is still pinnable.
-        let headKey = head?.key
-        let otherMembers = cluster.members.filter { $0.key != headKey }
-        return VStack(alignment: .leading, spacing: 0) {
-            ForEach(otherMembers) { member in
-                let isPinned = pinnedThreadKeys.contains(SavedThreadsStore.PinnedKey(threadKey: member.key))
-                let isRoot = member.key == cluster.rootKey
-                Button(action: { isPinned ? onUnpin(member) : onPin(member) }) {
-                    HStack(alignment: .center, spacing: 10) {
-                        Rectangle()
-                            .fill(AgentBuddyTheme.accent.opacity(0.4))
-                            .frame(width: 10, height: 1)
-                        VStack(alignment: .leading, spacing: 1) {
-                            HStack(spacing: 6) {
-                                FormattedText(text: branchLabel(for: member, isRoot: isRoot), lineLimit: 1)
-                                    .agentBuddyFont(size: 12.5, weight: isPinned ? .semibold : .regular)
-                                    .foregroundStyle(isPinned ? AgentBuddyTheme.accent : AgentBuddyTheme.textPrimary.opacity(0.92))
-                                if isRoot {
-                                    Text("root")
-                                        .agentBuddyMonoFont(size: 9, weight: .regular)
-                                        .foregroundStyle(AgentBuddyTheme.textMuted.opacity(0.7))
-                                }
-                            }
-                            Text(relativeDate(Int64(member.updatedAt.timeIntervalSince1970)))
-                                .agentBuddyMonoFont(size: 10, weight: .regular)
-                                .foregroundStyle(AgentBuddyTheme.textMuted.opacity(0.75))
-                        }
-                        Spacer(minLength: 6)
-                        pinButton(isPinned: isPinned, size: 14) {
-                            isPinned ? onUnpin(member) : onPin(member)
-                        }
-                    }
-                    .padding(.leading, 36)
-                    .padding(.trailing, 14)
-                    .padding(.vertical, 5)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.bottom, 4)
-        .overlay(alignment: .leading) {
-            Rectangle()
-                .fill(AgentBuddyTheme.accent.opacity(0.3))
-                .frame(width: 2)
-                .padding(.leading, 30)
-        }
-    }
-
-    private func pinButton(isPinned: Bool, size: CGFloat, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: isPinned ? "checkmark.circle.fill" : "plus.circle")
-                .font(.system(size: size, weight: .medium))
-                .foregroundStyle(isPinned ? AgentBuddyTheme.accent : AgentBuddyTheme.textSecondary.opacity(0.7))
-        }
-        .buttonStyle(.plain)
-    }
-
-    /// Codex auto-titles threads from the *first* user message, which is
-    /// shared up to the fork point — so two siblings often have identical
-    /// titles. Inside a cluster the user needs a distinguisher: the
-    /// most-recent user message (the divergent prompt) when it actually
-    /// differs from the title. Fall back to the title for the root and
-    /// for forks whose latest prompt hasn't diverged yet.
-    private func branchLabel(for member: HomeDashboardRecentSession, isRoot: Bool) -> String {
-        if isRoot { return member.sessionTitle }
-        let lastUser = (member.lastUserMessage ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        if lastUser.isEmpty { return member.sessionTitle }
-        let normalize: (String) -> String = { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
-        if normalize(lastUser) == normalize(member.sessionTitle) {
-            return member.sessionTitle
-        }
-        return lastUser
-    }
 }

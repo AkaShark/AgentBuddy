@@ -5,102 +5,77 @@ struct ExperimentalFeaturesView: View {
     @State private var debugSettings = DebugSettings.shared
 
     var body: some View {
-        ZStack {
-            AgentBuddyTheme.backgroundGradient.ignoresSafeArea()
-            Form {
-                Section {
-                    ForEach(AgentBuddyFeature.allCases) { feature in
-                        Toggle(isOn: binding(for: feature)) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(feature.displayName)
-                                    .agentBuddyFont(.subheadline)
-                                    .foregroundColor(AgentBuddyTheme.textPrimary)
-                                Text(feature.description)
-                                    .agentBuddyFont(.caption)
-                                    .foregroundColor(AgentBuddyTheme.textSecondary)
-                            }
-                        }
-                        .tint(AgentBuddyTheme.accentStrong)
-                        .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
+        Form {
+            Section {
+                ForEach(AgentBuddyFeature.allCases) { feature in
+                    Toggle(isOn: binding(for: feature)) {
+                        SettingsMintRowLabel(
+                            title: Text(verbatim: feature.displayName),
+                            subtitle: Text(verbatim: feature.description)
+                        )
                     }
-                } header: {
-                    Text("Features")
-                        .foregroundColor(AgentBuddyTheme.textSecondary)
-                } footer: {
+                    .tint(AgentBuddyTheme.action)
+                    .settingsMintRow()
+                }
+            } header: {
+                Text("Features")
+                    .settingsMintHeader()
+            } footer: {
+                Label {
                     Text("Experimental features may be unstable or change without notice.")
-                        .foregroundColor(AgentBuddyTheme.textMuted)
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle")
+                        .foregroundStyle(AgentBuddyTheme.warning)
+                        .accessibilityHidden(true)
                 }
-
-                Section {
-                    Toggle(isOn: Binding(
-                        get: { debugSettings.enabled },
-                        set: { debugSettings.enabled = $0 }
-                    )) {
-                        HStack(spacing: 10) {
-                            Image(systemName: "ant")
-                                .foregroundColor(AgentBuddyTheme.accent)
-                                .frame(width: 20)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Debug Mode")
-                                    .agentBuddyFont(.subheadline)
-                                    .foregroundColor(AgentBuddyTheme.textPrimary)
-                                Text("Show debug controls in conversations")
-                                    .agentBuddyFont(.caption)
-                                    .foregroundColor(AgentBuddyTheme.textSecondary)
-                            }
-                        }
-                    }
-                    .tint(AgentBuddyTheme.accent)
-                    .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
-
-                    #if DEBUG
-                    NavigationLink {
-                        ProximityPairView()
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: "wave.3.right")
-                                .foregroundColor(AgentBuddyTheme.accent)
-                                .frame(width: 20)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Pair")
-                                    .agentBuddyFont(.subheadline)
-                                    .foregroundColor(AgentBuddyTheme.textPrimary)
-                                Text("Walk-up pairing with proximity + haptics")
-                                    .agentBuddyFont(.caption)
-                                    .foregroundColor(AgentBuddyTheme.textSecondary)
-                            }
-                        }
-                    }
-                    .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
-                    #endif
-
-                    #if !targetEnvironment(macCatalyst) && DEBUG
-                    NavigationLink {
-                        UWBDebugView()
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: "dot.radiowaves.left.and.right")
-                                .foregroundColor(AgentBuddyTheme.accent)
-                                .frame(width: 20)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("UWB Debug")
-                                    .agentBuddyFont(.subheadline)
-                                    .foregroundColor(AgentBuddyTheme.textPrimary)
-                                Text("Live distance & direction to a paired Mac")
-                                    .agentBuddyFont(.caption)
-                                    .foregroundColor(AgentBuddyTheme.textSecondary)
-                            }
-                        }
-                    }
-                    .listRowBackground(AgentBuddyTheme.surface.opacity(0.6))
-                    #endif
-                } header: {
-                    Text("Debug")
-                        .foregroundColor(AgentBuddyTheme.textSecondary)
-                }
+                .settingsMintFooter()
             }
-            .scrollContentBackground(.hidden)
+
+            Section {
+                Toggle(isOn: Binding(
+                    get: { debugSettings.enabled },
+                    set: { debugSettings.enabled = $0 }
+                )) {
+                    SettingsMintRowLabel(
+                        "Debug Mode",
+                        subtitle: "Show debug controls in conversations",
+                        systemImage: "ant"
+                    )
+                }
+                .tint(AgentBuddyTheme.action)
+                .settingsMintRow()
+
+                #if DEBUG
+                NavigationLink {
+                    ProximityPairView()
+                } label: {
+                    SettingsMintRowLabel(
+                        "Pair",
+                        subtitle: "Walk-up pairing with proximity + haptics",
+                        systemImage: "wave.3.right"
+                    )
+                }
+                .settingsMintRow()
+                #endif
+
+                #if !targetEnvironment(macCatalyst) && DEBUG
+                NavigationLink {
+                    UWBDebugView()
+                } label: {
+                    SettingsMintRowLabel(
+                        "UWB Debug",
+                        subtitle: "Live distance & direction to a paired Mac",
+                        systemImage: "dot.radiowaves.left.and.right"
+                    )
+                }
+                .settingsMintRow()
+                #endif
+            } header: {
+                Text("Debug")
+                    .settingsMintHeader()
+            }
         }
+        .settingsMintList()
         .navigationTitle("Experimental")
         .navigationBarTitleDisplayMode(.inline)
     }

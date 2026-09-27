@@ -167,26 +167,26 @@ targets:
           - AgentBuddy.entitlements
           - AgentBuddy-Catalyst.entitlements
           - AgentBuddy-Catalyst-DeveloperID.entitlements
-          - Models/AppLifecycleController.swift
-          - Models/AppRuntimeController.swift
-          - Models/CodexTurnAttributes.swift
-          - Models/CodexVoiceCallAttributes.swift
-          - Models/OrientationResponder.swift
-          - Models/RealtimeWebRtcSession.swift
-          - Models/StableSafeAreaInsets.swift
-          - Models/TurnLiveActivityController.swift
-          - Models/VoiceRuntimeController.swift
-          - Models/VoiceSessionControl.swift
-          - Models/VoiceSessionModels.swift
-          - Models/WatchCompanionBridge.swift
-          - Models/WatchProjection.swift
-          - Views/HomeVoiceOrbButton.swift
-          - Views/InlineVoiceButton.swift
-          - Views/InlineVoiceStatusStrip.swift
-          - Views/LiveActivityPreview.swift
-          - Views/LockScreenCardView.swift
-          - Views/RealtimeVoiceScreen.swift
-          - Views/VoiceCallView.swift
+          - "Models/AppLifecycleController*.swift"
+          - "Models/AppRuntimeController*.swift"
+          - "Models/CodexTurnAttributes*.swift"
+          - "Models/CodexVoiceCallAttributes*.swift"
+          - "Models/OrientationResponder*.swift"
+          - "Models/RealtimeWebRtcSession*.swift"
+          - "Models/StableSafeAreaInsets*.swift"
+          - "Models/TurnLiveActivityController*.swift"
+          - "Models/VoiceRuntimeController*.swift"
+          - "Models/VoiceSessionControl*.swift"
+          - "Models/VoiceSessionModels*.swift"
+          - "Models/WatchCompanionBridge*.swift"
+          - "Models/WatchProjection*.swift"
+          - "Views/HomeVoiceOrbButton*.swift"
+          - "Views/InlineVoiceButton*.swift"
+          - "Views/InlineVoiceStatusStrip*.swift"
+          - "Views/LiveActivityPreview*.swift"
+          - "Views/LockScreenCardView*.swift"
+          - "Views/RealtimeVoiceScreen*.swift"
+          - "Views/VoiceCallView*.swift"
           - "**/*.h"
       - path: Sources/AgentBuddy/Bridge/UniFFICodexClient.generated.swift
     resources:
@@ -383,8 +383,8 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: true
-        CODE_SIGNING_ALLOWED: false
-        CODE_SIGNING_REQUIRED: false
+        # Signed with the team's automatic signing so unit tests can run on
+        # the physical iPhone (the simulator is not used; see AGENTS.md).
   AgentBuddyUITests:
     type: bundle.ui-testing
     platform: iOS

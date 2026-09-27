@@ -1,58 +1,66 @@
 import SwiftUI
 
+/// Attachment source chooser (photo library, file, camera).
 struct ConversationComposerAttachSheet: View {
     let onPickPhotoLibrary: () -> Void
     let onChooseFile: (() -> Void)?
     let onTakePhoto: (() -> Void)?
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: BuddySpacing.sm) {
             Text("Attach")
-                .agentBuddyFont(.headline, weight: .semibold)
-                .foregroundColor(AgentBuddyTheme.textPrimary)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .buddyText(.title)
+                .foregroundStyle(AgentBuddyTheme.textPrimary)
+                .padding(.bottom, BuddySpacing.xxs)
 
-            Button(action: onPickPhotoLibrary) {
-                sheetButtonLabel("Photo Library", systemImage: "photo.on.rectangle")
-            }
+            VStack(spacing: 0) {
+                sheetButton("Photo Library", systemImage: "photo.on.rectangle", action: onPickPhotoLibrary)
 
-            if let onChooseFile {
-                Button(action: onChooseFile) {
-                    sheetButtonLabel("Choose File", systemImage: "folder")
+                if let onChooseFile {
+                    BuddyDivider()
+                    sheetButton("Choose File", systemImage: "folder", action: onChooseFile)
+                }
+
+                if let onTakePhoto {
+                    BuddyDivider()
+                    sheetButton("Take Photo", systemImage: "camera", action: onTakePhoto)
                 }
             }
-
-            if let onTakePhoto {
-                Button(action: onTakePhoto) {
-                    sheetButtonLabel("Take Photo", systemImage: "camera")
-                }
-            }
+            .buddyCard(.surface, radius: BuddyRadius.card, padding: nil)
 
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 12)
-        .padding(.bottom, 20)
+        .padding(.horizontal, BuddySpacing.xl)
+        .padding(.top, BuddySpacing.xl)
+        .padding(.bottom, BuddySpacing.lg)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(AgentBuddyTheme.backgroundGradient.ignoresSafeArea())
+        .buddyPageBackground()
     }
 
-    @ViewBuilder
-    private func sheetButtonLabel(_ title: String, systemImage: String) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: systemImage)
-                .agentBuddyFont(.body, weight: .medium)
-                .foregroundColor(AgentBuddyTheme.accent)
-                .frame(width: 20)
+    private func sheetButton(_ title: LocalizedStringKey, systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: BuddySpacing.sm) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(AgentBuddyTheme.link)
+                    .frame(width: 28)
+                    .accessibilityHidden(true)
 
-            Text(title)
-                .agentBuddyFont(.body, weight: .medium)
-                .foregroundColor(AgentBuddyTheme.textPrimary)
+                Text(title)
+                    .buddyText(.body, weight: .medium)
+                    .foregroundStyle(AgentBuddyTheme.textPrimary)
 
-            Spacer()
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, BuddySpacing.md)
+            .frame(minHeight: 56)
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, 16)
-        .frame(height: 52)
-        .modifier(GlassRoundedRectModifier(cornerRadius: 18))
+        .buttonStyle(.plain)
     }
 }

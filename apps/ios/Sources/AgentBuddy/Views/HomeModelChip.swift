@@ -99,48 +99,35 @@ struct HomeModelChip: View {
                         .foregroundStyle(AgentBuddyTheme.warning)
                 }
                 Image(systemName: "cpu")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(disabled ? AgentBuddyTheme.textMuted : AgentBuddyTheme.accent)
-                Text(selectedModelLabel)
-                    .agentBuddyMonoFont(size: 12, weight: .semibold)
-                    .foregroundStyle(disabled ? AgentBuddyTheme.textSecondary : AgentBuddyTheme.textPrimary)
-                    .lineLimit(1)
+                    .font(.system(size: 13, weight: .medium))
+                    .accessibilityHidden(true)
+                Text(verbatim: selectedModelLabel)
                 if !reasoningLabel.isEmpty {
-                    Text(reasoningLabel)
-                        .agentBuddyMonoFont(size: 11, weight: .regular)
-                        .foregroundStyle(AgentBuddyTheme.textSecondary.opacity(0.85))
-                        .lineLimit(1)
+                    Text(verbatim: reasoningLabel)
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
                 }
                 if isPlanMode {
-                    Text("plan")
-                        .agentBuddyMonoFont(size: 10, weight: .bold)
-                        .foregroundStyle(.black)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1)
-                        .background(AgentBuddyTheme.accent, in: Capsule())
+                    Text("Plan")
+                        .buddyText(.caption, weight: .semibold)
+                        .foregroundStyle(AgentBuddyTheme.onBrand)
+                        .padding(.horizontal, 6)
+                        .background(AgentBuddyTheme.brand, in: Capsule())
                 }
                 if isFullAccess {
                     Image(systemName: "lock.open.fill")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(AgentBuddyTheme.danger)
+                        .accessibilityLabel(Text("Full access"))
                 }
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(AgentBuddyTheme.textMuted)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
+                    .accessibilityHidden(true)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .contentShape(Capsule())
+            .buddyContextChip(isEnabled: !disabled)
         }
         .buttonStyle(.plain)
-        .modifier(GlassCapsuleModifier(interactive: true))
-        .overlay(
-            Capsule(style: .continuous)
-                .stroke(AgentBuddyTheme.textMuted.opacity(0.55), lineWidth: 0.8)
-                .allowsHitTesting(false)
-        )
         .disabled(disabled)
-        .opacity(disabled ? 0.5 : 1)
         .sheet(isPresented: $showSheet) {
             ConversationOptionsSheet(
                 models: availableModels,

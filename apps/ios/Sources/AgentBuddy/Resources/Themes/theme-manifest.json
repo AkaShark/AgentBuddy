@@ -248,6 +248,22 @@
     "foregroundHex": "#DCD7BA"
   },
   {
+    "slug": "agentbuddy-mint-dark",
+    "name": "AgentBuddy Mint Dark",
+    "type": "dark",
+    "accentHex": "#C3E7B5",
+    "backgroundHex": "#111914",
+    "foregroundHex": "#EEF4EB"
+  },
+  {
+    "slug": "agentbuddy-mint-light",
+    "name": "AgentBuddy Mint Light",
+    "type": "light",
+    "accentHex": "#3D7149",
+    "backgroundHex": "#F5F6F1",
+    "foregroundHex": "#172B20"
+  },
+  {
     "slug": "agentbuddy-dark",
     "name": "AgentBuddy Dark",
     "type": "dark",

@@ -2,8 +2,9 @@ import SwiftUI
 
 /// Shared visual language for "this thing's current state" — used for task
 /// rows (active / hydrating / hydrated / idle) and server pills (connected /
-/// connecting / failed / idle). Colors are fixed green/orange/red so the
-/// meaning reads the same across themes.
+/// connecting / failed / idle). Colours come from the Mint status roles
+/// (success / warning / danger); callers pair the dot with text so the state
+/// never depends on colour alone.
 enum StatusDotState {
     /// Solid green. Something is done / healthy.
     case ok
@@ -20,21 +21,22 @@ enum StatusDotState {
 struct StatusDot: View {
     let state: StatusDotState
     var size: CGFloat = 10
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Group {
             switch state {
             case .ok:
-                Circle().fill(Color.green).frame(width: size, height: size)
+                Circle().fill(AgentBuddyTheme.success).frame(width: size, height: size)
             case .active:
-                pulsingDot(color: .green)
+                pulsingDot(color: AgentBuddyTheme.success)
             case .pending:
-                pulsingDot(color: .orange)
+                pulsingDot(color: AgentBuddyTheme.warning)
             case .error:
-                Circle().fill(Color.red).frame(width: size, height: size)
+                Circle().fill(AgentBuddyTheme.danger).frame(width: size, height: size)
             case .idle:
                 Circle()
-                    .stroke(AgentBuddyTheme.textMuted.opacity(0.6), lineWidth: 1.5)
+                    .stroke(AgentBuddyTheme.borderControl, lineWidth: 1.5)
                     .frame(width: size + 2, height: size + 2)
             }
         }
@@ -46,8 +48,17 @@ struct StatusDot: View {
     /// recycling), this ties the animation directly to the scene clock —
     /// every frame SwiftUI re-evaluates with the current time and the
     /// derived opacity/scale, so the pulse is always running as long as
-    /// the dot is visible.
+    /// the dot is visible. Reduce Motion shows a still dot instead.
+    @ViewBuilder
     private func pulsingDot(color: Color) -> some View {
+        if reduceMotion {
+            Circle().fill(color).frame(width: size, height: size)
+        } else {
+            pulsingTimeline(color: color)
+        }
+    }
+
+    private func pulsingTimeline(color: Color) -> some View {
         TimelineView(.animation) { context in
             // Period ≈ 1.6s; opacity sweeps 0.35 → 1.0, scale 0.85 → 1.0.
             let t = context.date.timeIntervalSinceReferenceDate

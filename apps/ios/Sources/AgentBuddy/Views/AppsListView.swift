@@ -11,19 +11,17 @@ struct AppsListView: View {
     @State private var detailAppId: String?
 
     var body: some View {
-        ZStack {
-            AgentBuddyTheme.backgroundGradient.ignoresSafeArea()
-            Group {
-                if store.apps.isEmpty {
-                    emptyState
-                } else {
-                    list
-                }
+        Group {
+            if store.apps.isEmpty {
+                emptyState
+            } else {
+                list
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .buddyPageBackground()
         .navigationTitle("Apps")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarColorScheme(.dark, for: .navigationBar)
         .onAppear {
             store.reload()
             if let pending = navigation.consumeRequest() {
@@ -40,8 +38,18 @@ struct AppsListView: View {
             SavedAppDetailView(appId: appId)
         }
         .sheet(item: $renameTarget) { app in
-            renameSheet(for: app)
-                .presentationDetents([.medium])
+            SavedAppRenameSheet(
+                text: $renameText,
+                onCancel: { renameTarget = nil },
+                onSave: {
+                    let trimmed = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !trimmed.isEmpty else { renameTarget = nil; return }
+                    _ = try? store.rename(id: app.id, title: trimmed)
+                    renameTarget = nil
+                }
+            )
+            .presentationDetents([.medium])
+            .buddySheetStyle()
         }
         .alert(
             "Delete \"\(deleteTarget?.title ?? "")\"?",
@@ -71,25 +79,27 @@ struct AppsListView: View {
                     row(for: app)
                 }
                 .buttonStyle(.plain)
-                .listRowBackground(Color.clear)
+                .listRowBackground(AgentBuddyTheme.surface)
+                .listRowSeparatorTint(AgentBuddyTheme.border)
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                     Button(role: .destructive) {
                         deleteTarget = app
                     } label: {
                         Label("Delete", systemImage: "trash")
                     }
+                    .tint(AgentBuddyTheme.swipeFill(.danger))
                     Button {
                         renameText = app.title
                         renameTarget = app
                     } label: {
                         Label("Rename", systemImage: "pencil")
                     }
-                    .tint(AgentBuddyTheme.accent)
+                    .tint(AgentBuddyTheme.swipeFill(.link))
                 }
             }
         }
         .scrollContentBackground(.hidden)
-        .listStyle(.plain)
+        .listStyle(.insetGrouped)
     }
 
     private var sortedApps: [SavedApp] {
@@ -97,50 +107,13 @@ struct AppsListView: View {
     }
 
     private func row(for app: SavedApp) -> some View {
-        HStack(spacing: 12) {
-            monogram(for: app)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(app.title)
-                    .agentBuddyFont(.body, weight: .semibold)
-                    .foregroundColor(AgentBuddyTheme.textPrimary)
-                    .lineLimit(1)
-                Text(relativeUpdated(app))
-                    .agentBuddyFont(.caption)
-                    .foregroundColor(AgentBuddyTheme.textMuted)
-            }
-            Spacer()
+        BuddyListRow(
+            title: Text(verbatim: app.title),
+            subtitle: Text("Updated \(relativeUpdated(app))")
+        ) {
+            BuddyIconTile(content: .initial(monogramInitials(from: app.title)))
         }
-        .padding(.vertical, 6)
-    }
-
-    private func monogram(for app: SavedApp) -> some View {
-        let tint = monogramTint(for: app.id)
-        let initials = monogramInitials(from: app.title)
-        return ZStack {
-            RoundedRectangle(cornerRadius: 10)
-                .fill(tint.opacity(0.25))
-            Text(initials)
-                .agentBuddyFont(.subheadline, weight: .bold)
-                .foregroundColor(tint)
-        }
-        .frame(width: 40, height: 40)
-    }
-
-    private func monogramTint(for id: String) -> Color {
-        // Deterministic per-app tint pulled from a small palette of theme
-        // accents so existing apps keep the same color across launches.
-        let palette: [Color] = [
-            AgentBuddyTheme.accent,
-            AgentBuddyTheme.accentStrong,
-            AgentBuddyTheme.success,
-            AgentBuddyTheme.warning,
-            AgentBuddyTheme.danger,
-            AgentBuddyTheme.textSystem,
-        ]
-        var hasher = Hasher()
-        hasher.combine(id)
-        let idx = abs(hasher.finalize()) % palette.count
-        return palette[idx]
+        .foregroundStyle(AgentBuddyTheme.textSecondary)
     }
 
     private func monogramInitials(from title: String) -> String {
@@ -153,54 +126,64 @@ struct AppsListView: View {
         let date = Date(timeIntervalSince1970: TimeInterval(app.updatedAtMs) / 1000.0)
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
-        return "Updated \(formatter.localizedString(for: date, relativeTo: Date()))"
+        return formatter.localizedString(for: date, relativeTo: Date())
     }
 
     private var emptyState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "square.grid.2x2")
-                .agentBuddyFont(.largeTitle)
-                .foregroundColor(AgentBuddyTheme.textMuted)
-            Text("No apps yet")
-                .agentBuddyFont(.title3, weight: .semibold)
-                .foregroundColor(AgentBuddyTheme.textPrimary)
-            Text("When the AI generates an interactive widget with an app_id, it saves here automatically.")
-                .agentBuddyFont(.footnote)
-                .foregroundColor(AgentBuddyTheme.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
+        VStack {
+            BuddyEmptyState(
+                systemImage: "square.grid.2x2",
+                title: "No apps yet",
+                message: "When the AI generates an interactive widget with an app_id, it saves here automatically."
+            )
+            Spacer(minLength: 0)
         }
+        .padding(.horizontal, BuddySpacing.xl)
+        .padding(.top, BuddySpacing.md)
+    }
+}
+
+/// Rename sheet shared by the apps list and the saved-app screen: Mint sheet
+/// with a bordered title field, Cancel and one primary Save.
+struct SavedAppRenameSheet: View {
+    @Binding var text: String
+    let onCancel: () -> Void
+    let onSave: () -> Void
+
+    @FocusState private var isFocused: Bool
+
+    private var canSave: Bool {
+        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    private func renameSheet(for app: SavedApp) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: BuddyRadius.button, style: .continuous)
+        VStack(alignment: .leading, spacing: BuddySpacing.md) {
             Text("Rename App")
-                .agentBuddyFont(.title3, weight: .semibold)
-                .foregroundColor(AgentBuddyTheme.textPrimary)
+                .buddyText(.title)
+                .foregroundStyle(AgentBuddyTheme.textPrimary)
+                .accessibilityAddTraits(.isHeader)
 
-            TextField("Title", text: $renameText)
-                .agentBuddyFont(size: 15)
-                .padding(10)
-                .background(AgentBuddyTheme.surfaceLight.opacity(0.6))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .foregroundColor(AgentBuddyTheme.textPrimary)
+            TextField("Title", text: $text)
+                .focused($isFocused)
+                .buddyText(.body)
+                .foregroundStyle(AgentBuddyTheme.textPrimary)
+                .tint(AgentBuddyTheme.focus)
+                .padding(.horizontal, BuddySpacing.md)
+                .frame(minHeight: BuddySize.control)
+                .background(AgentBuddyTheme.surface, in: shape)
+                .overlay { shape.strokeBorder(isFocused ? AgentBuddyTheme.focus : AgentBuddyTheme.borderControl, lineWidth: 1) }
 
-            HStack {
-                Button("Cancel") { renameTarget = nil }
-                    .foregroundColor(AgentBuddyTheme.textSecondary)
-                Spacer()
-                Button("Save") {
-                    let trimmed = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !trimmed.isEmpty else { renameTarget = nil; return }
-                    _ = try? store.rename(id: app.id, title: trimmed)
-                    renameTarget = nil
-                }
-                .foregroundColor(AgentBuddyTheme.accent)
-                .disabled(renameText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            HStack(spacing: BuddySpacing.sm) {
+                BuddyButton("Cancel", kind: .secondary, action: onCancel)
+                BuddyButton("Save", action: onSave)
+                    .disabled(!canSave)
             }
+
             Spacer()
         }
-        .padding(20)
-        .background(AgentBuddyTheme.surface.ignoresSafeArea())
+        .padding(BuddySpacing.xl)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .buddyPageBackground()
     }
 }

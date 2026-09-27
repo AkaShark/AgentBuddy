@@ -114,6 +114,11 @@ enum FontFamilyOption: String, CaseIterable, Identifiable {
     case mono = "mono"
     case system = "system"
 
+    /// Used when the user never picked a family. The Mint design system uses the
+    /// platform font for interface text and keeps monospace for code; an explicit
+    /// choice stored under `fontFamily` is always kept.
+    static let defaultOption: FontFamilyOption = .system
+
     var id: String { rawValue }
 
     var displayName: String {
@@ -131,8 +136,8 @@ enum AgentBuddyFont {
     private static let berkeleyBold = "BerkeleyMono-Bold"
 
     static var storedFamily: FontFamilyOption {
-        let raw = UserDefaults.standard.string(forKey: "fontFamily") ?? "mono"
-        return FontFamilyOption(rawValue: raw) ?? .mono
+        let raw = UserDefaults.standard.string(forKey: "fontFamily") ?? FontFamilyOption.defaultOption.rawValue
+        return FontFamilyOption(rawValue: raw) ?? FontFamilyOption.defaultOption
     }
 
     static var markdownFontName: String {

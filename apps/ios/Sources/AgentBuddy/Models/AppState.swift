@@ -22,6 +22,8 @@ final class AppState {
 
     var currentCwd = ""
     var showServerPicker = false
+    /// Where the next add-host sheet starts; reset to `.chooser` on dismiss.
+    var serverPickerEntryPoint: DiscoveryEntryPoint = .chooser
     var collapsedSessionFolders: Set<String> = []
     var sessionsSelectedServerFilterId: String?
     var sessionsShowOnlyForks = false
@@ -54,6 +56,10 @@ final class AppState {
     var showModelSelector = false
     var showSettings = false
     var pendingThreadNavigation: ThreadKey?
+    /// Conversation currently on screen (observable mirror of
+    /// `AppRuntimeController.visibleConversationKey`), used by UI that must
+    /// not duplicate what the open conversation already shows.
+    var visibleConversationKey: ThreadKey?
     private var dismissedPendingUserInputIds: Set<String> = []
     private var threadPermissionOverrides: [String: ThreadPermissionOverride] = [:]
     var approvalPolicy: String {

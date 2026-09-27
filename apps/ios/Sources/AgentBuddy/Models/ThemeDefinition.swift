@@ -101,6 +101,19 @@ struct ResolvedTheme {
     let textOnAccent: String
     let codeBackground: String
 
+    // Semantic roles from the Mint design system (spec/UI-GUIDELINES.md §2).
+    // Themes opt in with explicit `agentbuddy.*` keys; every other theme gets
+    // values derived from its existing palette, so it looks the same as before.
+    let brand: String
+    let onBrand: String
+    let borderControl: String
+    let focus: String
+    let successSurface: String
+    let warningSurface: String
+    let dangerSurface: String
+    let disabled: String
+    let onDisabled: String
+
     init(slug: String, definition d: ThemeDefinition) {
         self.slug = slug
         self.name = d.name
@@ -116,20 +129,31 @@ struct ResolvedTheme {
         self.surfaceLight = c["activityBar.background"] ?? Self.adjustBrightness(self.surface, by: d.type == .dark ? 0.04 : -0.03)
         self.textSecondary = c["sideBar.foreground"] ?? Self.dimColor(fg, factor: 0.55)
         self.textMuted = c["editorLineNumber.foreground"] ?? Self.dimColor(fg, factor: 0.35)
-        self.textBody = Self.dimColor(fg, factor: 0.88)
-        self.textSystem = Self.dimColor(fg, factor: 0.7)
+        self.textBody = c["agentbuddy.textBody"] ?? Self.dimColor(fg, factor: 0.88)
+        self.textSystem = c["agentbuddy.textSystem"] ?? Self.dimColor(fg, factor: 0.7)
         self.accent = c["textLink.foreground"] ?? c["button.background"] ?? (d.type == .dark ? "#B0B0B0" : "#4A4A4A")
         self.accentStrong = c["button.background"] ?? c["textLink.foreground"] ?? self.accent
         self.border = c["editorGroup.border"] ?? c["sideBar.border"] ?? Self.adjustBrightness(self.surface, by: d.type == .dark ? 0.05 : -0.05)
         self.separator = c["panel.border"] ?? Self.adjustBrightness(bg, by: d.type == .dark ? 0.04 : -0.04)
-        self.danger = d.type == .dark ? "#FF5555" : "#D32F2F"
-        self.success = d.type == .dark ? "#6EA676" : "#2E7D32"
-        self.warning = d.type == .dark ? "#E2A644" : "#E65100"
-        self.codeBackground = bg
+        self.danger = c["agentbuddy.error"] ?? (d.type == .dark ? "#FF5555" : "#D32F2F")
+        self.success = c["agentbuddy.success"] ?? (d.type == .dark ? "#6EA676" : "#2E7D32")
+        self.warning = c["agentbuddy.warning"] ?? (d.type == .dark ? "#E2A644" : "#E65100")
+        self.codeBackground = c["agentbuddy.codeBackground"] ?? bg
 
         // Compute textOnAccent based on accent brightness
         let accentBright = Self.brightness(of: self.accentStrong)
-        self.textOnAccent = accentBright > 0.5 ? "#0D0D0D" : "#FFFFFF"
+        self.textOnAccent = c["agentbuddy.onAction"] ?? (accentBright > 0.5 ? "#0D0D0D" : "#FFFFFF")
+
+        let isDark = d.type == .dark
+        self.brand = c["agentbuddy.brand"] ?? Self.blend(self.accentStrong, over: self.surface, alpha: isDark ? 0.28 : 0.22)
+        self.onBrand = c["agentbuddy.onBrand"] ?? fg
+        self.borderControl = c["agentbuddy.borderControl"] ?? Self.dimColor(fg, factor: 0.5)
+        self.focus = c["agentbuddy.focus"] ?? self.accentStrong
+        self.successSurface = c["agentbuddy.successSurface"] ?? Self.blend(self.success, over: bg, alpha: isDark ? 0.2 : 0.12)
+        self.warningSurface = c["agentbuddy.warningSurface"] ?? Self.blend(self.warning, over: bg, alpha: isDark ? 0.2 : 0.14)
+        self.dangerSurface = c["agentbuddy.errorSurface"] ?? Self.blend(self.danger, over: bg, alpha: isDark ? 0.2 : 0.1)
+        self.disabled = c["agentbuddy.disabled"] ?? self.surfaceLight
+        self.onDisabled = c["agentbuddy.onDisabled"] ?? self.textMuted
 
     }
 
@@ -146,6 +170,14 @@ struct ResolvedTheme {
         let ng = min(1, max(0, g + amount))
         let nb = min(1, max(0, b + amount))
         return rgbToHex(nr, ng, nb)
+    }
+
+    /// Composites `foreground` at `alpha` over an opaque `background`.
+    static func blend(_ foreground: String, over background: String, alpha: Double) -> String {
+        let (fr, fg, fb) = hexToRGB(foreground)
+        let (br, bg, bb) = hexToRGB(background)
+        let a = min(1, max(0, alpha))
+        return rgbToHex(fr * a + br * (1 - a), fg * a + bg * (1 - a), fb * a + bb * (1 - a))
     }
 
     static func dimColor(_ hex: String, factor: Double) -> String {
