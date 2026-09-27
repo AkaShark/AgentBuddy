@@ -5,11 +5,11 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.BugReport
+import androidx.compose.material.icons.outlined.Compress
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Pets
 import androidx.compose.material.icons.outlined.Science
-import androidx.compose.material.icons.outlined.Compress
 import androidx.compose.material.icons.outlined.ViewAgenda
 import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.runtime.Composable

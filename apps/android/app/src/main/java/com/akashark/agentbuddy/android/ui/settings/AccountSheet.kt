@@ -1,6 +1,8 @@
 package com.akashark.agentbuddy.android.ui.settings
 
 import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -12,8 +14,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import com.akashark.agentbuddy.android.auth.ChatGPTOAuthActivity
 import com.akashark.agentbuddy.android.state.ChatGPTOAuth
 import com.akashark.agentbuddy.android.state.ChatGPTOAuthTokenStore
@@ -22,8 +22,8 @@ import com.akashark.agentbuddy.android.ui.LocalAppModel
 import com.akashark.agentbuddy.android.util.LLog
 import kotlinx.coroutines.launch
 import uniffi.codex_mobile_client.Account
-import uniffi.codex_mobile_client.AppRefreshAccountRequest
 import uniffi.codex_mobile_client.AppLoginAccountRequest
+import uniffi.codex_mobile_client.AppRefreshAccountRequest
 
 /**
  * Account login/logout management for a specific server.
