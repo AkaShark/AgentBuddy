@@ -9,44 +9,32 @@ extension SessionsScreen {
         return Group {
             if runtimeKinds.count > 1 {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        runtimeKindPill(label: "All", icon: "square.grid.2x2", kind: nil)
+                    HStack(spacing: BuddySpacing.xs) {
+                        runtimeKindPill(label: Text("All"), kind: nil)
                         ForEach(orderedRuntimeKinds(present: runtimeKinds), id: \.self) { kind in
                             runtimeKindPill(
-                                label: runtimeKindLabel(kind),
-                                icon: runtimeKindIcon(kind),
+                                label: Text(verbatim: runtimeKindLabel(kind)),
                                 kind: kind
                             )
                         }
                     }
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, BuddySpacing.xl)
                 }
-                .padding(.vertical, 6)
+                .sessionsListRow(horizontal: 0)
             }
         }
     }
 
-    private func runtimeKindPill(label: String, icon: String, kind: AgentRuntimeKind?) -> some View {
-        let isActive = selectedRuntimeKindFilter == kind
-        return Button {
+    private func runtimeKindPill(label: Text, kind: AgentRuntimeKind?) -> some View {
+        Button {
             selectedRuntimeKindFilter = kind
         } label: {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .agentBuddyFont(size: 10, weight: .semibold)
-                Text(label)
-                    .lineLimit(1)
-            }
-            .agentBuddyFont(.caption)
-            .foregroundColor(isActive ? AgentBuddyTheme.textOnAccent : AgentBuddyTheme.textSecondary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(isActive ? AgentBuddyTheme.accent : AgentBuddyTheme.surface.opacity(0.65))
-            .overlay(
-                Capsule()
-                    .stroke(isActive ? AgentBuddyTheme.accent : AgentBuddyTheme.border.opacity(0.7), lineWidth: 1)
+            SessionsFilterChip(
+                title: label,
+                systemImage: kind == nil ? "square.grid.2x2" : nil,
+                agentKind: kind,
+                isSelected: selectedRuntimeKindFilter == kind
             )
-            .clipShape(Capsule())
         }
         .buttonStyle(.plain)
     }
@@ -59,125 +47,120 @@ extension SessionsScreen {
         kind.titleDisplayLabel
     }
 
-    private func runtimeKindIcon(_ kind: AgentRuntimeKind) -> String {
-        // The filter pill renders an SF Symbol; the alleycat manifest
-        // ships a PNG, not an SF Symbol name, so we use a generic
-        // fallback here. Richer rendering of the actual agent icon
-        // happens via `AgentIconView` everywhere else in the app.
-        _ = kind
-        return "person.fill"
-    }
-
+    /// Mint search field: surface fill, required-control outline, radius 16, 48pt.
     var sessionSearchBar: some View {
-        HStack(spacing: 8) {
+        let shape = RoundedRectangle(cornerRadius: BuddyRadius.button, style: .continuous)
+        return HStack(spacing: BuddySpacing.xs) {
             Image(systemName: "magnifyingglass")
-                .foregroundColor(AgentBuddyTheme.textMuted)
-                .agentBuddyFont(.caption)
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(AgentBuddyTheme.textSecondary)
+                .accessibilityHidden(true)
 
-            TextField("Search sessions", text: $sessionSearchQuery)
-                .agentBuddyFont(.footnote)
-                .foregroundColor(AgentBuddyTheme.textPrimary)
+            TextField("Search tasks", text: $sessionSearchQuery)
+                .buddyText(.body)
+                .foregroundStyle(AgentBuddyTheme.textPrimary)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled(true)
+                .submitLabel(.search)
 
             if !sessionSearchQuery.isEmpty {
                 Button {
                     sessionSearchQuery = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(AgentBuddyTheme.textMuted)
-                        .agentBuddyFont(size: 14)
+                        .font(.system(size: 17))
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
+                        .frame(width: BuddySize.minHitTarget, height: BuddySize.minHitTarget)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(Text("Clear search"))
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(AgentBuddyTheme.surface.opacity(0.55))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(AgentBuddyTheme.border.opacity(0.85), lineWidth: 1)
-        )
-        .cornerRadius(8)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.leading, BuddySpacing.md)
+        .padding(.trailing, sessionSearchQuery.isEmpty ? BuddySpacing.md : BuddySpacing.xxs)
+        .frame(minHeight: BuddySize.control)
+        .background(AgentBuddyTheme.surface, in: shape)
+        .overlay {
+            shape.strokeBorder(AgentBuddyTheme.borderControl, lineWidth: 1)
+        }
     }
 
     var sessionFilterRow: some View {
-        HStack(spacing: 8) {
-            Menu {
-                Button("All servers") { selectedServerFilterId = nil }
-                ForEach(connectedServerOptions, id: \.id) { option in
-                    Button(option.name) { selectedServerFilterId = option.id }
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: BuddySpacing.xs) {
+                Menu {
+                    Button("All hosts") { selectedServerFilterId = nil }
+                    ForEach(connectedServerOptions, id: \.id) { option in
+                        Button(option.name) { selectedServerFilterId = option.id }
+                    }
+                } label: {
+                    SessionsFilterChip(
+                        title: selectedServerFilterTitle,
+                        systemImage: "laptopcomputer",
+                        isSelected: selectedServerFilterId != nil,
+                        opensMenu: true
+                    )
                 }
-            } label: {
-                filterChip(
-                    title: selectedServerFilterTitle,
-                    isActive: selectedServerFilterId != nil,
-                    icon: "server.rack"
-                )
-            }
-            .buttonStyle(.plain)
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text("Show tasks from"))
+                .accessibilityValue(selectedServerFilterTitle)
 
-            Button {
-                showOnlyForks.toggle()
-            } label: {
-                filterChip(
-                    title: "Forks",
-                    isActive: showOnlyForks,
-                    icon: "arrow.triangle.branch"
-                )
-            }
-            .buttonStyle(.plain)
-
-            Menu {
-                ForEach(WorkspaceSortMode.allCases) { mode in
-                    Button(mode.title) { workspaceSortMode = mode }
+                Button {
+                    showOnlyForks.toggle()
+                } label: {
+                    SessionsFilterChip(
+                        title: Text("Forks only"),
+                        systemImage: "arrow.triangle.branch",
+                        isSelected: showOnlyForks
+                    )
                 }
-            } label: {
-                filterChip(
-                    title: workspaceSortMode.title,
-                    isActive: workspaceSortMode != .mostRecent,
-                    icon: "arrow.up.arrow.down"
-                )
-            }
-            .buttonStyle(.plain)
+                .buttonStyle(.plain)
 
-            if selectedServerFilterId != nil || showOnlyForks {
-                Button("Clear") {
-                    selectedServerFilterId = nil
-                    showOnlyForks = false
+                Menu {
+                    ForEach(WorkspaceSortMode.allCases) { mode in
+                        Button {
+                            workspaceSortMode = mode
+                        } label: {
+                            Text(LocalizedStringKey(mode.title))
+                        }
+                    }
+                } label: {
+                    SessionsFilterChip(
+                        title: Text(LocalizedStringKey(workspaceSortMode.title)),
+                        systemImage: "arrow.up.arrow.down",
+                        isSelected: workspaceSortMode != .mostRecent,
+                        opensMenu: true
+                    )
                 }
-                .agentBuddyFont(.caption)
-                .foregroundColor(AgentBuddyTheme.accent)
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text("Sort"))
+                .accessibilityValue(Text(LocalizedStringKey(workspaceSortMode.title)))
+
+                if selectedServerFilterId != nil || showOnlyForks {
+                    Button {
+                        selectedServerFilterId = nil
+                        showOnlyForks = false
+                    } label: {
+                        Text("Clear filters")
+                            .buddyText(.label, weight: .semibold)
+                            .foregroundStyle(AgentBuddyTheme.link)
+                            .padding(.horizontal, BuddySpacing.xs)
+                            .frame(minHeight: BuddySize.minHitTarget)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
             }
-            Spacer(minLength: 0)
+            .padding(.horizontal, BuddySpacing.xl)
         }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 10)
+        .sessionsListRow(horizontal: 0)
     }
 
-    private var selectedServerFilterTitle: String {
-        guard let selectedServerFilterId else { return "All servers" }
-        return connectedServerOptions.first(where: { $0.id == selectedServerFilterId })?.name ?? "All servers"
-    }
-
-    private func filterChip(title: String, isActive: Bool, icon: String) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon)
-                .agentBuddyFont(size: 10, weight: .semibold)
-            Text(title)
-                .lineLimit(1)
-        }
-        .agentBuddyFont(.caption)
-        .foregroundColor(isActive ? AgentBuddyTheme.textOnAccent : AgentBuddyTheme.textSecondary)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(isActive ? AgentBuddyTheme.accent : AgentBuddyTheme.surface.opacity(0.65))
-        .overlay(
-            RoundedRectangle(cornerRadius: 7)
-                .stroke(isActive ? AgentBuddyTheme.accent : AgentBuddyTheme.border.opacity(0.7), lineWidth: 1)
-        )
-        .cornerRadius(7)
+    private var selectedServerFilterTitle: Text {
+        guard let selectedServerFilterId,
+              let name = connectedServerOptions.first(where: { $0.id == selectedServerFilterId })?.name
+        else { return Text("All hosts") }
+        return Text(verbatim: name)
     }
 }

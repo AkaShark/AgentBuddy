@@ -19,15 +19,17 @@ struct SessionReplySwipeWrapper<Content: View>: View {
 
     var body: some View {
         ZStack(alignment: .leading) {
-            // Blue reply hint behind the row, revealed as you swipe right.
-            HStack(spacing: 6) {
-                Image(systemName: "arrowshape.turn.up.left.fill")
-                    .font(.system(size: 14, weight: .semibold))
-                Text("reply")
-                    .agentBuddyMonoFont(size: 12, weight: .semibold)
+            // Reply hint behind the row (icon + text in the link colour),
+            // revealed as you swipe right.
+            HStack(spacing: BuddySpacing.xs) {
+                Image(systemName: "arrowshape.turn.up.left")
+                    .font(.system(size: 17, weight: .semibold))
+                    .accessibilityHidden(true)
+                Text("Reply")
+                    .buddyText(.label, weight: .semibold)
             }
-            .foregroundStyle(AgentBuddyTheme.accent)
-            .padding(.leading, 16)
+            .foregroundStyle(AgentBuddyTheme.link)
+            .padding(.leading, BuddySpacing.md)
             .opacity(revealOpacity)
 
             content()

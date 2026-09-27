@@ -1,6 +1,9 @@
 import SwiftUI
 
 extension SessionsScreen {
+    /// Task row in the home-row style: status tile, heading title (two lines),
+    /// label subtitle with status / updated time / model, tags, and a visible
+    /// "…" menu so long press is never the only way to reach row actions.
     func sessionRow(
         _ thread: AppSessionSummary,
         isActive: Bool,
@@ -15,212 +18,266 @@ extension SessionsScreen {
         let parent = derived.parentByKey[thread.key]
         let hasTurnActive = ephemeralState?.hasTurnActive ?? thread.hasActiveTurn
         let updatedAt = ephemeralState?.updatedAt ?? thread.updatedAtDate
+        let state = rowTaskState(for: thread, hasTurnActive: hasTurnActive)
+        let indent = CGFloat(min(depth, 4)) * BuddySpacing.md
 
-        return VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .top, spacing: 6) {
-                HStack(spacing: 0) {
-                    Color.clear
-                        .frame(width: CGFloat(depth) * 8)
-                    if hasChildren {
-                        Button(action: onToggleNode) {
-                            Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
-                                .agentBuddyFont(size: 9, weight: .semibold)
-                                .foregroundColor(AgentBuddyTheme.textSecondary)
-                                .frame(width: 10, height: 10)
-                        }
-                        .buttonStyle(.plain)
-                    } else {
-                        Color.clear.frame(width: 10, height: 10)
+        return VStack(alignment: .leading, spacing: BuddySpacing.xs) {
+            HStack(alignment: .center, spacing: BuddySpacing.xs) {
+                HStack(alignment: .center, spacing: BuddySpacing.md) {
+                    statusTile(state)
+
+                    VStack(alignment: .leading, spacing: BuddySpacing.xxs) {
+                        FormattedText(text: thread.sessionTitle, lineLimit: 2)
+                            .buddyText(.heading)
+                            .foregroundStyle(AgentBuddyTheme.textPrimary)
+                            .multilineTextAlignment(.leading)
+                            .accessibilityIdentifier("sessions.sessionTitle")
+
+                        Text(verbatim: rowSubtitle(thread: thread, state: state, updatedAt: updatedAt, parent: parent))
+                            .buddyText(.label, weight: .regular)
+                            .foregroundStyle(AgentBuddyTheme.textSecondary)
+                            .lineLimit(3)
+
+                        rowTags(thread: thread, isActive: isActive)
                     }
-                }
-                .padding(.top, 2)
-
-                HStack(alignment: .top, spacing: 6) {
-                    if hasTurnActive {
-                        PulsingDot().padding(.top, 3)
-                    } else if thread.isSubagent {
-                        subagentStatusIndicator(thread.subagentStatus).padding(.top, 3)
-                    } else {
-                        Circle().fill(AgentBuddyTheme.textMuted.opacity(0.4)).frame(width: 8, height: 8).padding(.top, 3)
-                    }
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            FormattedText(text: thread.sessionTitle, lineLimit: 2)
-                                .agentBuddyFont(.footnote)
-                                .foregroundColor(AgentBuddyTheme.textPrimary)
-                                .multilineTextAlignment(.leading)
-                                .accessibilityIdentifier("sessions.sessionTitle")
-
-                            if thread.isSubagent {
-                                HStack(spacing: 3) {
-                                    Image(systemName: "person.2.fill")
-                                        .agentBuddyFont(size: 8, weight: .semibold)
-                                    Text(thread.agentDisplayLabel ?? "Agent")
-                                        .agentBuddyFont(.caption2)
-                                }
-                                .foregroundColor(AgentBuddyTheme.textOnAccent)
-                                .padding(.horizontal, 5)
-                                .padding(.vertical, 2)
-                                .background(AgentBuddyTheme.success)
-                                .cornerRadius(4)
-                            } else if thread.isFork {
-                                Text("Fork")
-                                    .agentBuddyFont(.caption2)
-                                    .foregroundColor(AgentBuddyTheme.textOnAccent)
-                                    .padding(.horizontal, 5)
-                                    .padding(.vertical, 2)
-                                    .background(AgentBuddyTheme.accent)
-                                    .cornerRadius(4)
-                            }
-
-                            Spacer(minLength: 0)
-
-                            if resumingKey == thread.key {
-                                ProgressView()
-                                    .controlSize(.small)
-                                    .tint(AgentBuddyTheme.accent)
-                            }
-                        }
-
-                        HStack(spacing: 4) {
-                            Text(relativeDate(updatedAt))
-                                .foregroundColor(AgentBuddyTheme.textSecondary)
-                            if let provider = thread.sessionModelLabel {
-                                Text("•")
-                                    .foregroundColor(AgentBuddyTheme.textMuted)
-                                Text(provider)
-                                    .foregroundColor(AgentBuddyTheme.textMuted)
-                            }
-                            if let parent {
-                                Text("•")
-                                    .foregroundColor(AgentBuddyTheme.textMuted)
-                                Text("from \(parent.sessionTitle)")
-                                    .foregroundColor(AgentBuddyTheme.textMuted)
-                            }
-                        }
-                        .agentBuddyFont(.caption2)
-                        .lineLimit(1)
-                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .contentShape(Rectangle())
                 .accessibilityElement(children: .combine)
-                .accessibilityAddTraits(.isButton)
+                .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
                 .accessibilityIdentifier("sessions.sessionRow")
                 .onTapGesture(perform: onSelectSession)
+
+                rowTrailingControls(
+                    thread,
+                    hasChildren: hasChildren,
+                    isCollapsed: isCollapsed,
+                    onToggleNode: onToggleNode
+                )
             }
 
             if isActive {
                 lineageSummary(for: thread, derived: derived)
+                    .padding(.leading, BuddySize.rowTile + BuddySpacing.md)
             }
         }
-        .padding(.leading, 1)
-        .padding(.trailing, 8)
-        .padding(.vertical, 5)
+        .padding(.leading, indent)
+        .overlay(alignment: .leading) {
+            if depth > 0 {
+                Rectangle()
+                    .fill(AgentBuddyTheme.border)
+                    .frame(width: 1)
+                    .padding(.leading, indent - BuddySpacing.xs)
+                    .accessibilityHidden(true)
+            }
+        }
+        .padding(.horizontal, BuddySpacing.sm)
+        .padding(.vertical, BuddySpacing.sm)
+        .frame(minHeight: 64)
         .background {
             if isActive {
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(AgentBuddyTheme.surfaceLight.opacity(0.55))
+                let shape = RoundedRectangle(cornerRadius: BuddyRadius.detailCard, style: .continuous)
+                shape
+                    .fill(AgentBuddyTheme.surface)
+                    .overlay { shape.strokeBorder(AgentBuddyTheme.border, lineWidth: 1) }
             }
         }
         .contentShape(Rectangle())
         .hoverEffect(.highlight)
     }
 
+    // MARK: - Row parts
+
+    private func statusTile(_ state: BuddyTaskState) -> some View {
+        let isQuiet = state == .completed || state == .idle
+        return BuddyIconTile(
+            content: .symbol(state.systemImage),
+            fill: isQuiet ? AgentBuddyTheme.surface : state.fill,
+            foreground: isQuiet ? AgentBuddyTheme.textSecondary : state.foreground
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: BuddyRadius.tile, style: .continuous)
+                .strokeBorder(AgentBuddyTheme.border, lineWidth: isQuiet ? 1 : 0)
+        }
+    }
+
+    @ViewBuilder
+    private func rowTags(thread: AppSessionSummary, isActive: Bool) -> some View {
+        if isActive || thread.isSubagent || thread.isFork {
+            HStack(spacing: 6) {
+                if isActive {
+                    SessionsRowTag(title: Text("Current task"), systemImage: "eye")
+                }
+                if thread.isSubagent {
+                    SessionsRowTag(
+                        title: thread.agentDisplayLabel.map { Text(verbatim: $0) } ?? Text("Sub-agent"),
+                        systemImage: "person.2"
+                    )
+                } else if thread.isFork {
+                    SessionsRowTag(title: Text("Fork"), systemImage: "arrow.triangle.branch")
+                }
+            }
+            .padding(.top, 2)
+        }
+    }
+
+    private func rowTrailingControls(
+        _ thread: AppSessionSummary,
+        hasChildren: Bool,
+        isCollapsed: Bool,
+        onToggleNode: @escaping () -> Void
+    ) -> some View {
+        HStack(spacing: 0) {
+            if hasChildren {
+                Button(action: onToggleNode) {
+                    Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
+                        .frame(width: BuddySize.minHitTarget, height: BuddySize.minHitTarget)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text(isCollapsed ? "Show forks" : "Hide forks"))
+            }
+
+            if resumingKey == thread.key {
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(AgentBuddyTheme.textSecondary)
+                    .frame(width: BuddySize.minHitTarget, height: BuddySize.minHitTarget)
+            } else {
+                Menu {
+                    sessionRowContextMenu(thread)
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(AgentBuddyTheme.textSecondary)
+                        .frame(width: BuddySize.minHitTarget, height: BuddySize.minHitTarget)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel(Text("More actions"))
+            }
+        }
+    }
+
+    // MARK: - Lineage
+
+    @ViewBuilder
     private func lineageSummary(for thread: AppSessionSummary, derived: SessionsDerivedData) -> some View {
         let parent = derived.parentByKey[thread.key]
         let siblings = derived.siblingsByKey[thread.key] ?? []
         let children = derived.childrenByKey[thread.key] ?? []
-        let hasLineage = parent != nil || !siblings.isEmpty || !children.isEmpty
 
-        return Group {
-            if hasLineage {
-                VStack(alignment: .leading, spacing: 5) {
-                    Divider().background(AgentBuddyTheme.border.opacity(0.7))
-
-                    HStack(spacing: 6) {
-                        if let parent {
-                            Button {
-                                Task { await resumeSession(parent) }
-                            } label: {
-                                lineageChip(title: "Parent", count: 1, isInteractive: true)
-                            }
-                            .buttonStyle(.plain)
-                        }
-
-                        if !siblings.isEmpty {
-                            Menu {
-                                ForEach(siblings) { sibling in
-                                    Button(sibling.sessionTitle) {
-                                        Task { await resumeSession(sibling) }
-                                    }
-                                }
-                            } label: {
-                                lineageChip(title: "Siblings", count: siblings.count, isInteractive: true)
-                            }
-                        }
-
-                        if !children.isEmpty {
-                            Menu {
-                                ForEach(children) { child in
-                                    Button(child.sessionTitle) {
-                                        Task { await resumeSession(child) }
-                                    }
-                                }
-                            } label: {
-                                lineageChip(title: "Children", count: children.count, isInteractive: true)
-                            }
-                        }
-
-                        Spacer(minLength: 0)
+        if parent != nil || !siblings.isEmpty || !children.isEmpty {
+            VStack(alignment: .leading, spacing: BuddySpacing.xxs) {
+                BuddyDivider()
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: BuddySpacing.xs) {
+                        lineageChips(parent: parent, siblings: siblings, children: children)
+                    }
+                    VStack(alignment: .leading, spacing: 0) {
+                        lineageChips(parent: parent, siblings: siblings, children: children)
                     }
                 }
             }
         }
     }
 
-    private func lineageChip(title: String, count: Int, isInteractive: Bool) -> some View {
-        Text("\(title) \(count)")
-            .agentBuddyFont(.caption2)
-            .foregroundColor(isInteractive ? AgentBuddyTheme.accent : AgentBuddyTheme.textMuted)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 4)
-            .background(AgentBuddyTheme.surface.opacity(0.8))
-            .overlay(
-                RoundedRectangle(cornerRadius: 5)
-                    .stroke(isInteractive ? AgentBuddyTheme.accent.opacity(0.5) : AgentBuddyTheme.border.opacity(0.5), lineWidth: 1)
-            )
-            .cornerRadius(5)
+    @ViewBuilder
+    private func lineageChips(
+        parent: AppSessionSummary?,
+        siblings: [AppSessionSummary],
+        children: [AppSessionSummary]
+    ) -> some View {
+        if let parent {
+            Button {
+                Task { await resumeSession(parent) }
+            } label: {
+                lineageChipLabel(Text("Parent task"), systemImage: "arrow.up.left", opensMenu: false)
+            }
+            .buttonStyle(.plain)
+        }
+
+        if !siblings.isEmpty {
+            Menu {
+                ForEach(siblings) { sibling in
+                    Button(sibling.sessionTitle) {
+                        Task { await resumeSession(sibling) }
+                    }
+                }
+            } label: {
+                lineageChipLabel(Text("\(siblings.count) sibling tasks"), systemImage: "arrow.triangle.branch", opensMenu: true)
+            }
+        }
+
+        if !children.isEmpty {
+            Menu {
+                ForEach(children) { child in
+                    Button(child.sessionTitle) {
+                        Task { await resumeSession(child) }
+                    }
+                }
+            } label: {
+                lineageChipLabel(Text("\(children.count) forked tasks"), systemImage: "arrow.turn.down.right", opensMenu: true)
+            }
+        }
     }
 
-    @ViewBuilder
-    private func subagentStatusIndicator(_ status: AppSubagentStatus) -> some View {
-        switch status {
-        case .completed:
-            Image(systemName: "checkmark.circle.fill")
-                .agentBuddyFont(size: 8)
-                .foregroundColor(AgentBuddyTheme.success)
-                .frame(width: 8, height: 8)
-        case .errored:
-            Image(systemName: "exclamationmark.circle.fill")
-                .agentBuddyFont(size: 8)
-                .foregroundColor(AgentBuddyTheme.danger)
-                .frame(width: 8, height: 8)
-        case .shutdown:
-            Image(systemName: "stop.circle.fill")
-                .agentBuddyFont(size: 8)
-                .foregroundColor(AgentBuddyTheme.textMuted)
-                .frame(width: 8, height: 8)
-        case .interrupted:
-            Image(systemName: "pause.circle.fill")
-                .agentBuddyFont(size: 8)
-                .foregroundColor(AgentBuddyTheme.warning)
-                .frame(width: 8, height: 8)
-        case .pendingInit, .running, .unknown:
-            Circle()
-                .fill(AgentBuddyTheme.textMuted.opacity(0.4))
-                .frame(width: 8, height: 8)
+    private func lineageChipLabel(_ title: Text, systemImage: String, opensMenu: Bool) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: systemImage)
+                .imageScale(.small)
+                .accessibilityHidden(true)
+            title
+            if opensMenu {
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 11, weight: .semibold))
+                    .accessibilityHidden(true)
+            }
         }
+        .buddyContextChip()
+    }
+
+    // MARK: - Presentation
+
+    /// Render-only mapping from snapshot fields to the Mint task state; it
+    /// mirrors the home rows (`HomeTaskPresentation.state`).
+    private func rowTaskState(for thread: AppSessionSummary, hasTurnActive: Bool) -> BuddyTaskState {
+        if hasTurnActive { return .running }
+        if thread.isSubagent {
+            switch thread.subagentStatus {
+            case .completed: return .completed
+            case .errored: return .failed
+            case .shutdown, .interrupted: return .interrupted
+            case .pendingInit, .running, .unknown: return .idle
+            }
+        }
+        return thread.lastTurnEndMs == nil ? .idle : .completed
+    }
+
+    private func rowSubtitle(
+        thread: AppSessionSummary,
+        state: BuddyTaskState,
+        updatedAt: Date,
+        parent: AppSessionSummary?
+    ) -> String {
+        var parts: [String] = []
+        switch state {
+        case .running: parts.append(String(localized: "Running"))
+        case .failed: parts.append(String(localized: "Failed"))
+        case .interrupted: parts.append(String(localized: "Stopped"))
+        case .completed where thread.isSubagent: parts.append(String(localized: "Completed"))
+        default: break
+        }
+        parts.append(String(localized: "Updated \(relativeDate(updatedAt))"))
+        if let provider = thread.sessionModelLabel {
+            parts.append(provider)
+        }
+        var text = parts.joined(separator: " · ")
+        if let parent {
+            text += "\n" + String(localized: "from \(parent.sessionTitle)")
+        }
+        return text
     }
 
     private func relativeDate(_ date: Date) -> String {

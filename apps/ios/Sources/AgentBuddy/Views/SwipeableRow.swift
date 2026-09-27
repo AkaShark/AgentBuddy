@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Swipe-left-to-hide row wrapper. Shows a full-width red "hide" background
-/// whose opacity scales with drag distance. If the user drags past the
+/// Swipe-left-to-hide row wrapper. Shows a full-width "Hide" background
+/// (secondary surface, icon + text) whose opacity scales with drag distance. If the user drags past the
 /// commit threshold and releases, `onHide` is invoked and the caller is
 /// expected to remove the row from its list (exit animation is the caller's
 /// concern).
@@ -29,19 +29,20 @@ struct SwipeableRow<Content: View>: View {
 
     var body: some View {
         ZStack(alignment: .trailing) {
-            // Full-row red background, opacity driven by how far we've slid.
+            // Full-row background, opacity driven by how far we've slid.
             Rectangle()
-                .fill(Color.red)
+                .fill(AgentBuddyTheme.surfaceSoft)
                 .opacity(revealOpacity)
                 .overlay(alignment: .trailing) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "eye.slash.fill")
-                            .font(.system(size: 15, weight: .semibold))
-                        Text("hide")
-                            .agentBuddyMonoFont(size: 13, weight: .semibold)
+                    HStack(spacing: BuddySpacing.xs) {
+                        Image(systemName: "eye.slash")
+                            .font(.system(size: 17, weight: .semibold))
+                            .accessibilityHidden(true)
+                        Text("Hide")
+                            .buddyText(.label, weight: .semibold)
                     }
-                    .foregroundStyle(Color.white)
-                    .padding(.trailing, 20)
+                    .foregroundStyle(AgentBuddyTheme.textPrimary)
+                    .padding(.trailing, BuddySpacing.lg)
                     .opacity(revealOpacity)
                 }
 
