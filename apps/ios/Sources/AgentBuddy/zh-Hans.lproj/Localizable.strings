@@ -403,3 +403,16 @@
 
 /* === 主机不支持完成通知（host push §9）=== */
 "This host doesn't support completion notifications yet. Update the AgentBuddy desktop app to enable them." = "该主机版本不支持完成通知，升级桌面 App 后可用";
+"Idle" = "空闲";
+"Running" = "进行中";
+"Stopping…" = "正在停止…";
+"Needs your OK" = "等待你确认";
+"Waiting for your reply" = "等待你回复";
+"Failed" = "失败";
+"Stopped" = "已停止";
+"Looking for hosts…" = "正在查找主机…";
+"Connecting…" = "正在连接…";
+"Connected" = "已连接";
+"Disconnected" = "已断开";
+"Connection failed" = "连接失败";
+"Completed" = "已完成";

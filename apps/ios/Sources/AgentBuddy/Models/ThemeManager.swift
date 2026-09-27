@@ -69,6 +69,12 @@ final class ThemeManager {
     private static let appGroupSuite = AgentBuddyPalette.appGroupSuite
     private static let appearanceModeKey = "appearanceMode"
 
+    /// Mint is the default for anyone who has not picked a theme. An explicit
+    /// choice is stored under `selectedLightTheme` / `selectedDarkTheme` and is
+    /// always kept.
+    static let defaultLightSlug = "agentbuddy-mint-light"
+    static let defaultDarkSlug = "agentbuddy-mint-dark"
+
     private(set) var lightTheme: ResolvedTheme = .defaultLight
     private(set) var darkTheme: ResolvedTheme = .defaultDark
     private(set) var appearanceMode: AgentBuddyAppearanceMode = .system
@@ -77,12 +83,12 @@ final class ThemeManager {
     private var systemColorScheme: ColorScheme = .dark
 
     var selectedLightSlug: String {
-        get { UserDefaults.standard.string(forKey: "selectedLightTheme") ?? "agentbuddy-light" }
+        get { UserDefaults.standard.string(forKey: "selectedLightTheme") ?? Self.defaultLightSlug }
         set { UserDefaults.standard.set(newValue, forKey: "selectedLightTheme") }
     }
 
     var selectedDarkSlug: String {
-        get { UserDefaults.standard.string(forKey: "selectedDarkTheme") ?? "agentbuddy-dark" }
+        get { UserDefaults.standard.string(forKey: "selectedDarkTheme") ?? Self.defaultDarkSlug }
         set { UserDefaults.standard.set(newValue, forKey: "selectedDarkTheme") }
     }
 
@@ -214,14 +220,14 @@ final class ThemeManager {
     /// so the Live Activity widget can read it.
     func syncFontPreference() {
         guard let shared = UserDefaults(suiteName: Self.appGroupSuite) else { return }
-        let family = UserDefaults.standard.string(forKey: "fontFamily") ?? "mono"
+        let family = UserDefaults.standard.string(forKey: "fontFamily") ?? FontFamilyOption.defaultOption.rawValue
         shared.set(family, forKey: "fontFamily")
     }
 
     private func writeToSharedDefaults() {
         guard let shared = UserDefaults(suiteName: Self.appGroupSuite) else { return }
         // Sync font preference alongside theme colors
-        let family = UserDefaults.standard.string(forKey: "fontFamily") ?? "mono"
+        let family = UserDefaults.standard.string(forKey: "fontFamily") ?? FontFamilyOption.defaultOption.rawValue
         shared.set(family, forKey: "fontFamily")
         shared.set(appearanceMode.rawValue, forKey: Self.appearanceModeKey)
         let pairs: [(String, String, String)] = [
