@@ -1,38 +1,9 @@
 package com.akashark.agentbuddy.android.ui.sessions
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.MoreHoriz
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -43,17 +14,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
 import com.akashark.agentbuddy.android.ui.LocalAppModel
 import com.akashark.agentbuddy.android.ui.RecentDirectoryEntry
 import com.akashark.agentbuddy.android.ui.RecentDirectoryStore
@@ -89,7 +51,6 @@ fun DirectoryPickerSheet(
     var showHiddenDirectories by remember { mutableStateOf(false) }
     var searchQuery by remember(selectedServerId) { mutableStateOf("") }
     var showServerMenu by remember { mutableStateOf(false) }
-    var showRecentsMenu by remember { mutableStateOf(false) }
     var showGoToPathDialog by remember { mutableStateOf(false) }
     var pathInput by remember { mutableStateOf("") }
     var remoteHomePath by remember(selectedServerId) { mutableStateOf("") }
@@ -207,16 +168,6 @@ fun DirectoryPickerSheet(
         return listOf(homeRoot) + suffix
     }
 
-    fun relativeTime(epochMillis: Long): String {
-        val deltaMinutes = ((System.currentTimeMillis() - epochMillis).coerceAtLeast(0L) / 60000L)
-        return when {
-            deltaMinutes < 1L -> "刚刚"
-            deltaMinutes < 60L -> "${deltaMinutes} 分钟前"
-            deltaMinutes < 1440L -> "${deltaMinutes / 60L} 小时前"
-            deltaMinutes < 10080L -> "${deltaMinutes / 1440L} 天前"
-            else -> "${deltaMinutes / 10080L} 周前"
-        }
-    }
 
     fun navigateInto(name: String) {
         val nextPath = RemotePath.parse(currentPath).join(name).asString()
@@ -305,360 +256,54 @@ fun DirectoryPickerSheet(
             .fillMaxWidth()
             .fillMaxHeight(0.94f),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(AgentBuddyTheme.background)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text(
-                text = "选择目录",
-                color = AgentBuddyTheme.textPrimary,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = selectedServer?.let { "已连接服务器：${it.name} • ${it.sourceLabel}" } ?: "未选择服务器",
-                    color = if (selectedServer == null) AgentBuddyTheme.textMuted else AgentBuddyTheme.textSecondary,
-                    fontSize = 12.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
+        DirectoryPickerHeader(
+            servers = servers,
+            selectedServer = selectedServer,
+            selectedServerId = selectedServerId,
+            showServerMenu = showServerMenu,
+            onShowServerMenuChange = { showServerMenu = it },
+            onSelectServer = { selectedServerId = it },
+            showHiddenDirectories = showHiddenDirectories,
+            onToggleHiddenDirectories = { showHiddenDirectories = !showHiddenDirectories },
+            searchQuery = searchQuery,
+            onSearchQueryChange = { searchQuery = it },
+            currentPath = currentPath,
+            context = context,
+            isLocalServer = { isLocalServer(it) },
+            pathSegments = { pathSegments(it) },
+            onNavigateUp = { navigateUp() },
+            onOpenGoToPath = {
+                pathInput = com.akashark.agentbuddy.android.state.PathDisplay.display(
+                    currentPath,
+                    isLocalServer(selectedServerId),
+                    context,
+                    remoteHome = remoteHomePath,
                 )
+                showGoToPathDialog = true
+            },
+            onOpenPath = { path -> scope.launch { listDirectory(selectedServerId, path) } },
+        )
 
-                Box {
-                    Text(
-                        text = "切换服务器",
-                        color = AgentBuddyTheme.accent,
-                        fontSize = 12.sp,
-                        modifier = Modifier.clickable(enabled = servers.isNotEmpty()) { showServerMenu = true },
-                    )
-                    DropdownMenu(
-                        expanded = showServerMenu,
-                        onDismissRequest = { showServerMenu = false },
-                    ) {
-                        servers.forEach { server ->
-                            DropdownMenuItem(
-                                text = { Text("${server.name} • ${server.sourceLabel}") },
-                                onClick = {
-                                    showServerMenu = false
-                                    selectedServerId = server.id
-                                },
-                            )
-                        }
-                    }
-                }
+        DirectoryPickerContent(
+            isLoading = isLoading,
+            errorMessage = errorMessage,
+            recentEntries = recentEntries,
+            filteredEntries = filteredEntries,
+            searchQuery = searchQuery,
+            selectedServerId = selectedServerId,
+            context = context,
+            isLocalServer = { isLocalServer(it) },
+            completeSelection = { serverId, path -> completeSelection(serverId, path) },
+            navigateInto = { navigateInto(it) },
+            onRetry = { scope.launch { listDirectory(selectedServerId, currentPath.ifEmpty { "/" }) } },
+            onShowServerMenu = { showServerMenu = true },
+            onClearRecents = { recentEntries = recentStore.clear(selectedServerId, limit = 8) },
+        )
 
-                IconButton(onClick = { showHiddenDirectories = !showHiddenDirectories }) {
-                    Icon(
-                        imageVector = if (showHiddenDirectories) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                        contentDescription = if (showHiddenDirectories) "隐藏隐藏文件夹" else "显示隐藏文件夹",
-                        tint = if (showHiddenDirectories) AgentBuddyTheme.accent else AgentBuddyTheme.textSecondary,
-                    )
-                }
-            }
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(AgentBuddyTheme.surface, RoundedCornerShape(8.dp))
-                    .border(1.dp, AgentBuddyTheme.border.copy(alpha = 0.85f), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(Icons.Default.Search, contentDescription = null, tint = AgentBuddyTheme.textMuted)
-                Spacer(Modifier.width(8.dp))
-                Box(modifier = Modifier.weight(1f)) {
-                    if (searchQuery.isEmpty()) {
-                        Text("搜索文件夹", color = AgentBuddyTheme.textMuted, fontSize = 13.sp)
-                    }
-                    BasicTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        textStyle = TextStyle(color = AgentBuddyTheme.textPrimary, fontSize = 13.sp),
-                        cursorBrush = SolidColor(AgentBuddyTheme.accent),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-                if (searchQuery.isNotEmpty()) {
-                    IconButton(onClick = { searchQuery = "" }) {
-                        Icon(Icons.Default.Clear, contentDescription = "清除搜索", tint = AgentBuddyTheme.textMuted)
-                    }
-                }
-            }
-
-            val homeAnchorLocal = remember(selectedServerId, context) {
-                if (isLocalServer(selectedServerId)) com.akashark.agentbuddy.android.state.HomeAnchor.path(context) else null
-            }
-            val canGoUp = currentPath != "/" && currentPath.isNotEmpty() && currentPath != homeAnchorLocal
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                item {
-                    Text(
-                        text = "上一级",
-                        color = if (canGoUp) AgentBuddyTheme.accent else AgentBuddyTheme.textMuted,
-                        fontSize = 12.sp,
-                        modifier = Modifier
-                            .background(AgentBuddyTheme.surface, RoundedCornerShape(8.dp))
-                            .clickable(enabled = canGoUp) { navigateUp() }
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
-                    )
-                }
-                item {
-                    Text(
-                        text = "跳转到路径",
-                        color = AgentBuddyTheme.accent,
-                        fontSize = 12.sp,
-                        modifier = Modifier
-                            .background(AgentBuddyTheme.surface, RoundedCornerShape(8.dp))
-                            .clickable {
-                                pathInput = com.akashark.agentbuddy.android.state.PathDisplay.display(
-                                    currentPath,
-                                    isLocalServer(selectedServerId),
-                                    context,
-                                    remoteHome = remoteHomePath,
-                                )
-                                showGoToPathDialog = true
-                            }
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
-                    )
-                }
-                items(pathSegments(currentPath)) { segment ->
-                    val isCurrent = segment.second == currentPath
-                    Text(
-                        text = segment.first,
-                        color = if (isCurrent) Color.Black else AgentBuddyTheme.textSecondary,
-                        fontSize = 12.sp,
-                        modifier = Modifier
-                            .background(
-                                if (isCurrent) AgentBuddyTheme.accent else AgentBuddyTheme.surface,
-                                RoundedCornerShape(8.dp),
-                            )
-                            .clickable { scope.launch { listDirectory(selectedServerId, segment.second) } }
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
-                    )
-                }
-            }
-        }
-
-        when {
-            isLoading -> {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("加载中…", color = AgentBuddyTheme.textSecondary, fontSize = 13.sp)
-                }
-            }
-
-            errorMessage != null -> {
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Text("无法加载目录", color = AgentBuddyTheme.danger, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = errorMessage ?: "",
-                        color = AgentBuddyTheme.textSecondary,
-                        fontSize = 12.sp,
-                        maxLines = 4,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text(
-                            text = "重试",
-                            color = AgentBuddyTheme.accent,
-                            fontSize = 13.sp,
-                            modifier = Modifier.clickable { scope.launch { listDirectory(selectedServerId, currentPath.ifEmpty { "/" }) } },
-                        )
-                        Text(
-                            text = "切换服务器",
-                            color = AgentBuddyTheme.accent,
-                            fontSize = 13.sp,
-                            modifier = Modifier.clickable { showServerMenu = true },
-                        )
-                    }
-                }
-            }
-
-            else -> {
-                LazyColumn(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .background(AgentBuddyTheme.background),
-                ) {
-                    val mostRecentEntry = recentEntries.firstOrNull()
-                    if (mostRecentEntry != null && searchQuery.isBlank()) {
-                        item("recent-continue") {
-                            PickerRow(
-                                icon = Icons.Default.CheckCircle,
-                                title = "继续 ${(mostRecentEntry.path.substringAfterLast('/')).ifBlank { mostRecentEntry.path }}",
-                                subtitle = com.akashark.agentbuddy.android.state.PathDisplay.display(
-                                    mostRecentEntry.path,
-                                    isLocalServer(selectedServerId),
-                                    context,
-                                ),
-                                accent = AgentBuddyTheme.accent,
-                                onClick = { completeSelection(selectedServerId, mostRecentEntry.path) },
-                            )
-                        }
-                    }
-
-                    if (recentEntries.isNotEmpty() && searchQuery.isBlank()) {
-                        item("recent-header") {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text("最近目录", color = AgentBuddyTheme.textSecondary, fontSize = 12.sp)
-                                Spacer(Modifier.weight(1f))
-                                Box {
-                                    IconButton(onClick = { showRecentsMenu = true }) {
-                                        Icon(Icons.Default.MoreHoriz, contentDescription = "最近目录选项", tint = AgentBuddyTheme.textMuted)
-                                    }
-                                    DropdownMenu(
-                                        expanded = showRecentsMenu,
-                                        onDismissRequest = { showRecentsMenu = false },
-                                    ) {
-                                        DropdownMenuItem(
-                                            text = { Text("清除最近目录") },
-                                            onClick = {
-                                                showRecentsMenu = false
-                                                recentEntries = recentStore.clear(selectedServerId, limit = 8)
-                                            },
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                        items(recentEntries, key = { "recent-${it.serverId}-${it.path}" }) { recent ->
-                            val pretty = com.akashark.agentbuddy.android.state.PathDisplay.display(
-                                recent.path,
-                                isLocalServer(selectedServerId),
-                                context,
-                            )
-                            PickerRow(
-                                icon = Icons.Default.Folder,
-                                title = recent.path.substringAfterLast('/').ifBlank { recent.path },
-                                subtitle = "$pretty • ${relativeTime(recent.lastUsedAtEpochMillis)}",
-                                accent = AgentBuddyTheme.textSecondary,
-                                onClick = { completeSelection(selectedServerId, recent.path) },
-                            )
-                        }
-                        item("recent-footer") {
-                            Text(
-                                text = "最近目录按已连接服务器分别保存。",
-                                color = AgentBuddyTheme.textMuted,
-                                fontSize = 11.sp,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                            )
-                        }
-                    }
-
-                    if (filteredEntries.isEmpty()) {
-                        item("empty") {
-                            Text(
-                                text = if (searchQuery.isBlank()) "没有子目录" else "没有与 \"$searchQuery\" 匹配的结果",
-                                color = AgentBuddyTheme.textMuted,
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp),
-                            )
-                        }
-                    } else {
-                        items(filteredEntries, key = { "entry-$it" }) { entry ->
-                            PickerRow(
-                                icon = Icons.Default.Folder,
-                                title = entry,
-                                subtitle = null,
-                                accent = AgentBuddyTheme.accent,
-                                onClick = { navigateInto(entry) },
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(AgentBuddyTheme.background)
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(
-                text = currentPath.ifBlank { "选择一个文件夹以开始新会话。" },
-                color = if (currentPath.isBlank()) AgentBuddyTheme.textSecondary else AgentBuddyTheme.textMuted,
-                fontSize = 12.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Button(
-                    onClick = onDismiss,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = AgentBuddyTheme.surface,
-                        contentColor = AgentBuddyTheme.textPrimary,
-                    ),
-                ) {
-                    Text("取消")
-                }
-                Button(
-                    onClick = { completeSelection(selectedServerId, currentPath) },
-                    enabled = currentPath.isNotBlank(),
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (currentPath.isNotBlank()) AgentBuddyTheme.accent else AgentBuddyTheme.surface,
-                        contentColor = if (currentPath.isNotBlank()) Color.Black else AgentBuddyTheme.textMuted,
-                    ),
-                ) {
-                    Text("选择文件夹")
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PickerRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    title: String,
-    subtitle: String?,
-    accent: Color,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(icon, contentDescription = null, tint = accent)
-        Spacer(Modifier.width(10.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, color = AgentBuddyTheme.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-            subtitle?.let {
-                Spacer(Modifier.height(2.dp))
-                Text(it, color = AgentBuddyTheme.textMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
+        DirectoryPickerFooter(
+            currentPath = currentPath,
+            onDismiss = onDismiss,
+            onSelectCurrentPath = { completeSelection(selectedServerId, currentPath) },
+        )
     }
 }
