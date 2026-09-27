@@ -1,50 +1,14 @@
 package com.akashark.agentbuddy.android.ui.common
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.LockOpen
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.unit.dp
 import com.akashark.agentbuddy.android.state.ampReasoningEffortLocked
-import com.akashark.agentbuddy.android.ui.AgentBuddyTextStyle
-import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
 import com.akashark.agentbuddy.android.ui.LocalAppModel
-import com.akashark.agentbuddy.android.ui.scaled
 import uniffi.codex_mobile_client.AppModeKind
 import uniffi.codex_mobile_client.AppThreadPermissionPreset
 import uniffi.codex_mobile_client.AppThreadSnapshot
@@ -55,7 +19,10 @@ import uniffi.codex_mobile_client.threadPermissionPreset
  * Reusable model/reasoning/plan/permissions/fast-mode panel shared by the
  * conversation header (scoped to an existing thread) and the home composer
  * chip (pre-thread, `thread == null`). Mirrors iOS
- * `HeaderView.swift` + `ConversationOptionsSheet.swift`.
+ * `InlineModelSelectorView` + `ModelPickerComponents`.
+ *
+ * This wrapper reads `AppLaunchState` and the thread snapshot and renders
+ * [ModelSelectorPanelContent], which only takes plain state and callbacks.
  *
  * When `thread` is null:
  *   - Permission toggle operates on `AppLaunchState` defaults (threadKey=null)
@@ -63,8 +30,8 @@ import uniffi.codex_mobile_client.threadPermissionPreset
  *   - Plan toggle is hidden — the collaboration mode is a per-thread field
  *     with no pre-thread equivalent on Android.
  *
- * `onToggleMode` is invoked for Plan chip taps; pass null (or it will be
- * ignored because the chip is hidden) when there's no thread.
+ * `onToggleMode` is invoked for Plan switch changes; pass null (or it will be
+ * ignored because the switch is hidden) when there's no thread.
  */
 @Composable
 fun ModelSelectorPanel(
@@ -78,7 +45,6 @@ fun ModelSelectorPanel(
 ) {
     val appModel = LocalAppModel.current
     val launchState by appModel.launchState.snapshot.collectAsState()
-    var modelSearchQuery by rememberSaveable { mutableStateOf("") }
     val visibleModels = remember(availableModels) {
         availableModels.filter { it.isVisibleModelOption() }
     }
@@ -92,43 +58,6 @@ fun ModelSelectorPanel(
         ?: visibleModels.firstOrNull { it.id == selectedModel || it.model == selectedModel }?.agentRuntimeKind
     val selectedRuntimeSupportsPermissionOverrides =
         selectedRuntime?.supportsThreadPermissionOverrides ?: true
-    val runtimeBuckets = remember(visibleModels) {
-        visibleModels
-            .groupBy { it.agentRuntimeKind }
-            .map { (kind, models) -> RuntimeModelBucket(kind = kind, count = models.size) }
-            .sortedBy { it.kind.runtimeSortIndex }
-    }
-    var selectedRuntimeFilterName by rememberSaveable { mutableStateOf<String?>(null) }
-    var initializedRuntimeFilter by rememberSaveable { mutableStateOf(false) }
-    val selectedRuntimeFilter = runtimeBuckets.firstOrNull {
-        it.kind == selectedRuntimeFilterName
-    }?.kind
-
-    LaunchedEffect(selectedRuntime, runtimeBuckets) {
-        if (!initializedRuntimeFilter) {
-            if (selectedRuntime != null && runtimeBuckets.any { it.kind == selectedRuntime }) {
-                selectedRuntimeFilterName = selectedRuntime
-            }
-            initializedRuntimeFilter = true
-        } else if (
-            selectedRuntimeFilterName != null &&
-            runtimeBuckets.none { it.kind == selectedRuntimeFilterName }
-        ) {
-            selectedRuntimeFilterName = null
-        }
-    }
-
-    val runtimeScopedModels = remember(visibleModels, selectedRuntimeFilter) {
-        selectedRuntimeFilter?.let { runtime ->
-            visibleModels.filter { it.agentRuntimeKind == runtime }
-        } ?: visibleModels
-    }
-    val modelSearchIndex = remember(runtimeScopedModels) {
-        ModelSearchIndex(runtimeScopedModels)
-    }
-    val filteredModels = remember(modelSearchIndex, modelSearchQuery) {
-        modelSearchIndex.results(modelSearchQuery)
-    }
     val selectedModelDefinition by remember(selectedModel, selectedRuntime, visibleModels) {
         derivedStateOf {
             visibleModels.firstOrNull { it.matchesModelSelection(selectedModel, selectedRuntime) }
@@ -182,258 +111,75 @@ fun ModelSelectorPanel(
         }
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .then(
-                if (showBackground) {
-                    Modifier.background(AgentBuddyTheme.codeBackground)
-                } else {
-                    Modifier
-                },
-            )
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-    ) {
-        Text(
-            text = "模型",
-            color = AgentBuddyTheme.textSecondary,
-            fontSize = AgentBuddyTextStyle.caption2.scaled,
-        )
-
-        if (runtimeBuckets.size > 1) {
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.padding(top = 2.dp, bottom = 4.dp),
-            ) {
-                item(key = "all") {
-                    RuntimeFilterChip(
-                        label = "全部",
-                        count = visibleModels.size,
-                        selected = selectedRuntimeFilterName == null,
-                        onClick = { selectedRuntimeFilterName = null },
-                    )
-                }
-                items(runtimeBuckets, key = { it.kind }) { bucket ->
-                    RuntimeFilterChip(
-                        label = bucket.kind.runtimeLabel,
-                        count = bucket.count,
-                        selected = selectedRuntimeFilter == bucket.kind,
-                        onClick = { selectedRuntimeFilterName = bucket.kind },
-                        leadingIcon = { ModelRuntimeIcon(bucket.kind) },
-                    )
-                }
-            }
+    val threadKey = thread?.key
+    val isFullAccess = if (selectedRuntimeSupportsPermissionOverrides) {
+        val approval = appModel.launchState.approvalPolicyValue(threadKey)
+            ?: thread?.effectiveApprovalPolicy
+        val sandbox = appModel.launchState.turnSandboxPolicy(threadKey)
+            ?: thread?.effectiveSandboxPolicy
+        val preset = if (approval != null && sandbox != null) {
+            threadPermissionPreset(approval, sandbox)
+        } else {
+            null
         }
-
-        OutlinedTextField(
-            value = modelSearchQuery,
-            onValueChange = { modelSearchQuery = it },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 6.dp, bottom = 4.dp),
-            textStyle = TextStyle(
-                color = AgentBuddyTheme.textPrimary,
-                fontSize = AgentBuddyTextStyle.caption.scaled,
-            ),
-            singleLine = true,
-            label = {
-                Text(
-                    "搜索模型",
-                    color = AgentBuddyTheme.textSecondary,
-                    fontSize = AgentBuddyTextStyle.caption2.scaled,
-                )
-            },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = null,
-                    tint = AgentBuddyTheme.textSecondary,
-                    modifier = Modifier.size(16.dp),
-                )
-            },
-            trailingIcon = {
-                if (modelSearchQuery.isNotEmpty()) {
-                    IconButton(onClick = { modelSearchQuery = "" }) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "清除模型搜索",
-                            tint = AgentBuddyTheme.textSecondary,
-                            modifier = Modifier.size(16.dp),
-                        )
-                    }
-                }
-            },
-        )
-
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 320.dp)
-                .padding(vertical = 4.dp),
-        ) {
-            items(filteredModels, key = { "${it.agentRuntimeKind}:${it.id}" }) { model ->
-                val isSelected = model.matchesModelSelection(selectedModel, selectedRuntime)
-                ModelOptionRow(
-                    model = model,
-                    selected = isSelected,
-                    onClick = {
-                        appModel.launchState.updateSelectedModel(
-                            model.id,
-                            agentRuntimeKind = model.agentRuntimeKind,
-                        )
-                        appModel.launchState.updateReasoningEffort(
-                            if (ampEffortLocked && model.agentRuntimeKind == "amp") {
-                                null
-                            } else {
-                                model.defaultReasoningEffortSelection()
-                            },
-                        )
-                    },
-                )
-            }
-        }
-
-        if (visibleModels.isEmpty()) {
-            Text(
-                text = "正在加载模型...",
-                color = AgentBuddyTheme.textMuted,
-                fontSize = AgentBuddyTextStyle.caption2.scaled,
-                modifier = Modifier.padding(vertical = 4.dp),
-            )
-        } else if (filteredModels.isEmpty()) {
-            Text(
-                text = "没有匹配的模型",
-                color = AgentBuddyTheme.textMuted,
-                fontSize = AgentBuddyTextStyle.caption2.scaled,
-                modifier = Modifier.padding(vertical = 4.dp),
-            )
-        }
-
-        if (ampEffortLocked) {
-            Text(
-                text = "推理强度在首条消息后即被锁定。",
-                color = AgentBuddyTheme.textSecondary,
-                fontSize = AgentBuddyTextStyle.caption2.scaled,
-                modifier = Modifier.padding(top = 4.dp, bottom = 2.dp),
-            )
-        } else if (supportedEfforts.isNotEmpty()) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        "推理强度",
-                        color = AgentBuddyTheme.textSecondary,
-                        fontSize = AgentBuddyTextStyle.caption2.scaled,
-                    )
-                    Spacer(Modifier.width(4.dp))
-                }
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    items(supportedEfforts) { option ->
-                        val effort = effortLabel(option.reasoningEffort)
-                        FilterChip(
-                            selected = selectedEffort == effort,
-                            onClick = {
-                                appModel.launchState.updateReasoningEffort(effort)
-                            },
-                            label = { Text(effort, fontSize = 10f.scaled) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = AgentBuddyTheme.accent,
-                                selectedLabelColor = Color.Black,
-                            ),
-                        )
-                    }
-                }
-            }
-        }
-
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.padding(top = 4.dp),
-        ) {
-            val threadKey = thread?.key
-            if (thread != null && onToggleMode != null) {
-                val isPlan = thread.collaborationMode == AppModeKind.PLAN
-                FilterChip(
-                    selected = isPlan,
-                    onClick = {
-                        val next = if (isPlan) AppModeKind.DEFAULT else AppModeKind.PLAN
-                        onToggleMode(next)
-                    },
-                    label = { Text("计划", fontSize = 10f.scaled) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = AgentBuddyTheme.accent,
-                        selectedLabelColor = Color.Black,
-                    ),
-                )
-            }
-
-            if (selectedRuntimeSupportsPermissionOverrides) {
-                val currentPreset = run {
-                    val approval = appModel.launchState.approvalPolicyValue(threadKey)
-                        ?: thread?.effectiveApprovalPolicy
-                    val sandbox = appModel.launchState.turnSandboxPolicy(threadKey)
-                        ?: thread?.effectiveSandboxPolicy
-                    if (approval != null && sandbox != null) {
-                        threadPermissionPreset(approval, sandbox)
-                    } else {
-                        null
-                    }
-                }
-                val isFullAccess = currentPreset == AppThreadPermissionPreset.FULL_ACCESS
-                FilterChip(
-                    selected = isFullAccess,
-                    onClick = {
-                        if (isFullAccess) {
-                            appModel.launchState.updateThreadPermissions(
-                                threadKey,
-                                approvalPolicy = "on-request",
-                                sandboxMode = "workspace-write",
-                            )
-                        } else {
-                            appModel.launchState.updateThreadPermissions(
-                                threadKey,
-                                approvalPolicy = "never",
-                                sandboxMode = "danger-full-access",
-                            )
-                        }
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = if (isFullAccess) Icons.Default.LockOpen else Icons.Default.Lock,
-                            contentDescription = null,
-                            modifier = Modifier.size(12.dp),
-                        )
-                    },
-                    label = {
-                        Text(
-                            if (isFullAccess) "完全访问" else "需审批",
-                            fontSize = 10f.scaled,
-                        )
-                    },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = AgentBuddyTheme.danger,
-                        selectedLabelColor = Color.White,
-                        selectedLeadingIconColor = Color.White,
-                    ),
-                )
-            }
-            Spacer(Modifier.weight(1f))
-            Text(
-                "快速模式",
-                color = AgentBuddyTheme.textSecondary,
-                fontSize = AgentBuddyTextStyle.caption2.scaled,
-            )
-            Switch(
-                checked = fastMode,
-                onCheckedChange = onFastModeChange,
-                colors = SwitchDefaults.colors(
-                    checkedTrackColor = AgentBuddyTheme.accent,
-                ),
-            )
-        }
+        preset == AppThreadPermissionPreset.FULL_ACCESS
+    } else {
+        null
     }
+    val planMode = if (thread != null && onToggleMode != null) {
+        thread.collaborationMode == AppModeKind.PLAN
+    } else {
+        null
+    }
+
+    ModelSelectorPanelContent(
+        state = ModelPanelState(
+            models = visibleModels,
+            selectedModel = selectedModel,
+            selectedRuntime = selectedRuntime,
+            efforts = supportedEfforts,
+            selectedEffort = selectedEffort,
+            effortLocked = ampEffortLocked,
+            planMode = planMode,
+            fullAccess = isFullAccess,
+            fastMode = fastMode,
+        ),
+        actions = ModelPanelActions(
+            onSelectModel = { model ->
+                appModel.launchState.updateSelectedModel(
+                    model.id,
+                    agentRuntimeKind = model.agentRuntimeKind,
+                )
+                appModel.launchState.updateReasoningEffort(
+                    if (ampEffortLocked && model.agentRuntimeKind == "amp") {
+                        null
+                    } else {
+                        model.defaultReasoningEffortSelection()
+                    },
+                )
+            },
+            onSelectEffort = { effort -> appModel.launchState.updateReasoningEffort(effort) },
+            onPlanModeChange = { enabled ->
+                onToggleMode?.invoke(if (enabled) AppModeKind.PLAN else AppModeKind.DEFAULT)
+            },
+            onFullAccessChange = { enabled ->
+                if (enabled) {
+                    appModel.launchState.updateThreadPermissions(
+                        threadKey,
+                        approvalPolicy = "never",
+                        sandboxMode = "danger-full-access",
+                    )
+                } else {
+                    appModel.launchState.updateThreadPermissions(
+                        threadKey,
+                        approvalPolicy = "on-request",
+                        sandboxMode = "workspace-write",
+                    )
+                }
+            },
+            onFastModeChange = onFastModeChange,
+        ),
+        modifier = modifier,
+        showBackground = showBackground,
+    )
 }

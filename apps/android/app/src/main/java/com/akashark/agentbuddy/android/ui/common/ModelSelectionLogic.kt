@@ -15,6 +15,17 @@ internal fun effortLabel(value: ReasoningEffort): String = when (value) {
     ReasoningEffort.MAX -> "max"
 }
 
+/** Chinese display name of a reasoning effort; the wire value stays [effortLabel]. */
+internal fun effortDisplayName(value: ReasoningEffort): String = when (value) {
+    ReasoningEffort.NONE -> "无"
+    ReasoningEffort.MINIMAL -> "极低"
+    ReasoningEffort.LOW -> "低"
+    ReasoningEffort.MEDIUM -> "中"
+    ReasoningEffort.HIGH -> "高"
+    ReasoningEffort.X_HIGH -> "极高"
+    ReasoningEffort.MAX -> "最高"
+}
+
 internal fun ModelInfo.defaultReasoningEffortSelection(): String? =
     if (supportedReasoningEfforts.isEmpty()) null else effortLabel(defaultReasoningEffort)
 
