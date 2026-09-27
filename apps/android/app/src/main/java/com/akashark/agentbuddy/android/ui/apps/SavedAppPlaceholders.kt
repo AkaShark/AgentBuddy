@@ -1,138 +1,126 @@
 package com.akashark.agentbuddy.android.ui.apps
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.akashark.agentbuddy.android.ui.AgentBuddyTextStyle
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
-import com.akashark.agentbuddy.android.ui.scaled
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyButtonKind
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyEmptyState
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySpacing
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyTextStyle
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyReduceMotion
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyTextStyle
+
+private val PlaceholderMaxWidth = 480.dp
 
 @Composable
 internal fun LoadingPlaceholder() {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(BuddySpacing.sm, Alignment.CenterVertically),
+    ) {
         CircularProgressIndicator(
-            color = AgentBuddyTheme.accent,
+            color = AgentBuddyTheme.textSecondary,
             strokeWidth = 2.dp,
             modifier = Modifier.size(28.dp),
+        )
+        Text(
+            text = "正在加载应用…",
+            style = buddyTextStyle(BuddyTextStyle.LABEL),
+            color = AgentBuddyTheme.textSecondary,
         )
     }
 }
 
 @Composable
 internal fun BrokenPlaceholder(onDelete: () -> Unit) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.padding(32.dp),
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Warning,
-                contentDescription = null,
-                tint = AgentBuddyTheme.warning,
-                modifier = Modifier.size(44.dp),
-            )
-            Text(
-                text = "该应用的文件已丢失",
-                color = AgentBuddyTheme.textPrimary,
-                fontSize = AgentBuddyTextStyle.headline.scaled,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = "删除它以清除该条目。",
-                color = AgentBuddyTheme.textSecondary,
-                fontSize = AgentBuddyTextStyle.footnote.scaled,
-            )
-            TextButton(onClick = onDelete) {
-                Text("删除应用", color = AgentBuddyTheme.danger)
-            }
-        }
+    PlaceholderFrame {
+        BuddyEmptyState(
+            icon = Icons.Outlined.WarningAmber,
+            title = "该应用的文件已丢失",
+            message = "删除它以清除该条目。",
+            actionTitle = "删除应用",
+            actionIcon = Icons.Outlined.Delete,
+            actionKind = BuddyButtonKind.DESTRUCTIVE,
+            onAction = onDelete,
+        )
     }
 }
 
 @Composable
 internal fun FailurePlaceholder(message: String, onRetry: () -> Unit) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(24.dp),
-        ) {
-            Text(
-                text = "无法加载该应用。",
-                color = AgentBuddyTheme.textPrimary,
-                fontSize = AgentBuddyTextStyle.headline.scaled,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = message,
-                color = AgentBuddyTheme.textSecondary,
-                fontSize = AgentBuddyTextStyle.footnote.scaled,
-            )
-            TextButton(onClick = onRetry) {
-                Icon(Icons.Default.Refresh, contentDescription = null, tint = AgentBuddyTheme.accent)
-                Spacer(Modifier.width(6.dp))
-                Text("重试", color = AgentBuddyTheme.accent)
-            }
-        }
+    PlaceholderFrame {
+        BuddyEmptyState(
+            icon = Icons.Outlined.ErrorOutline,
+            title = "无法加载该应用",
+            message = message,
+            actionTitle = "重新加载",
+            actionIcon = Icons.Outlined.Refresh,
+            actionKind = BuddyButtonKind.SECONDARY,
+            onAction = onRetry,
+        )
     }
 }
 
 @Composable
-internal fun ShimmerOverlay() {
-    val transition = rememberInfiniteTransition(label = "shimmer")
-    val alpha by transition.animateFloat(
-        initialValue = 0.25f,
-        targetValue = 0.55f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 900, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "shimmer-alpha",
-    )
+private fun PlaceholderFrame(content: @Composable () -> Unit) {
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.White.copy(alpha = alpha * 0.05f)),
+        modifier = Modifier.fillMaxSize().padding(horizontal = BuddySpacing.xl),
+        contentAlignment = Alignment.Center,
     ) {
-        // Thin progress bar along the top.
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 2.dp)
-                .clip(RoundedCornerShape(1.dp))
-                .background(AgentBuddyTheme.accent.copy(alpha = alpha))
-                .size(width = 0.dp, height = 2.dp)
-                .fillMaxWidth(),
-        )
+        Box(Modifier.widthIn(max = PlaceholderMaxWidth).fillMaxWidth()) { content() }
+    }
+}
+
+/**
+ * Veil over the running widget while an update is in flight, with a
+ * progress strip along the top. The strip only moves when motion is
+ * allowed; touches still reach the widget.
+ */
+@Composable
+internal fun ShimmerOverlay() {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(AgentBuddyTheme.background.copy(alpha = 0.35f))
+                .semantics { contentDescription = "正在更新应用" },
+    ) {
+        if (buddyReduceMotion) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(3.dp)
+                    .background(AgentBuddyTheme.link),
+            )
+        } else {
+            LinearProgressIndicator(
+                modifier = Modifier.fillMaxWidth().height(3.dp),
+                color = AgentBuddyTheme.link,
+                trackColor = AgentBuddyTheme.surfaceSoft,
+            )
+        }
     }
 }

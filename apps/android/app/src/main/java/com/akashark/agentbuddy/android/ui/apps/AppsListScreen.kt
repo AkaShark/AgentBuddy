@@ -1,32 +1,13 @@
 package com.akashark.agentbuddy.android.ui.apps
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.systemBarsPadding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.GridView
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -35,19 +16,25 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import com.akashark.agentbuddy.android.state.SavedAppsStore
-import com.akashark.agentbuddy.android.ui.AgentBuddyTextStyle
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
+import com.akashark.agentbuddy.android.ui.BuddySwipeTone
 import com.akashark.agentbuddy.android.ui.common.SwipeAction
 import com.akashark.agentbuddy.android.ui.common.SwipeableRow
-import com.akashark.agentbuddy.android.ui.scaled
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyButtonKind
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyChevron
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyEmptyState
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyIconTile
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyTileContent
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySize
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySpacing
+import com.akashark.agentbuddy.android.ui.settings.SettingsFooter
+import com.akashark.agentbuddy.android.ui.settings.SettingsPage
+import com.akashark.agentbuddy.android.ui.settings.SettingsRow
+import com.akashark.agentbuddy.android.ui.settings.SettingsRowDivider
+import com.akashark.agentbuddy.android.ui.settings.settingsSection
 import kotlinx.coroutines.launch
 import uniffi.codex_mobile_client.SavedApp
 import java.util.concurrent.TimeUnit
@@ -61,215 +48,107 @@ fun AppsListScreen(
     val scope = rememberCoroutineScope()
     val apps by SavedAppsStore.apps.collectAsState()
     var renameTarget by remember { mutableStateOf<SavedApp?>(null) }
-    var renameText by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         SavedAppsStore.reload(context)
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(AgentBuddyTheme.background)
-            .systemBarsPadding(),
-    ) {
-        // Top bar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "返回",
-                    tint = AgentBuddyTheme.textPrimary,
+    AppsListContent(
+        apps = apps,
+        onBack = onBack,
+        onOpenApp = onOpenApp,
+        onRename = { renameTarget = it },
+        onDelete = { app ->
+            scope.launch {
+                try {
+                    SavedAppsStore.delete(context, app.id)
+                } catch (_: Exception) {}
+            }
+        },
+        modifier = Modifier.systemBarsPadding(),
+    )
+
+    renameTarget?.let { app ->
+        RenameAppDialog(
+            currentTitle = app.title,
+            onDismiss = { renameTarget = null },
+            onRename = { title ->
+                renameTarget = null
+                scope.launch {
+                    try {
+                        SavedAppsStore.rename(context, app.id, title)
+                    } catch (_: Exception) {}
+                }
+            },
+        )
+    }
+}
+
+/**
+ * Saved apps as one settings-style group. Swipe right renames, swipe left
+ * deletes (both also TalkBack actions); the footer says so.
+ */
+@Composable
+internal fun AppsListContent(
+    apps: List<SavedApp>,
+    onBack: () -> Unit,
+    onOpenApp: (String) -> Unit,
+    onRename: (SavedApp) -> Unit,
+    onDelete: (SavedApp) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    SettingsPage(title = "应用", onBack = onBack, modifier = modifier) {
+        if (apps.isEmpty()) {
+            item(key = "empty") {
+                Spacer(Modifier.height(BuddySpacing.md))
+                BuddyEmptyState(
+                    icon = Icons.Outlined.GridView,
+                    title = "暂无应用",
+                    message = "在任务里让搭子做一个交互式小组件（带 app_id），它会自动保存到这里，以后可以直接打开。",
+                    actionTitle = "返回去开始任务",
+                    actionKind = BuddyButtonKind.SECONDARY,
+                    onAction = onBack,
                 )
             }
-            Text(
-                text = "应用",
-                color = AgentBuddyTheme.textPrimary,
-                fontSize = AgentBuddyTextStyle.headline.scaled,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(start = 4.dp),
-            )
-        }
-
-        renameTarget?.let { app ->
-            AlertDialog(
-                onDismissRequest = { renameTarget = null },
-                title = { Text("重命名 app") },
-                text = {
-                    OutlinedTextField(
-                        value = renameText,
-                        onValueChange = { renameText = it },
-                        label = { Text("标题") },
-                        singleLine = true,
-                    )
-                },
-                confirmButton = {
-                    TextButton(onClick = {
-                        val trimmed = renameText.trim()
-                        if (trimmed.isEmpty()) return@TextButton
-                        scope.launch {
-                            try {
-                                SavedAppsStore.rename(context, app.id, trimmed)
-                            } catch (_: Exception) {}
-                        }
-                        renameTarget = null
-                    }) {
-                        Text("保存")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { renameTarget = null }) {
-                        Text("取消")
-                    }
-                },
-            )
-        }
-
-        if (apps.isEmpty()) {
-            EmptyState()
         } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                    horizontal = 12.dp,
-                    vertical = 8.dp,
-                ),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+            settingsSection(
+                title = "已保存 ${apps.size} 个",
+                key = "apps",
+                footer = { SettingsFooter("向右滑动重命名，向左滑动删除。") },
             ) {
-                items(apps, key = { it.id }) { app ->
+                apps.forEachIndexed { index, app ->
                     SwipeableRow(
-                        leadingAction = SwipeAction(
-                            icon = Icons.Filled.Edit,
-                            label = "重命名",
-                            tint = AgentBuddyTheme.accent,
-                            onTrigger = {
-                                renameText = app.title
-                                renameTarget = app
-                            },
-                        ),
-                        trailingAction = SwipeAction(
-                            icon = Icons.Filled.Delete,
-                            label = "删除",
-                            tint = AgentBuddyTheme.textMuted,
-                            onTrigger = {
-                                scope.launch {
-                                    try {
-                                        SavedAppsStore.delete(context, app.id)
-                                    } catch (_: Exception) {}
-                                }
-                            },
-                        ),
+                        leadingAction =
+                            SwipeAction(
+                                icon = Icons.Outlined.Edit,
+                                label = "重命名",
+                                tint = AgentBuddyTheme.swipeFill(BuddySwipeTone.LINK),
+                                onTrigger = { onRename(app) },
+                            ),
+                        trailingAction =
+                            SwipeAction(
+                                icon = Icons.Outlined.Delete,
+                                label = "删除",
+                                tint = AgentBuddyTheme.swipeFill(BuddySwipeTone.DANGER),
+                                onTrigger = { onDelete(app) },
+                            ),
                     ) {
-                        AppRow(app = app, onClick = { onOpenApp(app.id) })
+                        SettingsRow(
+                            title = app.title.ifBlank { "未命名应用" },
+                            subtitle = "${relativeTime(app.updatedAtMs)}更新",
+                            onClick = { onOpenApp(app.id) },
+                            leading = { BuddyIconTile(BuddyTileContent.Initial(monogramInitials(app.title))) },
+                            trailing = { BuddyChevron() },
+                            modifier = Modifier.background(AgentBuddyTheme.surface),
+                        )
+                    }
+                    if (index < apps.lastIndex) {
+                        SettingsRowDivider(startIndent = BuddySpacing.md + BuddySize.rowTile + BuddySpacing.sm)
                     }
                 }
             }
         }
     }
-}
-
-@Composable
-private fun AppRow(
-    app: SavedApp,
-    onClick: () -> Unit,
-) {
-    val monogram = monogramInitials(app.title)
-    val tint = monogramTint(app.id)
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(AgentBuddyTheme.surface, RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(tint.copy(alpha = 0.25f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = monogram,
-                color = tint,
-                fontSize = AgentBuddyTextStyle.headline.scaled,
-                fontWeight = FontWeight.Bold,
-            )
-        }
-        Spacer(Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = app.title.ifBlank { "未命名应用" },
-                color = AgentBuddyTheme.textPrimary,
-                fontSize = AgentBuddyTextStyle.callout.scaled,
-                fontWeight = FontWeight.Medium,
-            )
-            Text(
-                text = relativeTime(app.updatedAtMs),
-                color = AgentBuddyTheme.textMuted,
-                fontSize = AgentBuddyTextStyle.caption2.scaled,
-            )
-        }
-    }
-}
-
-@Composable
-private fun EmptyState() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.GridView,
-                contentDescription = null,
-                tint = AgentBuddyTheme.textMuted,
-                modifier = Modifier.size(44.dp),
-            )
-            Text(
-                text = "暂无应用",
-                color = AgentBuddyTheme.textPrimary,
-                fontSize = AgentBuddyTextStyle.headline.scaled,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = "当 AI 生成带 app_id 的交互式小组件时，会自动保存到此处。",
-                color = AgentBuddyTheme.textSecondary,
-                fontSize = AgentBuddyTextStyle.footnote.scaled,
-            )
-        }
-    }
-}
-
-/**
- * Deterministic per-app tint drawn from a small palette of theme accents so
- * existing apps keep the same color across launches. Mirrors iOS
- * `AppsListView.monogramTint(for:)`.
- */
-@Composable
-private fun monogramTint(id: String): Color {
-    val palette = listOf(
-        AgentBuddyTheme.accent,
-        AgentBuddyTheme.accentStrong,
-        AgentBuddyTheme.success,
-        AgentBuddyTheme.warning,
-        AgentBuddyTheme.danger,
-        AgentBuddyTheme.textSystem,
-    )
-    val idx = (id.hashCode().toLong() and 0x7FFFFFFFL).toInt() % palette.size
-    return palette[idx]
 }
 
 /**

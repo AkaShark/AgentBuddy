@@ -6,11 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.systemBarsPadding
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -24,6 +20,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.akashark.agentbuddy.android.state.SavedAppsStore
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
 import com.akashark.agentbuddy.android.ui.LocalAppModel
+import com.akashark.agentbuddy.android.ui.settings.SettingsAlertDialog
 import kotlinx.coroutines.launch
 import uniffi.codex_mobile_client.SavedApp
 import uniffi.codex_mobile_client.SavedAppWithPayload
@@ -41,7 +38,6 @@ fun SavedAppScreen(
 
     var payload by remember(appId) { mutableStateOf<SavedAppWithPayload?>(null) }
     var loadState by remember(appId) { mutableStateOf<LoadState>(LoadState.Loading) }
-    var showMenu by remember { mutableStateOf(false) }
     var renameDialogVisible by remember { mutableStateOf(false) }
     var deleteConfirmVisible by remember { mutableStateOf(false) }
     var showUpdateOverlay by remember { mutableStateOf(false) }
@@ -82,30 +78,14 @@ fun SavedAppScreen(
         TopBar(
             title = currentPayload?.app?.title.orEmpty(),
             onBack = onBack,
-            onTitleClick = { renameDialogVisible = true },
+            onRename = { renameDialogVisible = true },
             onUpdate = { showUpdateOverlay = true },
-            onOpenMenu = { showMenu = true },
+            onDelete = { deleteConfirmVisible = true },
             onViewConversation = if (originThreadKey != null && onOpenConversation != null) {
                 { onOpenConversation(originThreadKey) }
             } else null,
             isUpdating = isUpdating,
         )
-        DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-            DropdownMenuItem(
-                text = { Text("重命名") },
-                onClick = {
-                    showMenu = false
-                    renameDialogVisible = true
-                },
-            )
-            DropdownMenuItem(
-                text = { Text("删除", color = AgentBuddyTheme.danger) },
-                onClick = {
-                    showMenu = false
-                    deleteConfirmVisible = true
-                },
-            )
-        }
 
         Box(modifier = Modifier.fillMaxSize()) {
             when (val state = loadState) {
@@ -201,26 +181,22 @@ fun SavedAppScreen(
     }
 
     if (deleteConfirmVisible) {
-        AlertDialog(
+        SettingsAlertDialog(
             onDismissRequest = { deleteConfirmVisible = false },
-            title = { Text("删除这个 app？") },
-            text = {
-                Text("它的 HTML 和已保存状态将从本设备移除。")
+            title = "删除这个 app？",
+            confirmText = "删除",
+            dismissText = "取消",
+            destructive = true,
+            onConfirm = {
+                deleteConfirmVisible = false
+                scope.launch {
+                    try {
+                        SavedAppsStore.delete(context, appId)
+                    } catch (_: Exception) {}
+                    onBack()
+                }
             },
-            confirmButton = {
-                TextButton(onClick = {
-                    deleteConfirmVisible = false
-                    scope.launch {
-                        try {
-                            SavedAppsStore.delete(context, appId)
-                        } catch (_: Exception) {}
-                        onBack()
-                    }
-                }) { Text("删除", color = AgentBuddyTheme.danger) }
-            },
-            dismissButton = {
-                TextButton(onClick = { deleteConfirmVisible = false }) { Text("取消") }
-            },
+            text = { Text("它的 HTML 和已保存状态将从本设备移除。") },
         )
     }
 }
