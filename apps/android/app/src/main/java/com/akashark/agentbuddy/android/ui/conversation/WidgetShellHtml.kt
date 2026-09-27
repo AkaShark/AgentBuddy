@@ -58,43 +58,20 @@ internal fun wrapWidgetHtml(
     val body = widgetHtml.trim()
     val initialPending = if (body.isEmpty()) "null" else "'${escapeJsString(body)}'"
     val appInjection = appState?.let { buildAppStateInjection(it) } ?: ""
+    // Colours follow the App's light / dark theme (see WidgetShellTheme.kt).
+    val themeCss = widgetShellThemeCss().prependIndent("        ").trimStart()
     val shell = """
         <!DOCTYPE html><html><head><meta charset="utf-8">
         <meta name="viewport" content="width=device-width,initial-scale=1.0">
         <style>
+        $themeCss
         :root {
-            --color-background-primary: #000000;
-            --color-background-secondary: #111111;
-            --color-background-tertiary: #1a1a1a;
-            --color-background-info: #0d253a;
-            --color-background-danger: #3a1414;
-            --color-background-success: #0d2a14;
-            --color-background-warning: #3a2a0d;
-            --color-text-primary: #F3F3F3;
-            --color-text-secondary: #B3B3B3;
-            --color-text-tertiary: #8A8A8A;
-            --color-text-info: #00FF9C;
-            --color-text-danger: #FF6B6B;
-            --color-text-success: #00FF9C;
-            --color-text-warning: #FFD166;
-            --color-info: var(--color-text-info);
-            --color-danger: var(--color-text-danger);
-            --color-success: var(--color-text-success);
-            --color-warning: var(--color-text-warning);
-            --color-border-tertiary: rgba(255,255,255,0.08);
-            --color-border-secondary: rgba(255,255,255,0.16);
-            --color-border-primary: rgba(255,255,255,0.24);
-            --color-border-info: rgba(0,255,156,0.4);
-            --color-border-danger: rgba(255,107,107,0.4);
-            --color-border-success: rgba(0,255,156,0.4);
-            --color-border-warning: rgba(255,209,102,0.4);
             --font-sans: -apple-system, system-ui, Roboto, sans-serif;
             --font-serif: Georgia, 'Times New Roman', serif;
             --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
             --border-radius-md: 8px;
             --border-radius-lg: 12px;
             --border-radius-xl: 16px;
-            color-scheme: dark;
         }
         * { box-sizing: border-box; }
         body {
@@ -120,30 +97,6 @@ internal fun wrapWidgetHtml(
         .leader { stroke: var(--color-border-tertiary); stroke-width: 0.5; stroke-dasharray: 4 3; fill: none; }
         .node { cursor: pointer; }
         .node:hover { opacity: 0.85; }
-        .c-blue > rect, .c-blue > circle, .c-blue > ellipse { fill: #1e3a5f; stroke: rgba(96,165,250,0.4); }
-        .c-blue > .t, .c-blue > .th { fill: #93c5fd; }
-        .c-blue > .ts { fill: #60a5fa; }
-        .c-teal > rect, .c-teal > circle, .c-teal > ellipse { fill: #134e4a; stroke: rgba(45,212,191,0.4); }
-        .c-teal > .t, .c-teal > .th { fill: #5eead4; }
-        .c-teal > .ts { fill: #2dd4bf; }
-        .c-amber > rect, .c-amber > circle, .c-amber > ellipse { fill: #451a03; stroke: rgba(251,191,36,0.4); }
-        .c-amber > .t, .c-amber > .th { fill: #fcd34d; }
-        .c-amber > .ts { fill: #fbbf24; }
-        .c-green > rect, .c-green > circle, .c-green > ellipse { fill: #14532d; stroke: rgba(74,222,128,0.4); }
-        .c-green > .t, .c-green > .th { fill: #86efac; }
-        .c-green > .ts { fill: #4ade80; }
-        .c-red > rect, .c-red > circle, .c-red > ellipse { fill: #450a0a; stroke: rgba(248,113,113,0.4); }
-        .c-red > .t, .c-red > .th { fill: #fca5a5; }
-        .c-red > .ts { fill: #f87171; }
-        .c-purple > rect, .c-purple > circle, .c-purple > ellipse { fill: #2e1065; stroke: rgba(168,85,247,0.4); }
-        .c-purple > .t, .c-purple > .th { fill: #c4b5fd; }
-        .c-purple > .ts { fill: #a78bfa; }
-        .c-coral > rect, .c-coral > circle, .c-coral > ellipse { fill: #431407; stroke: rgba(251,146,60,0.4); }
-        .c-coral > .t, .c-coral > .th { fill: #fdba74; }
-        .c-coral > .ts { fill: #fb923c; }
-        .c-pink > rect, .c-pink > circle, .c-pink > ellipse { fill: #500724; stroke: rgba(244,114,182,0.4); }
-        .c-pink > .t, .c-pink > .th { fill: #f9a8d4; }
-        .c-pink > .ts { fill: #f472b6; }
         .c-gray > rect, .c-gray > circle, .c-gray > ellipse { fill: var(--color-background-tertiary); stroke: var(--color-border-secondary); }
         .c-gray > .t, .c-gray > .th { fill: var(--color-text-primary); }
         .c-gray > .ts { fill: var(--color-text-secondary); }
