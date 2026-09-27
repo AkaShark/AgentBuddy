@@ -52,4 +52,21 @@ extension AgentBuddyTheme {
     static var floatingShadow: Color {
         ThemeStore.shared.colorScheme == .dark ? .clear : Color.black.opacity(0.10)
     }
+
+    /// Swipe-action fill. The system draws swipe labels in white, so these
+    /// always use the light palette's strong colours, which keep white text
+    /// readable in both appearances.
+    static func swipeFill(_ tone: BuddySwipeTone) -> Color {
+        let light = ThemeStore.shared.light
+        switch tone {
+        case .link: return Color(hex: light.accent)
+        case .danger: return Color(hex: light.danger)
+        case .neutral: return Color(hex: light.textSecondary)
+        }
+    }
+}
+
+/// Meaning of a swipe action, mapped to a fill by `AgentBuddyTheme.swipeFill`.
+enum BuddySwipeTone {
+    case link, danger, neutral
 }

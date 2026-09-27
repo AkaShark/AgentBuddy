@@ -123,7 +123,7 @@ extension SessionsScreen {
                                     } label: {
                                         Label("Fork", systemImage: "arrow.triangle.branch")
                                     }
-                                    .tint(AgentBuddyTheme.link)
+                                    .tint(AgentBuddyTheme.swipeFill(.link))
                                 }
                                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                     // No `.destructive` role: that role makes the list
@@ -133,7 +133,7 @@ extension SessionsScreen {
                                     } label: {
                                         Label("Delete", systemImage: "trash")
                                     }
-                                    .tint(AgentBuddyTheme.danger)
+                                    .tint(AgentBuddyTheme.swipeFill(.danger))
                                 }
                                 .sessionsListRow(horizontal: BuddySpacing.sm, vertical: 1)
                             }

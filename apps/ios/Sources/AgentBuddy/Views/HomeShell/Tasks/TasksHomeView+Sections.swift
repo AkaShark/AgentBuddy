@@ -122,7 +122,7 @@ extension TasksHomeView {
         } label: {
             Label("Reply", systemImage: "arrowshape.turn.up.left")
         }
-        .tint(AgentBuddyTheme.link)
+        .tint(AgentBuddyTheme.swipeFill(.link))
     }
 
     private func hideSwipe(_ item: HomeTaskItem) -> some View {
@@ -131,7 +131,7 @@ extension TasksHomeView {
         } label: {
             Label("Hide", systemImage: "eye.slash")
         }
-        .tint(AgentBuddyTheme.textSecondary)
+        .tint(AgentBuddyTheme.swipeFill(.neutral))
     }
 
     private var searchButton: some View {
