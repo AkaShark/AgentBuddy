@@ -84,7 +84,7 @@ struct HostCard<MenuItems: View>: View {
                     .buddyText(.title)
                     .foregroundStyle(AgentBuddyTheme.textPrimary)
                     .lineLimit(2)
-                Text(verbatim: subtitle)
+                Text(subtitle)
                     .buddyText(.label, weight: .regular)
                     .foregroundStyle(AgentBuddyTheme.textSecondary)
             }
@@ -102,7 +102,7 @@ struct HostCard<MenuItems: View>: View {
                 HStack(spacing: 6) {
                     Circle().fill(connection.dotColor).frame(width: 8, height: 8)
                         .accessibilityHidden(true)
-                    Text(verbatim: server.sourceLabel)
+                    Text(HostSourcePresentation.title(for: server.sourceLabel))
                     Text(verbatim: "·")
                     Text(connection.title)
                 }
@@ -128,11 +128,28 @@ struct HostCard<MenuItems: View>: View {
         .accessibilityLabel(Text("Host actions"))
     }
 
-    private var subtitle: String {
-        server.sourceLabel
+    private var subtitle: LocalizedStringKey {
+        HostSourcePresentation.title(for: server.sourceLabel)
     }
 
     private var runningSummary: LocalizedStringKey {
         runningCount > 0 ? "\(runningCount) running" : "No tasks running right now"
+    }
+}
+
+/// Display names for the connection-mode keys in `HomeDashboardServer.sourceLabel`.
+/// The keys themselves stay untranslated because other code compares them.
+enum HostSourcePresentation {
+    static func title(for sourceLabel: String) -> LocalizedStringKey {
+        switch sourceLabel {
+        case "local": return "This device"
+        case "remote": return "Remote connection"
+        case "alleycat": return "Peer-to-peer"
+        case "ssh": return "SSH"
+        case "bonjour": return "Local network"
+        case "tailscale": return "Tailscale"
+        case "manual": return "Manual address"
+        default: return LocalizedStringKey(sourceLabel)
+        }
     }
 }

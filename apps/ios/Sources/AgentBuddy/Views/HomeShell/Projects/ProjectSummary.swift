@@ -40,7 +40,8 @@ struct ProjectSummary: Identifiable, Equatable {
                 displayPath: abbreviateHomePath(project.cwd),
                 taskCount: entry.total,
                 runningCount: entry.running,
-                lastUsed: project.lastUsedAtMs.map { Date(timeIntervalSince1970: TimeInterval($0) / 1000) }
+                // 0 means "unknown" upstream; don't render it as 1970.
+                lastUsed: project.lastUsedAtMs.flatMap { $0 > 0 ? Date(timeIntervalSince1970: TimeInterval($0) / 1000) : nil }
             )
         }
     }

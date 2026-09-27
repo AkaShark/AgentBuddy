@@ -3,11 +3,12 @@ import SwiftUI
 #if DEBUG
 /// DEBUG-only state gallery for verifying the Mint UI on a physical device
 /// without a connected host. Launch with `--mint-gallery=<page>` where page is
-/// `home`, `conversation`, `approvals` or `composer`; add `--mint-dark` for
+/// `home`, `projects`, `hosts`, `newtask`, `conversation`, `approvals` or
+/// `composer`; add `--mint-dark` for
 /// the dark palette. Nothing here writes user preferences.
 struct MintGalleryView: View {
     enum Page: String {
-        case home, conversation, approvals, composer
+        case home, conversation, approvals, composer, newtask, projects, hosts
     }
 
     static var requestedPage: Page? {
@@ -67,6 +68,36 @@ struct MintGalleryView: View {
                     onOpenConversation: { _ in },
                     onInfo: {}
                 )
+            }
+        case .newtask:
+            NavigationStack {
+                NewThreadHeroView(
+                    project: homeModel.projects.first,
+                    connectedServers: homeModel.connectedServers,
+                    selectedServerId: homeModel.connectedServers.first?.id,
+                    onSelectServer: { _ in },
+                    onOpenProjectPicker: {},
+                    onThreadCreated: { _ in },
+                    onCancel: {},
+                    autoFocus: false
+                )
+            }
+            .task {
+                homeModel.bind(appModel: appModel)
+                homeModel.activate()
+            }
+        case .projects, .hosts:
+            NavigationStack {
+                if Self.requestedPage == .projects {
+                    ProjectsHomeView(model: homeModel, actions: MintGalleryFixtures.noopActions, onManageHosts: {})
+                } else {
+                    HostsHomeView(model: homeModel, actions: MintGalleryFixtures.noopActions, onStartTask: { _ in })
+                }
+            }
+            .toolbar(.hidden, for: .navigationBar)
+            .task {
+                homeModel.bind(appModel: appModel)
+                homeModel.activate()
             }
         case .approvals:
             MintGalleryApprovalsPage()

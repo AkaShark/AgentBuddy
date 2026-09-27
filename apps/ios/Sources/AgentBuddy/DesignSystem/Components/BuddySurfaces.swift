@@ -181,3 +181,29 @@ struct BuddyIconTile: View {
         .accessibilityHidden(true)
     }
 }
+
+// MARK: - Context chip
+
+/// Tappable context chip (host / project / partner): surfaceSoft capsule at
+/// compact-pill height inside a 44pt hit area.
+private struct BuddyContextChipModifier: ViewModifier {
+    let isEnabled: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .buddyText(.label)
+            .foregroundStyle(isEnabled ? AgentBuddyTheme.textPrimary : AgentBuddyTheme.onDisabled)
+            .lineLimit(1)
+            .padding(.horizontal, BuddySpacing.sm)
+            .frame(minHeight: BuddySize.compactPill)
+            .background(isEnabled ? AgentBuddyTheme.surfaceSoft : AgentBuddyTheme.disabled, in: Capsule())
+            .frame(minHeight: BuddySize.minHitTarget)
+            .contentShape(Rectangle())
+    }
+}
+
+extension View {
+    func buddyContextChip(isEnabled: Bool = true) -> some View {
+        modifier(BuddyContextChipModifier(isEnabled: isEnabled))
+    }
+}

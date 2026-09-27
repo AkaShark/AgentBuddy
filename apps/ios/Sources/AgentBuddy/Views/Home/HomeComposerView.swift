@@ -71,25 +71,17 @@ struct HomeComposerView: View {
     var body: some View {
         VStack(spacing: 0) {
             if let errorMessage {
-                HStack(spacing: 6) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(AgentBuddyTheme.warning)
-                    Text(errorMessage)
-                        .agentBuddyFont(.caption)
-                        .foregroundStyle(AgentBuddyTheme.textSecondary)
-                    Spacer(minLength: 0)
-                    Button {
+                BuddyBanner(
+                    tone: .warning,
+                    message: Text(verbatim: errorMessage),
+                    actionTitle: "Dismiss",
+                    action: {
                         self.errorMessage = nil
                         isComposerFocused = false
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(AgentBuddyTheme.textMuted)
                     }
-                    .buttonStyle(.plain)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 6)
+                )
+                .padding(.horizontal, BuddySpacing.md)
+                .padding(.bottom, BuddySpacing.xs)
             }
 
             ConversationComposerContentView(

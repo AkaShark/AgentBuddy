@@ -1,17 +1,12 @@
 import SwiftUI
 
-/// Centered "new thread" landing used as the detail pane when the user taps
-/// "+" from the sidebar on regular-width surfaces.
+/// "开始一个新想法": the new-task composer. Used as the phone new-task sheet
+/// and as the iPad / Mac detail-pane root. Host, project and partner are
+/// explicit chips above the composer; changing any of them keeps the draft.
 ///
-/// Layout is intentionally simple — the composer lives in a flex VStack that
-/// pushes it toward the vertical center pre-send and toward the bottom
-/// post-send. Title, chips, and suggestions fade out on send so the eye
-/// follows the composer's motion.
-///
-/// On iOS 26 the composer's background is already a liquid-glass pill
-/// (courtesy of `ConversationComposerContentView`); when the layout
-/// animates, iOS tracks the glass as it moves so no explicit
-/// `GlassEffectContainer` is needed here.
+/// On send the heading fades and the composer settles before the parent
+/// swaps in the conversation (or dismisses the sheet), so the handoff reads
+/// as one motion.
 struct NewThreadHeroView: View {
     let project: AppProject?
     let connectedServers: [HomeDashboardServer]
@@ -28,176 +23,139 @@ struct NewThreadHeroView: View {
     var autoFocus: Bool = true
 
     @State private var isSending = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Delay between the composer firing `onThreadCreated` and the parent
-    /// replacing the route with `.conversation(key)`. Long enough for the
-    /// spring to settle visually so the handoff doesn't feel cut short,
-    /// short enough that the user isn't staring at an empty hero after
-    /// their message goes out.
+    /// replacing the route, long enough for the settle animation.
     private static let morphSettleSeconds: UInt64 = 360_000_000
 
     private var launchableServers: [HomeDashboardServer] {
         connectedServers.filter(\.canLaunchSessions)
     }
 
+    private var activeServerId: String? {
+        project?.serverId ?? selectedServerId
+    }
+
+    private var selectedLaunchableServer: HomeDashboardServer? {
+        guard let activeServerId else { return nil }
+        return launchableServers.first { $0.id == activeServerId }
+    }
+
     var body: some View {
-        ZStack {
-            AgentBuddyTheme.backgroundGradient.ignoresSafeArea()
-
-            VStack(spacing: 24) {
-                Spacer(minLength: 0)
-
-                if !isSending {
-                    Text("What should we build in AgentBuddy?")
-                        .font(.system(size: 22, weight: .medium))
-                        .foregroundStyle(AgentBuddyTheme.textPrimary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 24)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                }
-
-                HomeComposerView(
-                    project: project,
-                    transcriptionServerId: project?.serverId ?? selectedServerId,
-                    onThreadCreated: { key in
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
-                            isSending = true
-                        }
-                        Task { @MainActor in
-                            try? await Task.sleep(nanoseconds: Self.morphSettleSeconds)
-                            onThreadCreated(key)
-                        }
-                    },
-                    autoFocus: autoFocus
+        VStack(alignment: .leading, spacing: BuddySpacing.lg) {
+            if !isSending {
+                BuddyPageHeader(
+                    title: "Start a new idea",
+                    subtitle: Text("Describe what you want done. AgentBuddy starts on the host you pick and keeps you posted."),
+                    titleStyle: .title
                 )
-                .frame(maxWidth: 760)
-                .padding(.horizontal, 20)
+                .transition(.opacity.combined(with: .move(edge: .top)))
 
-                if !isSending {
-                    chipRow
-                        .transition(.opacity)
-
-                    suggestionsList
-                        .transition(.opacity)
-
-                    Spacer(minLength: 0)
-                } else {
-                    Spacer()
-                        .frame(height: 12)
-                }
+                contextChips
+                    .transition(.opacity)
             }
-            .padding(.vertical, 24)
-            .animation(.spring(response: 0.5, dampingFraction: 0.85), value: isSending)
+
+            HomeComposerView(
+                project: project,
+                transcriptionServerId: activeServerId,
+                onThreadCreated: { key in
+                    withAnimation(reduceMotion ? nil : .spring(response: 0.5, dampingFraction: 0.85)) {
+                        isSending = true
+                    }
+                    Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: Self.morphSettleSeconds)
+                        onThreadCreated(key)
+                    }
+                },
+                autoFocus: autoFocus
+            )
+            .padding(.horizontal, -BuddySpacing.md)
+
+            if project == nil, !launchableServers.isEmpty, !isSending {
+                BuddyBanner(
+                    tone: .info,
+                    message: Text("Pick a project so AgentBuddy knows which folder to work in."),
+                    systemImage: "folder",
+                    actionTitle: "Choose project",
+                    action: onOpenProjectPicker
+                )
+            }
+
+            Spacer(minLength: 0)
         }
+        .frame(maxWidth: 760, alignment: .leading)
+        .padding(.horizontal, BuddySpacing.xl)
+        .padding(.top, BuddySpacing.md)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .buddyPageBackground()
+        .animation(reduceMotion ? nil : .spring(response: 0.5, dampingFraction: 0.85), value: isSending)
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if let onCancel {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Cancel") { onCancel() }
-                        .foregroundStyle(AgentBuddyTheme.textSecondary)
+                        .foregroundStyle(AgentBuddyTheme.link)
                 }
             }
         }
     }
 
-    // MARK: - Chips
+    // MARK: - Context chips
 
-    private var chipRow: some View {
-        HStack(spacing: 8) {
-            serverChip
-            ProjectChip(
-                project: project,
-                disabled: launchableServers.isEmpty,
-                onTap: onOpenProjectPicker
-            )
-            HomeModelChip(
-                serverId: project?.serverId ?? selectedServerId,
-                disabled: selectedLaunchableServer == nil
-            )
+    private var contextChips: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: BuddySpacing.xs) { chips }
+            VStack(alignment: .leading, spacing: 0) { chips }
         }
-        .frame(maxWidth: .infinity, alignment: .center)
-        .padding(.horizontal, 20)
     }
 
     @ViewBuilder
+    private var chips: some View {
+        serverChip
+        ProjectChip(
+            project: project,
+            disabled: launchableServers.isEmpty,
+            onTap: onOpenProjectPicker
+        )
+        HomeModelChip(
+            serverId: activeServerId,
+            disabled: selectedLaunchableServer == nil
+        )
+    }
+
     private var serverChip: some View {
-        let activeServerId = project?.serverId ?? selectedServerId
-        let server = launchableServers.first { $0.id == activeServerId }
         Menu {
             if launchableServers.isEmpty {
-                Text("No servers connected")
+                Text("No hosts connected")
             } else {
-                ForEach(launchableServers, id: \.id) { s in
-                    Button(s.displayName) {
-                        onSelectServer(s.id)
+                ForEach(launchableServers, id: \.id) { server in
+                    Button {
+                        onSelectServer(server.id)
+                    } label: {
+                        if server.id == activeServerId {
+                            Label(server.displayName, systemImage: "checkmark")
+                        } else {
+                            Text(verbatim: server.displayName)
+                        }
                     }
                 }
             }
         } label: {
             HStack(spacing: 6) {
-                Image(systemName: "server.rack")
-                    .font(.system(size: 10, weight: .semibold))
-                Text(server?.displayName ?? "Server")
-                    .agentBuddyMonoFont(size: 12, weight: .regular)
+                Image(systemName: "laptopcomputer")
+                    .font(.system(size: 13, weight: .medium))
+                    .accessibilityHidden(true)
+                Text(verbatim: selectedLaunchableServer?.displayName ?? String(localized: "Choose host"))
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
+                    .accessibilityHidden(true)
             }
-            .foregroundStyle(server == nil ? AgentBuddyTheme.textMuted : AgentBuddyTheme.accent)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(AgentBuddyTheme.surfaceLight.opacity(0.6))
-            )
-            .overlay(
-                Capsule(style: .continuous)
-                    .stroke(AgentBuddyTheme.textMuted.opacity(0.2), lineWidth: 0.6)
-            )
+            .buddyContextChip(isEnabled: !launchableServers.isEmpty)
         }
         .disabled(launchableServers.isEmpty)
-    }
-
-    private var selectedLaunchableServer: HomeDashboardServer? {
-        let activeServerId = project?.serverId ?? selectedServerId
-        guard let activeServerId else { return nil }
-        return launchableServers.first { $0.id == activeServerId }
-    }
-
-    // MARK: - Suggestions
-
-    /// Placeholder suggestion rows. Data source TBD — for now these are
-    /// static prompts so the layout can be dialed in. When the real source
-    /// is wired, swap the array contents and make tapping prefill the
-    /// composer with the row's text.
-    private static let placeholderSuggestions: [String] = [
-        "帮我重构这个函数并补上注释",
-        "这段报错是什么意思，该怎么修？",
-        "给这个模块写一套单元测试",
-        "优化一下这个页面的加载速度"
-    ]
-
-    private var suggestionsList: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(Self.placeholderSuggestions.enumerated()), id: \.offset) { idx, text in
-                if idx > 0 {
-                    Divider()
-                        .background(AgentBuddyTheme.textMuted.opacity(0.15))
-                }
-                HStack(spacing: 10) {
-                    Image(systemName: "bubble.left.and.text.bubble.right")
-                        .font(.system(size: 12, weight: .regular))
-                        .foregroundStyle(AgentBuddyTheme.textMuted)
-                    Text(text)
-                        .agentBuddyFont(size: 13)
-                        .foregroundStyle(AgentBuddyTheme.textSecondary)
-                    Spacer(minLength: 0)
-                }
-                .padding(.vertical, 10)
-                .padding(.horizontal, 4)
-            }
-        }
-        .frame(maxWidth: 760)
-        .padding(.horizontal, 24)
+        .accessibilityLabel(Text("Host: \(selectedLaunchableServer?.displayName ?? String(localized: "Choose host"))"))
     }
 }

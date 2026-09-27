@@ -9,35 +9,25 @@ struct ProjectChip: View {
         Button(action: onTap) {
             HStack(spacing: 6) {
                 Image(systemName: "folder")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(project != nil ? AgentBuddyTheme.accent : AgentBuddyTheme.textMuted)
-                Text(label)
-                    .agentBuddyMonoFont(size: 12, weight: .semibold)
-                    .foregroundStyle(project != nil ? AgentBuddyTheme.textPrimary : AgentBuddyTheme.textSecondary)
-                    .lineLimit(1)
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(AgentBuddyTheme.textMuted)
+                    .font(.system(size: 13, weight: .medium))
+                    .accessibilityHidden(true)
+                Text(verbatim: label)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(AgentBuddyTheme.textSecondary)
+                    .accessibilityHidden(true)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .contentShape(Capsule())
+            .buddyContextChip(isEnabled: !disabled)
         }
         .buttonStyle(.plain)
-        .modifier(GlassCapsuleModifier(interactive: true))
-        .overlay(
-            Capsule(style: .continuous)
-                .stroke(AgentBuddyTheme.textMuted.opacity(0.55), lineWidth: 0.8)
-                .allowsHitTesting(false)
-        )
         .disabled(disabled)
-        .opacity(disabled ? 0.5 : 1)
+        .accessibilityLabel(Text("Project: \(label)"))
     }
 
     private var label: String {
         if let project {
             return projectDefaultLabel(cwd: project.cwd)
         }
-        return disabled ? "no server" : "pick project"
+        return disabled ? String(localized: "No host") : String(localized: "Choose project")
     }
 }
