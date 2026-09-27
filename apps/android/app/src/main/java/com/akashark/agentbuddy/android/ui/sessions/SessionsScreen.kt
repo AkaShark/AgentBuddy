@@ -1,46 +1,19 @@
 package com.akashark.agentbuddy.android.ui.sessions
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -49,27 +22,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
-import com.akashark.agentbuddy.android.state.displayTitle
 import com.akashark.agentbuddy.android.state.isConnected
 import com.akashark.agentbuddy.android.ui.LocalAppModel
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
 import com.akashark.agentbuddy.android.ui.RecentDirectoryEntry
 import com.akashark.agentbuddy.android.ui.RecentDirectoryStore
-import com.akashark.agentbuddy.android.ui.home.HomeDashboardSupport
 import kotlinx.coroutines.launch
-import uniffi.codex_mobile_client.AppArchiveThreadRequest
-import uniffi.codex_mobile_client.AppRenameThreadRequest
 import uniffi.codex_mobile_client.ThreadKey
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
@@ -96,7 +58,6 @@ fun SessionsScreen(
     }
 
     var searchQuery by remember { mutableStateOf("") }
-    var showSortMenu by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
     var isForkingActiveThread by remember { mutableStateOf(false) }
     var hasLoadedInitialSessions by remember { mutableStateOf(false) }
@@ -258,85 +219,19 @@ fun SessionsScreen(
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Top bar
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 8.dp),
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "返回",
-                    tint = AgentBuddyTheme.textPrimary,
-                )
-            }
-            Text(
-                text = title,
-                color = AgentBuddyTheme.textPrimary,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                text = "${derived.filteredCount}/${derived.totalCount}",
-                color = AgentBuddyTheme.textMuted,
-                fontSize = 12.sp,
-            )
-            val activeSummary = snapshot?.activeThread?.let { activeKey ->
-                snapshot?.sessionSummaries?.firstOrNull { it.key == activeKey }
-            }
-            if (activeSummary != null) {
-                TextButton(
-                    onClick = { scope.launch { forkThread(activeSummary) } },
-                    enabled = !isForkingActiveThread && !activeSummary.hasActiveTurn,
-                ) {
-                    if (isForkingActiveThread) {
-                        CircularProgressIndicator(
-                            color = AgentBuddyTheme.accent,
-                            strokeWidth = 2.dp,
-                            modifier = Modifier.size(14.dp),
-                        )
-                    } else {
-                        Text("分叉", color = AgentBuddyTheme.accent, fontSize = 12.sp)
-                    }
-                }
-            }
-            IconButton(
-                onClick = { scope.launch { loadSessions(force = true) } },
-                enabled = !isLoading && connectedServerIds.isNotEmpty(),
-                modifier = Modifier.size(32.dp),
-            ) {
-                if (isLoading && hasLoadedInitialSessions) {
-                    CircularProgressIndicator(
-                        color = AgentBuddyTheme.accent,
-                        strokeWidth = 2.dp,
-                        modifier = Modifier.size(16.dp),
-                    )
-                } else {
-                    Icon(
-                        Icons.Default.Refresh,
-                        contentDescription = "刷新会话",
-                        tint = if (connectedServerIds.isEmpty()) {
-                            AgentBuddyTheme.textMuted
-                        } else {
-                            AgentBuddyTheme.accent
-                        },
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-            }
-            if (onInfo != null) {
-                IconButton(onClick = onInfo, modifier = Modifier.size(32.dp)) {
-                    Icon(
-                        Icons.Outlined.Info,
-                        contentDescription = "服务器信息",
-                        tint = AgentBuddyTheme.accent,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-            }
-        }
+        SessionsTopBar(
+            title = title,
+            derived = derived,
+            snapshot = snapshot,
+            isForkingActiveThread = isForkingActiveThread,
+            isLoading = isLoading,
+            hasLoadedInitialSessions = hasLoadedInitialSessions,
+            connectedServerIds = connectedServerIds,
+            onBack = onBack,
+            onForkThread = { summary -> scope.launch { forkThread(summary) } },
+            onRefresh = { scope.launch { loadSessions(force = true) } },
+            onInfo = onInfo,
+        )
 
         if (serverId != null) {
             Button(
@@ -360,385 +255,24 @@ fun SessionsScreen(
         }
 
         // Search bar + filter chips
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .background(AgentBuddyTheme.surface, RoundedCornerShape(8.dp))
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-            ) {
-                if (searchQuery.isEmpty()) {
-                    Text("搜索会话\u2026", color = AgentBuddyTheme.textMuted, fontSize = 13.sp)
-                }
-                BasicTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    textStyle = TextStyle(color = AgentBuddyTheme.textPrimary, fontSize = 13.sp),
-                    cursorBrush = SolidColor(AgentBuddyTheme.accent),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            FilterChip(
-                selected = sessionsUiState.showOnlyForks,
-                onClick = { sessionsUiState.showOnlyForks = !sessionsUiState.showOnlyForks },
-                label = { Text("分叉", fontSize = 11.sp) },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = AgentBuddyTheme.accent,
-                    selectedLabelColor = Color.Black,
-                ),
-            )
-            Box {
-                FilterChip(
-                    selected = sessionsUiState.sortMode != WorkspaceSortMode.RECENT,
-                    onClick = { showSortMenu = true },
-                    label = { Text(sessionsUiState.sortMode.title, fontSize = 11.sp) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = AgentBuddyTheme.accent,
-                        selectedLabelColor = Color.Black,
-                    ),
-                )
-                DropdownMenu(expanded = showSortMenu, onDismissRequest = { showSortMenu = false }) {
-                    WorkspaceSortMode.entries.forEach { mode ->
-                        DropdownMenuItem(
-                            text = { Text(mode.title) },
-                            onClick = {
-                                sessionsUiState.sortMode = mode
-                                showSortMenu = false
-                                scheduleActiveSessionScrollIfNeeded()
-                            },
-                        )
-                    }
-                }
-            }
-        }
+        SessionsSearchBar(
+            searchQuery = searchQuery,
+            onSearchQueryChange = { searchQuery = it },
+            sessionsUiState = sessionsUiState,
+            onSortModeChanged = { scheduleActiveSessionScrollIfNeeded() },
+        )
 
-        if (derived.totalCount == 0) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-            ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        color = AgentBuddyTheme.accent,
-                        strokeWidth = 2.dp,
-                    )
-                } else {
-                    Text(
-                        text = "暂无会话(对话)",
-                        color = AgentBuddyTheme.textMuted,
-                        fontSize = 13.sp,
-                    )
-                }
-            }
-        } else {
-            if (isLoading) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                ) {
-                    CircularProgressIndicator(
-                        color = AgentBuddyTheme.accent,
-                        strokeWidth = 2.dp,
-                        modifier = Modifier.size(14.dp),
-                    )
-                    Text(
-                        text = "正在加载更多会话(对话)...",
-                        color = AgentBuddyTheme.textMuted,
-                        fontSize = 12.sp,
-                    )
-                }
-            }
-
-            // Session list
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 16.dp),
-            ) {
-                for (group in derived.groups) {
-                    val groupKey = SessionsDerivation.workspaceGroupKey(group.serverId, group.cwd)
-                    val isCollapsed = groupKey in sessionsUiState.collapsedWorkspaceGroupKeys
-
-                    // Group header
-                    item(key = "header-$groupKey") {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    sessionsUiState.toggleWorkspaceGroup(groupKey)
-                                }
-                                .padding(vertical = 8.dp),
-                        ) {
-                            Icon(
-                                if (isCollapsed) Icons.Default.ChevronRight else Icons.Default.ExpandMore,
-                                contentDescription = null,
-                                tint = AgentBuddyTheme.textMuted,
-                                modifier = Modifier.size(16.dp),
-                            )
-                            Spacer(Modifier.width(4.dp))
-                            Text(
-                                text = group.workspaceLabel,
-                                color = AgentBuddyTheme.textSecondary,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Text(
-                                text = "${group.nodes.size}",
-                                color = AgentBuddyTheme.textMuted,
-                                fontSize = 11.sp,
-                            )
-                        }
-                    }
-
-                    // Session nodes (if expanded)
-                    if (!isCollapsed) {
-                        items(
-                            items = visibleSessionRows(group.nodes, sessionsUiState.collapsedSessionNodeKeys),
-                            key = { "${it.summary.key.serverId}/${it.summary.key.threadId}" },
-                        ) { node ->
-                            SessionNodeRow(
-                                node = node,
-                                hasChildren = node.children.isNotEmpty(),
-                                isCollapsed = node.summary.key in sessionsUiState.collapsedSessionNodeKeys,
-                                onToggleCollapse = {
-                                    if (node.children.isNotEmpty()) {
-                                        sessionsUiState.toggleSessionNode(node.summary.key)
-                                        scheduleActiveSessionScrollIfNeeded()
-                                    }
-                                },
-                                onClick = {
-                                    appModel.launchState.updateCurrentCwd(node.summary.cwd)
-                                    onOpenConversation(node.summary.key)
-                                },
-                                onFork = {
-                                    scope.launch { forkThread(node.summary) }
-                                },
-                            )
-                        }
-                    }
-                }
-
-                item { Spacer(Modifier.height(32.dp)) }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun SessionNodeRow(
-    node: SessionTreeNode,
-    hasChildren: Boolean,
-    isCollapsed: Boolean,
-    onToggleCollapse: () -> Unit,
-    onClick: () -> Unit,
-    onFork: () -> Unit,
-) {
-    val appModel = LocalAppModel.current
-    val scope = rememberCoroutineScope()
-    val voiceController = remember { com.akashark.agentbuddy.android.state.VoiceRuntimeController.shared }
-    val summary = node.summary
-    var showMenu by remember { mutableStateOf(false) }
-    var showRenameDialog by remember { mutableStateOf(false) }
-    var showArchiveDialog by remember { mutableStateOf(false) }
-
-    Box {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = (node.depth * 16).dp)
-                .background(AgentBuddyTheme.surface, RoundedCornerShape(8.dp))
-                .combinedClickable(
-                    onClick = onClick,
-                    onLongClick = { showMenu = true },
-                )
-                .padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(18.dp)
-                    .let { modifier ->
-                        if (hasChildren) {
-                            modifier.clickable(onClick = onToggleCollapse)
-                        } else {
-                            modifier
-                        }
-                    },
-                contentAlignment = Alignment.Center,
-            ) {
-                if (hasChildren) {
-                    Icon(
-                        if (isCollapsed) Icons.Default.ChevronRight else Icons.Default.ExpandMore,
-                        contentDescription = if (isCollapsed) "展开子会话" else "折叠子会话",
-                        tint = AgentBuddyTheme.textMuted,
-                        modifier = Modifier.size(14.dp),
-                    )
-                }
-            }
-            Spacer(Modifier.width(6.dp))
-
-            // Active turn indicator
-            if (summary.hasActiveTurn) {
-                Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .clip(CircleShape)
-                        .background(AgentBuddyTheme.accent),
-                )
-                Spacer(Modifier.width(6.dp))
-            }
-
-            Column(modifier = Modifier.weight(1f)) {
-                com.akashark.agentbuddy.android.ui.common.FormattedText(
-                    text = summary.displayTitle,
-                    color = AgentBuddyTheme.textPrimary,
-                    fontSize = 13.sp,
-                    maxLines = 1,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    summary.model?.let { model ->
-                        Text(
-                            text = model.substringAfterLast('/'),
-                            color = AgentBuddyTheme.textMuted,
-                            fontSize = 10.sp,
-                        )
-                    }
-                    summary.agentDisplayLabel?.let { label ->
-                        Text(
-                            text = label,
-                            color = AgentBuddyTheme.accent,
-                            fontSize = 10.sp,
-                        )
-                    }
-                }
-            }
-
-            Text(
-                text = HomeDashboardSupport.relativeTime(summary.updatedAt),
-                color = AgentBuddyTheme.textMuted,
-                fontSize = 10.sp,
-            )
-        }
-
-        DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-            DropdownMenuItem(
-                text = { Text("分叉") },
-                onClick = {
-                    showMenu = false
-                    onFork()
-                },
-            )
-            DropdownMenuItem(
-                text = { Text("重命名") },
-                onClick = { showMenu = false; showRenameDialog = true },
-            )
-            DropdownMenuItem(
-                text = { Text("归档") },
-                onClick = { showMenu = false; showArchiveDialog = true },
-            )
-        }
-    }
-
-    // Rename dialog
-    if (showRenameDialog) {
-        var newName by remember { mutableStateOf(summary.title ?: "") }
-        AlertDialog(
-            onDismissRequest = { showRenameDialog = false },
-            title = { Text("重命名会话") },
-            text = {
-                OutlinedTextField(
-                    value = newName,
-                    onValueChange = { newName = it },
-                    label = { Text("名称") },
-                    singleLine = true,
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    showRenameDialog = false
-                    scope.launch {
-                        try {
-                            appModel.client.renameThread(
-                                summary.key.serverId,
-                                AppRenameThreadRequest(
-                                    threadId = summary.key.threadId,
-                                    name = newName,
-                                ),
-                            )
-                            appModel.refreshThreadSnapshot(summary.key)
-                        } catch (_: Exception) {}
-                    }
-                }) { Text("重命名") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showRenameDialog = false }) { Text("取消") }
-            },
+        SessionsListContent(
+            derived = derived,
+            isLoading = isLoading,
+            listState = listState,
+            sessionsUiState = sessionsUiState,
+            appModel = appModel,
+            onOpenConversation = onOpenConversation,
+            onSessionNodeToggled = { scheduleActiveSessionScrollIfNeeded() },
+            onForkThread = { summary -> scope.launch { forkThread(summary) } },
         )
     }
-
-    // Archive confirmation dialog
-    if (showArchiveDialog) {
-        AlertDialog(
-            onDismissRequest = { showArchiveDialog = false },
-            title = { Text("归档会话") },
-            text = { Text("确定要归档这个会话吗？") },
-            confirmButton = {
-                TextButton(onClick = {
-                    showArchiveDialog = false
-                    scope.launch {
-                        try {
-                            voiceController.stopVoiceSessionIfActive(appModel, summary.key)
-                            voiceController.clearPinnedLocalVoiceThreadIfMatches(appModel, summary.key)
-                            if (appModel.snapshot.value?.activeThread == summary.key) {
-                                appModel.store.setActiveThread(null)
-                            }
-                            appModel.client.archiveThread(
-                                summary.key.serverId,
-                                AppArchiveThreadRequest(threadId = summary.key.threadId),
-                            )
-                            appModel.refreshSnapshot()
-                        } catch (_: Exception) {}
-                    }
-                }) { Text("归档", color = AgentBuddyTheme.danger) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showArchiveDialog = false }) { Text("取消") }
-            },
-        )
-    }
-
-    Spacer(Modifier.height(4.dp))
-}
-
-private fun visibleSessionRows(
-    nodes: List<SessionTreeNode>,
-    collapsedSessionNodeKeys: Set<ThreadKey>,
-): List<SessionTreeNode> {
-    val result = mutableListOf<SessionTreeNode>()
-    fun walk(node: SessionTreeNode) {
-        result.add(node)
-        if (node.summary.key !in collapsedSessionNodeKeys) {
-            node.children.forEach { walk(it) }
-        }
-    }
-    nodes.forEach { walk(it) }
-    return result
 }
 
 private fun flatListIndexForThread(
