@@ -646,6 +646,7 @@
 		9268A2FDCCBCF4CD26B4355D /* MacPairingHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D8381D485C4558D24B8B8EF /* MacPairingHost.swift */; };
 		926C9005C58C3D5D91FFA175 /* GhosttyHostView+EditMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD340822EECF45A0784CB14B /* GhosttyHostView+EditMenu.swift */; };
 		929495F3C0EE250D68696018 /* kanagawa-lotus.json in Resources */ = {isa = PBXBuildFile; fileRef = 9092A86445EB28B7521E5197 /* kanagawa-lotus.json */; };
+		92B935288729FF600B8EC549 /* HomeShellSystemTabs.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8D5C27A84981D31FD75DBAD /* HomeShellSystemTabs.swift */; };
 		92D687ADE3673BF88C7CA82F /* PendingUserInputPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D167E24320B30BA78BFE956F /* PendingUserInputPromptView.swift */; };
 		92E87419FA0D734F1CE706F2 /* CatalystVoiceStubs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0842149F5C20AB874EEDF87F /* CatalystVoiceStubs.swift */; };
 		930ADF04CDB3EBEEF2E1F917 /* SwipeableRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D9F752D1CCD76816259D84D /* SwipeableRow.swift */; };
@@ -1093,6 +1094,7 @@
 		F50D55145B21CEA47593865B /* ConversationOptionsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99FBE151248B89B3F4811E4C /* ConversationOptionsSheet.swift */; };
 		F533C740596401ED95DE106F /* BuddyLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7CBA9946C92DE7CC066797A /* BuddyLayout.swift */; };
 		F56BF3D399C63696C0DAE48C /* NearbyMacPairing+PairSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A37B47590B1EF4F04A15B934 /* NearbyMacPairing+PairSession.swift */; };
+		F5906B29EAB5E91AFC3021CC /* HomeShellSystemTabs.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8D5C27A84981D31FD75DBAD /* HomeShellSystemTabs.swift */; };
 		F5AB4C0F7F2E49991DC8B956 /* WatchProjection+Voice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45A8C0BBC78B28C41834CE10 /* WatchProjection+Voice.swift */; };
 		F5CFAB9DF0FA16C3B81A00EC /* VoiceRuntimeController+LiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = E99028FD7E4E88E8A493DFB1 /* VoiceRuntimeController+LiveActivity.swift */; };
 		F67945BA5A1E0A87619A4519 /* TasksHomeHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = FECD1915CD201ABC777907F6 /* TasksHomeHeader.swift */; };
@@ -1682,6 +1684,7 @@
 		B858AF178E223BF59727262B /* ModelSelectorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelSelectorSheet.swift; sourceTree = "<group>"; };
 		B85B43BBA0B3BCF220D348C3 /* SSHLoginSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSHLoginSheet.swift; sourceTree = "<group>"; };
 		B8B6D7A057EA498588C5CB84 /* DebugSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugSettings.swift; sourceTree = "<group>"; };
+		B8D5C27A84981D31FD75DBAD /* HomeShellSystemTabs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeShellSystemTabs.swift; sourceTree = "<group>"; };
 		B991A786429DAEFF8FE2D40B /* HomeShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeShellView.swift; sourceTree = "<group>"; };
 		BA7E52D835D11D22E6C392AA /* AgentBuddyPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentBuddyPalette.swift; sourceTree = "<group>"; };
 		BB0FB3F7AEE7B69508100730 /* AgentBuddyMarkdownView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentBuddyMarkdownView.swift; sourceTree = "<group>"; };
@@ -1953,6 +1956,7 @@
 			children = (
 				FE190607805BE2F7A6B8820D /* HomeShellActions.swift */,
 				E9329744C48D6E7C9FDC884A /* HomeShellBottomBar.swift */,
+				B8D5C27A84981D31FD75DBAD /* HomeShellSystemTabs.swift */,
 				78A22AA11800232918F1C2A6 /* HomeShellTab.swift */,
 				B991A786429DAEFF8FE2D40B /* HomeShellView.swift */,
 				1844F3A78B73A2E5888607DC /* NewTaskSheet.swift */,
@@ -3610,6 +3614,7 @@
 				73DF6FDA0CD3B878B319011A /* HomeNavigationView.swift in Sources */,
 				57425E32CAFC302323C5219A /* HomeShellActions.swift in Sources */,
 				B672D9117D605EA24923FB4C /* HomeShellBottomBar.swift in Sources */,
+				F5906B29EAB5E91AFC3021CC /* HomeShellSystemTabs.swift in Sources */,
 				31DB36FF72B15BC4C153F4EA /* HomeShellTab.swift in Sources */,
 				3DD010A1198C52BF088F0BEE /* HomeShellView.swift in Sources */,
 				70268018EB812EF616B34EE9 /* HomeTaskItem.swift in Sources */,
@@ -4039,6 +4044,7 @@
 				08E2512DF274B851A0F4FEE2 /* HomeNavigationView.swift in Sources */,
 				CB9FFF5E5F51B22A722FD516 /* HomeShellActions.swift in Sources */,
 				CA8FC9D11443DADD3D4D0ECC /* HomeShellBottomBar.swift in Sources */,
+				92B935288729FF600B8EC549 /* HomeShellSystemTabs.swift in Sources */,
 				33EEA3329F0D1F70FF913DDA /* HomeShellTab.swift in Sources */,
 				456F4CE827BE4F4ECA42C1FF /* HomeShellView.swift in Sources */,
 				5C5C44BFD67645D50E791EEE /* HomeTaskItem.swift in Sources */,

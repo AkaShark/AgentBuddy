@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// Phone home: 任务 / 项目 / 主机 with a persistent composer pill and tab bar.
-/// It is the root of the phone `NavigationStack`, so conversations push over
-/// it (tab bar hidden, native back gesture intact) and popping restores the
-/// tab and scroll position.
+/// Home shell: 任务 / 项目 / 主机. On the phone it uses the system tab bar
+/// (`HomeShellSystemTabs`, Liquid Glass on iOS 26) and is the root of the phone
+/// `NavigationStack`, so conversations push over it (tab bar hidden, native
+/// back gesture intact) and popping restores the tab and scroll position. In
+/// the iPad / Mac sidebar it keeps a compact custom tab row.
 struct HomeShellView: View {
     var layout: HomeShellLayout = .phone
     let model: HomeDashboardModel
@@ -22,22 +23,57 @@ struct HomeShellView: View {
     }
 
     var body: some View {
-        content
+        Group {
+            if layout == .phone {
+                phoneTabs
+            } else {
+                sidebarShell
+            }
+        }
+        .toolbar(.hidden, for: .navigationBar)
+        #if DEBUG
+        .onAppear {
+            if MintGalleryView.isEnabled, let tab = MintGalleryView.requestedTab {
+                selectedTabRaw = tab.rawValue
+            }
+        }
+        #endif
+    }
+
+    /// Phone: the system tab bar (Liquid Glass on iOS 26).
+    private var phoneTabs: some View {
+        HomeShellSystemTabs(
+            selection: selectedTab,
+            composer: HomeComposerPillActions(
+                onCompose: { actions.newTask(nil) },
+                onVoice: actions.startVoice,
+                isStartingVoice: isStartingVoice
+            )
+        ) { tab in
+            page(for: tab)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(AgentBuddyTheme.background.ignoresSafeArea())
+        }
+    }
+
+    /// iPad / Mac sidebar column: keeps the compact custom tab row; the detail
+    /// pane owns the composer.
+    private var sidebarShell: some View {
+        page(for: selectedTab.wrappedValue)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .safeAreaInset(edge: .bottom, spacing: 0) { bottomChrome }
+            .safeAreaInset(edge: .bottom, spacing: 0) { sidebarTabBar }
             .background {
-                if layout == .sidebar && AgentBuddyPlatform.rendersAsMacApp {
+                if AgentBuddyPlatform.rendersAsMacApp {
                     Color.clear
                 } else {
                     AgentBuddyTheme.background.ignoresSafeArea()
                 }
             }
-            .toolbar(.hidden, for: .navigationBar)
     }
 
     @ViewBuilder
-    private var content: some View {
-        switch selectedTab.wrappedValue {
+    private func page(for tab: HomeShellTab) -> some View {
+        switch tab {
         case .tasks:
             TasksHomeView(
                 model: model,
@@ -61,31 +97,21 @@ struct HomeShellView: View {
         }
     }
 
-    private var bottomChrome: some View {
-        VStack(spacing: BuddySpacing.xs) {
-            if layout == .phone && selectedTab.wrappedValue.showsComposerPill {
-                HomeComposerPill(
-                    onCompose: { actions.newTask(nil) },
-                    onVoice: actions.startVoice,
-                    isStartingVoice: isStartingVoice
+    private var sidebarTabBar: some View {
+        HomeShellTabBar(selection: selectedTab)
+            .padding(.horizontal, BuddySpacing.md)
+            .padding(.top, BuddySpacing.xs)
+            .background {
+                LinearGradient(
+                    stops: [
+                        .init(color: AgentBuddyTheme.background.opacity(0), location: 0),
+                        .init(color: AgentBuddyTheme.background, location: 0.28),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
                 )
-                .padding(.horizontal, BuddySpacing.md)
+                .ignoresSafeArea(edges: .bottom)
+                .allowsHitTesting(false)
             }
-            HomeShellTabBar(selection: selectedTab)
-                .padding(.horizontal, BuddySpacing.md)
-        }
-        .padding(.top, BuddySpacing.xs)
-        .background {
-            LinearGradient(
-                stops: [
-                    .init(color: AgentBuddyTheme.background.opacity(0), location: 0),
-                    .init(color: AgentBuddyTheme.background, location: 0.28),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea(edges: .bottom)
-            .allowsHitTesting(false)
-        }
     }
 }

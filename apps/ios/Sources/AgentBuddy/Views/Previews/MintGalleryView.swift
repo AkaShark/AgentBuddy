@@ -20,6 +20,14 @@ struct MintGalleryView: View {
 
     static var isEnabled: Bool { requestedPage != nil }
 
+    /// `--mint-tab=tasks|projects|hosts` picks the home shell's starting tab.
+    static var requestedTab: HomeShellTab? {
+        for argument in ProcessInfo.processInfo.arguments where argument.hasPrefix("--mint-tab=") {
+            return HomeShellTab(rawValue: String(argument.dropFirst("--mint-tab=".count)))
+        }
+        return nil
+    }
+
     static var prefersDark: Bool {
         ProcessInfo.processInfo.arguments.contains("--mint-dark")
     }
