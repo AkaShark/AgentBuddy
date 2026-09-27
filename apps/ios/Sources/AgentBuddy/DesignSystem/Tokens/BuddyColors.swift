@@ -42,6 +42,10 @@ extension AgentBuddyTheme {
     static var warningSurface: Color { role(\.warningSurface) }
     static var dangerSurface: Color { role(\.dangerSurface) }
 
+    /// Chip fill placed on a `brand` surface. Brand is the same light mint in
+    /// both palettes, so a translucent white lift reads in either appearance.
+    static var brandChipFill: Color { Color.white.opacity(0.45) }
+
     /// Fill of controls that cannot be used right now.
     static var disabled: Color { role(\.disabled) }
     /// Content on `disabled`.

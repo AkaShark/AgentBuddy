@@ -19,7 +19,6 @@ extension HomeNavigationView {
     var homeShellActions: HomeShellActions {
         HomeShellActions(
             openSession: openRecentSession,
-            openThread: { key in openConversation(key) },
             showAllTasks: allTasksServerId.map { serverId in { showSessions(for: serverId) } },
             pinThread: pinThread,
             unpinThread: unpinThread,

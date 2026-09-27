@@ -138,7 +138,7 @@ struct BuddyChip: View {
     private var fill: Color {
         switch tone {
         case .soft: return AgentBuddyTheme.surfaceSoft
-        case .onBrand: return Color.white.opacity(0.45)
+        case .onBrand: return AgentBuddyTheme.brandChipFill
         case .outline: return AgentBuddyTheme.surface
         }
     }

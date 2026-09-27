@@ -159,6 +159,12 @@ struct ConversationInputBar: View {
         .onChange(of: isTurnActive) { _, active in
             if !active { isStopping = false }
         }
+        // A queued follow-up can start the next turn before the view sees the
+        // old one end, and a disconnect ends the stop request too.
+        .onChange(of: activeTurnId) { _, _ in isStopping = false }
+        .onChange(of: snapshot.isConnected) { _, connected in
+            if !connected { isStopping = false }
+        }
         .onChange(of: snapshot.composerPrefillRequest?.id) { _, _ in
             guard let prefill = snapshot.composerPrefillRequest else { return }
             inputText = prefill.text

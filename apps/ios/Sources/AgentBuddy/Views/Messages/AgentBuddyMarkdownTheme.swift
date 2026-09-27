@@ -278,7 +278,6 @@ private func syncHighlighterTheme(for colorScheme: ColorScheme) {
 
 private struct ScaledContentMarkdownModifier: ViewModifier {
     @Environment(\.textScale) private var textScale
-    @Environment(\.colorScheme) private var colorScheme
     let baseBodySize: CGFloat
     let baseCodeSize: CGFloat
     let selectionEnabled: Bool
@@ -286,13 +285,13 @@ private struct ScaledContentMarkdownModifier: ViewModifier {
     func body(content: Content) -> some View {
         let scaledBody = baseBodySize * textScale
         let scaledCode = baseCodeSize * textScale
-        let _ = syncHighlighterTheme(for: colorScheme)
-        // Hairball's code blocks are Equatable on (language, text) and keep the
-        // colours from the pass that first highlighted them. The first pass can
-        // still carry the system scheme before the app's appearance override
-        // lands, so rebuild the markdown subtree when the scheme changes.
+        // Follow the app's resolved scheme (the one every theme colour uses),
+        // not the SwiftUI environment. The environment can still carry the
+        // system scheme on the first pass and flips during app-switcher
+        // snapshots; Hairball's Equatable code blocks would keep colours
+        // highlighted in either. Real appearance changes re-ID the root view.
+        let _ = syncHighlighterTheme(for: ThemeStore.shared.colorScheme)
         let themed = content
-            .id(colorScheme)
             .markdownTheme(agentBuddyContentTheme(bodySize: scaledBody, codeSize: scaledCode))
             .lineSpacing(markdownLineSpacing(bodySize: scaledBody))
             .codeSyntaxHighlighter(sharedHighlighter)
@@ -307,7 +306,6 @@ private struct ScaledContentMarkdownModifier: ViewModifier {
 
 private struct ScaledSystemMarkdownModifier: ViewModifier {
     @Environment(\.textScale) private var textScale
-    @Environment(\.colorScheme) private var colorScheme
     let baseBodySize: CGFloat
     let baseCodeSize: CGFloat
     let selectionEnabled: Bool
@@ -315,13 +313,13 @@ private struct ScaledSystemMarkdownModifier: ViewModifier {
     func body(content: Content) -> some View {
         let scaledBody = baseBodySize * textScale
         let scaledCode = baseCodeSize * textScale
-        let _ = syncHighlighterTheme(for: colorScheme)
-        // Hairball's code blocks are Equatable on (language, text) and keep the
-        // colours from the pass that first highlighted them. The first pass can
-        // still carry the system scheme before the app's appearance override
-        // lands, so rebuild the markdown subtree when the scheme changes.
+        // Follow the app's resolved scheme (the one every theme colour uses),
+        // not the SwiftUI environment. The environment can still carry the
+        // system scheme on the first pass and flips during app-switcher
+        // snapshots; Hairball's Equatable code blocks would keep colours
+        // highlighted in either. Real appearance changes re-ID the root view.
+        let _ = syncHighlighterTheme(for: ThemeStore.shared.colorScheme)
         let themed = content
-            .id(colorScheme)
             .markdownTheme(agentBuddySystemTheme(bodySize: scaledBody, codeSize: scaledCode))
             .lineSpacing(markdownLineSpacing(bodySize: scaledBody))
             .codeSyntaxHighlighter(sharedHighlighter)

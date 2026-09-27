@@ -113,8 +113,10 @@ struct ConversationComposerEntryRowView: View {
                 inputText: $inputText,
                 isPresented: $showExpanded,
                 onPasteImage: onPasteImage,
-                onSend: onSendText,
-                hasAttachment: hasAttachment
+                onSend: { if canSend { onSendText() } },
+                hasAttachment: hasAttachment,
+                isSendEnabled: isConnected && !isVoiceBusy && !isSubmitting,
+                isConnected: isConnected
             )
         }
     }

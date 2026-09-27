@@ -97,6 +97,9 @@ extension ConversationInputBar {
             executeSlashCommand(invocation.command, args: invocation.args)
             return
         }
+        // Offline: keep the draft and attachments; every send path (button,
+        // return key, expanded composer, Mac shortcut) ends up here.
+        guard snapshot.isConnected else { return }
         inputText = ""
         attachedImage = nil
         attachedFiles = []

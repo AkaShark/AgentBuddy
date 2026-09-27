@@ -4,11 +4,11 @@ import SwiftUI
 /// DEBUG-only state gallery for verifying the Mint UI on a physical device
 /// without a connected host. Launch with `--mint-gallery=<page>` where page is
 /// `home`, `projects`, `hosts`, `newtask`, `conversation`, `approvals` or
-/// `composer`, `accessories`, `prompts`, `addhost`, `pair`, `tasks`, `info`, `models` or `settings`; add `--mint-dark` for
+/// `composer`, `accessories`, `prompts`, `addhost`, `pair`, `tasks`, `info`, `models`, `settings` or `expanded`; add `--mint-dark` for
 /// the dark palette. Nothing here writes user preferences.
 struct MintGalleryView: View {
     enum Page: String {
-        case home, conversation, approvals, composer, accessories, prompts, addhost, pair, tasks, info, models, settings, newtask, projects, hosts
+        case home, conversation, approvals, composer, accessories, prompts, addhost, pair, tasks, info, models, settings, expanded, newtask, projects, hosts
     }
 
     static var requestedPage: Page? {
@@ -130,6 +130,16 @@ struct MintGalleryView: View {
             }
         case .settings:
             SettingsView()
+        case .expanded:
+            ConversationComposerExpandedView(
+                inputText: .constant("Also check the logout path on iPad before shipping."),
+                isPresented: .constant(true),
+                onPasteImage: { _ in },
+                onSend: {},
+                hasAttachment: false,
+                isSendEnabled: false,
+                isConnected: false
+            )
         case .models:
             if let thread = appModel.snapshot?.threads.first(where: { $0.key == MintGalleryFixtures.mainThreadKey }) {
                 ScrollView {
@@ -182,7 +192,6 @@ enum MintGalleryFixtures {
     static var noopActions: HomeShellActions {
         HomeShellActions(
             openSession: { _ in },
-            openThread: { _ in },
             showAllTasks: {},
             pinThread: { _ in },
             unpinThread: { _ in },

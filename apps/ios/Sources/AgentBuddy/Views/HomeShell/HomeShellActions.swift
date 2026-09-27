@@ -7,7 +7,6 @@ import Foundation
 struct HomeShellActions {
     // MARK: Tasks
     var openSession: @MainActor (HomeDashboardRecentSession) async -> Void
-    var openThread: (ThreadKey) -> Void
     var showAllTasks: (() -> Void)?
     var pinThread: (ThreadKey) -> Void
     var unpinThread: (ThreadKey) -> Void
