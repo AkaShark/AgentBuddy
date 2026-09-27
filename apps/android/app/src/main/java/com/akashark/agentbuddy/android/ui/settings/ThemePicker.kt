@@ -2,29 +2,29 @@ package com.akashark.agentbuddy.android.ui.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.UnfoldMore
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,20 +32,67 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.akashark.agentbuddy.android.ui.BerkeleyMono
+import com.akashark.agentbuddy.android.ui.AgentBuddyColorThemeType
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
 import com.akashark.agentbuddy.android.ui.AgentBuddyThemeIndexEntry
+import com.akashark.agentbuddy.android.ui.BerkeleyMono
+import com.akashark.agentbuddy.android.ui.colorFromHex
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyIconButton
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyShapes
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySize
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySpacing
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyTextStyle
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyTextStyle
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Theme Picker Sheet (matches iOS ThemePickerSheet)
 // ═══════════════════════════════════════════════════════════════════════════════
+
+/** A titled run of themes in the picker; the title is null for search results. */
+internal data class ThemePickerSection(
+    val title: String?,
+    val entries: List<AgentBuddyThemeIndexEntry>,
+)
+
+private const val BrandThemePrefix = "agentbuddy-"
+
+/** Row padding + 28dp swatch + gap, so separators start under the theme name. */
+private val ThemeRowDividerIndent = BuddySpacing.md + 28.dp + BuddySpacing.sm
+
+/**
+ * Every theme stays selectable. Without a search the AgentBuddy themes (Mint
+ * first) are listed under 「推荐」, followed by the rest under 「全部主题」;
+ * a search shows one flat list of matches.
+ */
+internal fun themePickerSections(
+    themes: List<AgentBuddyThemeIndexEntry>,
+    query: String,
+): List<ThemePickerSection> {
+    val trimmed = query.trim()
+    if (trimmed.isNotEmpty()) {
+        val matches =
+            themes.filter {
+                it.name.contains(trimmed, ignoreCase = true) || it.slug.contains(trimmed, ignoreCase = true)
+            }
+        return if (matches.isEmpty()) emptyList() else listOf(ThemePickerSection(null, matches))
+    }
+    val brand = themes.filter { it.slug.startsWith(BrandThemePrefix) }
+    if (brand.isEmpty()) return if (themes.isEmpty()) emptyList() else listOf(ThemePickerSection(null, themes))
+    val suggested = brand.filter { "mint" in it.slug } + brand.filterNot { "mint" in it.slug }
+    val others = themes.filterNot { it.slug.startsWith(BrandThemePrefix) }
+    return listOfNotNull(
+        ThemePickerSection("推荐", suggested),
+        others.takeIf { it.isNotEmpty() }?.let { ThemePickerSection("全部主题", it) },
+    )
+}
 
 @Composable
 internal fun ThemePickerContent(
@@ -54,81 +101,43 @@ internal fun ThemePickerContent(
     selectedSlug: String,
     onSelect: (String) -> Unit,
     onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    val filtered = remember(themes, searchQuery) {
-        if (searchQuery.isBlank()) themes
-        else themes.filter { it.name.contains(searchQuery, ignoreCase = true) || it.slug.contains(searchQuery, ignoreCase = true) }
-    }
+    val sections = remember(themes, searchQuery) { themePickerSections(themes, searchQuery) }
 
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .imePadding()
-            .padding(16.dp),
-    ) {
-        // Title + Done
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Spacer(Modifier.weight(1f))
-            Text(title, color = AgentBuddyTheme.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.weight(1f))
-            TextButton(onClick = onDismiss) { Text("完成", color = AgentBuddyTheme.accent) }
-        }
-
-        Spacer(Modifier.height(8.dp))
-
-        // Search
-        Row(
-            Modifier.fillMaxWidth()
-                .background(AgentBuddyTheme.surface.copy(alpha = 0.55f), RoundedCornerShape(10.dp))
-                .border(1.dp, AgentBuddyTheme.border.copy(alpha = 0.85f), RoundedCornerShape(10.dp))
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(Icons.Default.Search, null, tint = AgentBuddyTheme.textMuted, modifier = Modifier.size(16.dp))
-            Spacer(Modifier.width(8.dp))
-            BasicTextField(
-                value = searchQuery, onValueChange = { searchQuery = it },
-                textStyle = TextStyle(color = AgentBuddyTheme.textPrimary, fontSize = 14.sp),
-                cursorBrush = SolidColor(AgentBuddyTheme.accent),
-                modifier = Modifier.fillMaxWidth(),
-                decorationBox = { inner ->
-                    if (searchQuery.isEmpty()) Text("搜索主题", color = AgentBuddyTheme.textMuted, fontSize = 14.sp)
-                    inner()
-                },
-            )
-        }
-
-        Spacer(Modifier.height(12.dp))
-
-        // Theme list
-        if (filtered.isEmpty()) {
-            Column(Modifier.fillMaxWidth().padding(top = 48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Default.Search, null, tint = AgentBuddyTheme.textMuted, modifier = Modifier.size(24.dp))
-                Spacer(Modifier.height(8.dp))
-                Text("没有匹配的主题", color = AgentBuddyTheme.textPrimary, fontSize = 14.sp)
-            }
-        } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(filtered, key = { it.slug }) { entry ->
-                    val isSelected = entry.slug == selectedSlug
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                            .background(AgentBuddyTheme.surface.copy(alpha = 0.72f), RoundedCornerShape(12.dp))
-                            .border(
-                                1.dp,
-                                if (isSelected) AgentBuddyTheme.accent.copy(alpha = 0.6f) else AgentBuddyTheme.border.copy(alpha = 0.85f),
-                                RoundedCornerShape(12.dp),
-                            )
-                            .clickable { onSelect(entry.slug) }
-                            .padding(horizontal = 12.dp, vertical = 11.dp),
+    Column(modifier.fillMaxWidth().imePadding()) {
+        SettingsPageHeader(title = title, onDone = onDismiss)
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+            Column(Modifier.widthIn(max = 640.dp).fillMaxWidth()) {
+                ThemeSearchField(
+                    query = searchQuery,
+                    onQueryChange = { searchQuery = it },
+                    modifier = Modifier.padding(horizontal = settingsGutter()).padding(top = BuddySpacing.xs),
+                )
+                if (sections.isEmpty()) {
+                    ThemePickerEmptyState(searchQuery.trim())
+                } else {
+                    LazyColumn(
+                        contentPadding =
+                            PaddingValues(
+                                start = settingsGutter(),
+                                end = settingsGutter(),
+                                bottom = BuddySpacing.xxl,
+                            ),
                     ) {
-                        ThemePreviewBadge(entry)
-                        Spacer(Modifier.width(10.dp))
-                        Text(entry.name, color = AgentBuddyTheme.textPrimary, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                        if (isSelected) {
-                            Icon(Icons.Default.Check, null, tint = AgentBuddyTheme.accent, modifier = Modifier.size(16.dp))
+                        sections.forEach { section ->
+                            settingsSection(title = section.title, key = section.title ?: "results") {
+                                section.entries.forEachIndexed { index, entry ->
+                                    if (index > 0) SettingsRowDivider(startIndent = ThemeRowDividerIndent)
+                                    SettingsSelectRow(
+                                        title = entry.name,
+                                        selected = entry.slug == selectedSlug,
+                                        onClick = { onSelect(entry.slug) },
+                                        leading = { ThemePreviewBadge(entry) },
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -137,45 +146,134 @@ internal fun ThemePickerContent(
     }
 }
 
-/** "Aa" badge with background/foreground/accent dot — matches iOS ThemePreviewBadge */
+/** 48dp search field: control outline, focus colour while editing, clear button. */
 @Composable
-private fun ThemePreviewBadge(entry: AgentBuddyThemeIndexEntry) {
-    val bg = try { Color(android.graphics.Color.parseColor(entry.backgroundHex)) } catch (_: Exception) { AgentBuddyTheme.surface }
-    val fg = try { Color(android.graphics.Color.parseColor(entry.foregroundHex)) } catch (_: Exception) { AgentBuddyTheme.textPrimary }
-    val accent = try { Color(android.graphics.Color.parseColor(entry.accentHex)) } catch (_: Exception) { AgentBuddyTheme.accent }
-
-    Box {
-        Box(
-            Modifier.size(width = 28.dp, height = 22.dp)
-                .background(bg, RoundedCornerShape(5.dp))
-                .border(0.5.dp, Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(5.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("Aa", color = fg, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = BerkeleyMono)
+private fun ThemeSearchField(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .heightIn(min = BuddySize.control)
+                .background(AgentBuddyTheme.surface, BuddyShapes.control)
+                .border(
+                    width = if (focused) 2.dp else 1.dp,
+                    color = if (focused) AgentBuddyTheme.focus else AgentBuddyTheme.borderControl,
+                    shape = BuddyShapes.control,
+                ).padding(start = BuddySpacing.md),
+        horizontalArrangement = Arrangement.spacedBy(BuddySpacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Outlined.Search, contentDescription = null, tint = AgentBuddyTheme.textSecondary, modifier = Modifier.size(BuddySize.icon))
+        Box(Modifier.weight(1f).padding(vertical = BuddySpacing.sm)) {
+            BasicTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                singleLine = true,
+                textStyle = buddyTextStyle(BuddyTextStyle.BODY).copy(color = AgentBuddyTheme.textPrimary),
+                cursorBrush = SolidColor(AgentBuddyTheme.focus),
+                interactionSource = interaction,
+                modifier = Modifier.fillMaxWidth().semantics { contentDescription = "搜索主题" },
+            )
+            if (query.isEmpty()) {
+                Text(
+                    text = "搜索主题",
+                    style = buddyTextStyle(BuddyTextStyle.BODY),
+                    color = AgentBuddyTheme.textSecondary,
+                    modifier = Modifier.clearAndSetSemantics {},
+                )
+            }
         }
-        Spacer(
-            Modifier.size(6.dp).clip(CircleShape).background(accent)
-                .align(Alignment.BottomEnd),
-        )
+        if (query.isNotEmpty()) {
+            BuddyIconButton(
+                icon = Icons.Outlined.Close,
+                contentDescription = "清除搜索",
+                onClick = { onQueryChange("") },
+                tint = AgentBuddyTheme.textSecondary,
+            )
+        }
     }
 }
 
 @Composable
-internal fun ThemePickerButton(entry: AgentBuddyThemeIndexEntry?, onClick: () -> Unit) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth()
-            .background(AgentBuddyTheme.surface.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick)
-            .padding(12.dp),
+private fun ThemePickerEmptyState(query: String) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = BuddySpacing.xxxl, start = BuddySpacing.xl, end = BuddySpacing.xl),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(BuddySpacing.xs),
     ) {
-        if (entry != null) {
-            ThemePreviewBadge(entry)
-            Spacer(Modifier.width(10.dp))
-            Text(entry.name, color = AgentBuddyTheme.textPrimary, fontSize = 14.sp, modifier = Modifier.weight(1f))
-        } else {
-            Text("没有主题", color = AgentBuddyTheme.textMuted, fontSize = 14.sp, modifier = Modifier.weight(1f))
+        Icon(Icons.Outlined.Search, contentDescription = null, tint = AgentBuddyTheme.textSecondary, modifier = Modifier.size(BuddySize.icon))
+        Text("没有匹配的主题", style = buddyTextStyle(BuddyTextStyle.HEADING), color = AgentBuddyTheme.textPrimary)
+        if (query.isNotEmpty()) {
+            Text(query, style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.Normal), color = AgentBuddyTheme.textSecondary)
         }
-        Text("⇅", color = AgentBuddyTheme.textMuted, fontSize = 12.sp)
     }
+}
+
+/** Swatch drawn from the theme's own colours (data, not interface colour). */
+@Composable
+internal fun ThemePreviewBadge(entry: AgentBuddyThemeIndexEntry) {
+    val isDarkTheme = entry.type == AgentBuddyColorThemeType.DARK
+    val bg = themeSwatchColor(entry.backgroundHex, fallback = if (isDarkTheme) Color.Black else Color.White)
+    val fg = themeSwatchColor(entry.foregroundHex, fallback = if (isDarkTheme) Color.White else Color.Black)
+    val accent = themeSwatchColor(entry.accentHex, fallback = AgentBuddyTheme.link)
+    val shape = RoundedCornerShape(5.dp)
+    Box(Modifier.clearAndSetSemantics {}) {
+        Box(
+            Modifier
+                .size(width = 28.dp, height = 22.dp)
+                .background(bg, shape)
+                .border(1.dp, AgentBuddyTheme.border, shape),
+            contentAlignment = Alignment.Center,
+        ) {
+            // Fixed size on purpose: the swatch is a picture of the theme, not text to read.
+            Text("Aa", color = fg, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = BerkeleyMono)
+        }
+        Box(
+            Modifier
+                .align(Alignment.BottomEnd)
+                .size(6.dp)
+                .background(accent, CircleShape),
+        )
+    }
+}
+
+/** Theme swatch colour; also accepts CSS short hex ("#fff"), which some themes use. */
+private fun themeSwatchColor(hex: String, fallback: Color): Color {
+    val trimmed = hex.trim()
+    val expanded =
+        if (trimmed.length == 4 && trimmed.startsWith("#")) {
+            "#" + trimmed.drop(1).map { "$it$it" }.joinToString("")
+        } else {
+            trimmed
+        }
+    return colorFromHex(expanded, fallback)
+}
+
+/** Current theme with an up/down marker; opens the picker. */
+@Composable
+internal fun ThemePickerButton(
+    entry: AgentBuddyThemeIndexEntry?,
+    onClick: () -> Unit,
+    onClickLabel: String,
+) {
+    SettingsRow(
+        title = entry?.name ?: "未知主题",
+        onClick = onClick,
+        onClickLabel = onClickLabel,
+        leading = entry?.let { { ThemePreviewBadge(it) } },
+        trailing = {
+            Icon(
+                Icons.Outlined.UnfoldMore,
+                contentDescription = null,
+                tint = AgentBuddyTheme.textSecondary,
+                modifier = Modifier.size(BuddySize.icon),
+            )
+        },
+    )
 }

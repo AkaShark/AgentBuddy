@@ -32,6 +32,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
 import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyChevron
@@ -103,10 +104,16 @@ internal fun SettingsGroup(
     )
 }
 
-/** Hairline separator between rows of a group; indented past the icon column. */
+/**
+ * Hairline separator between rows of a group; indented past the icon column
+ * (or by [startIndent] when the leading content is wider).
+ */
 @Composable
-internal fun SettingsRowDivider(indentForIcon: Boolean = true) {
-    BuddyDivider(startIndent = if (indentForIcon) SettingsIconIndent else BuddySpacing.md)
+internal fun SettingsRowDivider(
+    indentForIcon: Boolean = true,
+    startIndent: Dp? = null,
+) {
+    BuddyDivider(startIndent = startIndent ?: if (indentForIcon) SettingsIconIndent else BuddySpacing.md)
 }
 
 /** Selected marker for single-choice rows. Selection is also exposed to TalkBack by the row. */
