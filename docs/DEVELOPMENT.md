@@ -102,6 +102,7 @@ For Codex (use `ghostty` in the same commands for Ghostty):
 
 ```bash
 cd shared/third_party/codex
+git remote set-branches --add origin codex/agentbuddy  # once for shallow clones tracking only main
 git fetch origin
 git switch codex/agentbuddy  # first checkout: git switch --track origin/codex/agentbuddy
 git pull --ff-only
