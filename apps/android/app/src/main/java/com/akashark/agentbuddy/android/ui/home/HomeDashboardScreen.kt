@@ -776,6 +776,10 @@ fun HomeDashboardScreen(
                             SavedThreadsStore.remove(context, key)
                             pinnedKeys = SavedThreadsStore.pinnedKeys(context)
                         },
+                        onClearSearch = {
+                            searchQuery = ""
+                            selectedSearchRuntimeKind = null
+                        },
                     )
                 }
             }

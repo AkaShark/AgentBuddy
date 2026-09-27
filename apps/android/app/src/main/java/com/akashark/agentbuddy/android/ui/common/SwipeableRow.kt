@@ -46,6 +46,12 @@ data class SwipeAction(
     val label: String,
     val tint: Color,
     val onTrigger: () -> Unit,
+    /**
+     * Solid slot fill (use `AgentBuddyTheme.swipeFill`). When set, the icon and
+     * label are white so they stay readable in both appearances; otherwise the
+     * slot is a faint wash of [tint].
+     */
+    val fill: Color? = null,
 )
 
 /**
@@ -174,9 +180,20 @@ private fun BoxScope.ActionSlot(
     progress: Float,
     modifier: Modifier = Modifier,
 ) {
+    val content = if (action.fill != null) Color.White else action.tint
+    if (action.fill != null) {
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(action.fill.copy(alpha = action.fill.alpha * progress)),
+        )
+    }
     Box(
-        modifier = modifier
-            .background(action.tint.copy(alpha = 0.18f * progress)),
+        modifier = if (action.fill != null) {
+            modifier
+        } else {
+            modifier.background(action.tint.copy(alpha = 0.18f * progress))
+        },
         contentAlignment = alignment,
     ) {
         Row(
@@ -186,13 +203,13 @@ private fun BoxScope.ActionSlot(
             Icon(
                 imageVector = action.icon,
                 contentDescription = action.label,
-                tint = action.tint,
+                tint = content,
                 modifier = Modifier.size(18.dp),
             )
             Spacer(Modifier.width(6.dp))
             Text(
                 text = action.label,
-                color = action.tint,
+                color = content,
                 fontSize = 12.sp,
             )
         }
