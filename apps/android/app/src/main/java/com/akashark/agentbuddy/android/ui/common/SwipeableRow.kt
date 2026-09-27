@@ -59,9 +59,6 @@ data class SwipeAction(
  * swipe (drag left) reveal action slots behind the row. Releasing past the
  * commit threshold fires the action with a haptic; otherwise the row
  * springs back.
- *
- * This is a configurable generalization of [com.akashark.agentbuddy.android.ui.home.SwipeToHideRow].
- * Both coexist; use this one when you need a reply affordance or both-sided swipes.
  */
 @Composable
 fun SwipeableRow(
