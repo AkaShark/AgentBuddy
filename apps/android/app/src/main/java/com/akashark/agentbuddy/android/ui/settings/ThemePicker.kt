@@ -244,7 +244,7 @@ internal fun ThemePreviewBadge(entry: AgentBuddyThemeIndexEntry) {
 }
 
 /** Theme swatch colour; also accepts CSS short hex ("#fff"), which some themes use. */
-private fun themeSwatchColor(hex: String, fallback: Color): Color {
+internal fun themeSwatchColor(hex: String, fallback: Color): Color {
     val trimmed = hex.trim()
     val expanded =
         if (trimmed.length == 4 && trimmed.startsWith("#")) {
