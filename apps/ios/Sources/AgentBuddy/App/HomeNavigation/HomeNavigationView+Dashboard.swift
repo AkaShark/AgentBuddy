@@ -25,94 +25,26 @@ extension HomeNavigationView {
         )
     }
 
-    /// Sidebar projection of the home dashboard used inside
-    /// `NavigationSplitView`. Same data + callbacks as `homeDashboard`, but
-    /// renders with `.sidebar` chrome (no animated logo, no zoom, no bottom
-    /// composer) and exposes an `onNewThread` hook that pushes the hero
-    /// composer into the detail pane.
+    /// iPad / Mac sidebar: the same shell as phone, without the composer
+    /// pill. "New task" pushes the hero composer into the detail pane.
     var sidebarDashboard: some View {
-        HomeDashboardView(
-            chrome: .sidebar,
-            recentSessions: homeDashboardModel.recentSessions,
-            allSessions: homeDashboardModel.allSessions,
-            pinnedThreadKeys: homeDashboardModel.pinnedKeys,
-            connectedServers: homeDashboardModel.connectedServers,
-            projects: homeDashboardModel.projects,
-            selectedServerId: homeDashboardModel.selectedServerId,
-            selectedProject: homeDashboardModel.selectedProject,
-            openingRecentSessionKey: openingRecentSessionKey,
-            onOpenRecentSession: openRecentSession,
-            onSelectServer: handleSelectServer,
-            onAddServer: { appState.showServerPicker = true },
-            onOpenProjectPicker: { showProjectPicker = true },
-            onThreadCreated: { key in homeDashboardModel.pinThread(key) },
-            onShowSettings: { appState.showSettings = true },
-            onShowApps: savedAppsStore.apps.isEmpty ? nil : { navigationPath.append(.appsList) },
-            onShowTerminal: terminalLauncher,
-            onPinThread: pinThread,
-            onUnpinThread: unpinThread,
-            onHideThread: hideThread,
-            onNewThread: { openNewThread() },
-            onHydrateThread: { key, loadInitialTurns in
-                await hydrateThread(key, loadInitialTurns: loadInitialTurns)
-            },
-            onDeleteThread: deleteThread,
-            onReconnectServer: reconnectServer,
-            onRestartAppServer: restartAppServer,
-            onDisconnectServer: disconnectServer,
-            onRenameServer: renameServer,
-            onOpenRecording: { url in
-                navigationPath.append(.replayRecording(url))
-            },
-            onSendReply: sendQuickReply,
-            onCancelThread: cancelThread,
-            onForkThread: forkSessionFromHome,
-            onInputModeChange: { mode in
-                homeInputMode = mode
-            },
-            onSearchThreads: loadSearchThreads
-        )
-    }
-
-    var homeDashboard: some View {
-        HomeDashboardView(
-            recentSessions: homeDashboardModel.recentSessions,
-            allSessions: homeDashboardModel.allSessions,
-            pinnedThreadKeys: homeDashboardModel.pinnedKeys,
-            connectedServers: homeDashboardModel.connectedServers,
-            projects: homeDashboardModel.projects,
-            selectedServerId: homeDashboardModel.selectedServerId,
-            selectedProject: homeDashboardModel.selectedProject,
-            openingRecentSessionKey: openingRecentSessionKey,
-            onOpenRecentSession: openRecentSession,
-            onSelectServer: handleSelectServer,
-            onAddServer: { appState.showServerPicker = true },
-            onOpenProjectPicker: { showProjectPicker = true },
-            onThreadCreated: { key in homeDashboardModel.pinThread(key) },
-            onShowSettings: { appState.showSettings = true },
-            onShowApps: savedAppsStore.apps.isEmpty ? nil : { navigationPath.append(.appsList) },
-            onShowTerminal: terminalLauncher,
-            onPinThread: pinThread,
-            onUnpinThread: unpinThread,
-            onHideThread: hideThread,
-            onHydrateThread: { key, loadInitialTurns in
-                await hydrateThread(key, loadInitialTurns: loadInitialTurns)
-            },
-            onDeleteThread: deleteThread,
-            onReconnectServer: reconnectServer,
-            onRestartAppServer: restartAppServer,
-            onDisconnectServer: disconnectServer,
-            onRenameServer: renameServer,
-            onOpenRecording: { url in
-                navigationPath.append(.replayRecording(url))
-            },
-            onSendReply: sendQuickReply,
-            onCancelThread: cancelThread,
-            onForkThread: forkSessionFromHome,
-            onInputModeChange: { mode in
-                homeInputMode = mode
-            },
-            onSearchThreads: loadSearchThreads
+        var actions = homeShellActions
+        actions.newTask = { project in
+            if let project {
+                homeDashboardModel.selectedServerId = project.serverId
+                homeDashboardModel.selectedProject = project
+            }
+            openNewThread()
+        }
+        return HomeShellView(
+            layout: .sidebar,
+            model: homeDashboardModel,
+            actions: actions,
+            openingKey: openingRecentSessionKey,
+            onStartTaskOnServer: { server in
+                homeDashboardModel.selectedServerId = server.id
+                openNewThread()
+            }
         )
     }
 

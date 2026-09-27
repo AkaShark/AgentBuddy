@@ -7,6 +7,7 @@ struct TasksHomeHeader: View {
     let selectedServerId: String?
     let actions: HomeShellActions
     let onManageHosts: () -> Void
+    var showsComposeButton = false
 
     private var connectedCount: Int {
         servers.filter { $0.health == .connected }.count
@@ -21,6 +22,16 @@ struct TasksHomeHeader: View {
                 .layoutPriority(1)
             if actions.showApps != nil || actions.showTerminal != nil {
                 moreMenu
+            }
+            if showsComposeButton {
+                BuddyIconButton(
+                    systemImage: "square.and.pencil",
+                    accessibilityLabel: "Start a new task",
+                    tone: .plain,
+                    iconSize: 19
+                ) {
+                    actions.newTask(nil)
+                }
             }
             BuddyIconButton(
                 systemImage: "gearshape",

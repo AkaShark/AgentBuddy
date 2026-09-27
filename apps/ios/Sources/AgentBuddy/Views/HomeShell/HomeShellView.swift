@@ -5,6 +5,7 @@ import SwiftUI
 /// it (tab bar hidden, native back gesture intact) and popping restores the
 /// tab and scroll position.
 struct HomeShellView: View {
+    var layout: HomeShellLayout = .phone
     let model: HomeDashboardModel
     let actions: HomeShellActions
     let openingKey: ThreadKey?
@@ -24,7 +25,13 @@ struct HomeShellView: View {
         content
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .safeAreaInset(edge: .bottom, spacing: 0) { bottomChrome }
-            .buddyPageBackground()
+            .background {
+                if layout == .sidebar && AgentBuddyPlatform.rendersAsMacApp {
+                    Color.clear
+                } else {
+                    AgentBuddyTheme.background.ignoresSafeArea()
+                }
+            }
             .toolbar(.hidden, for: .navigationBar)
     }
 
@@ -36,7 +43,8 @@ struct HomeShellView: View {
                 model: model,
                 actions: actions,
                 openingKey: openingKey,
-                onManageHosts: { selectedTab.wrappedValue = .hosts }
+                onManageHosts: { selectedTab.wrappedValue = .hosts },
+                showsComposeButton: layout == .sidebar
             )
         case .projects:
             ProjectsHomeView(
@@ -55,7 +63,7 @@ struct HomeShellView: View {
 
     private var bottomChrome: some View {
         VStack(spacing: BuddySpacing.xs) {
-            if selectedTab.wrappedValue.showsComposerPill {
+            if layout == .phone && selectedTab.wrappedValue.showsComposerPill {
                 HomeComposerPill(
                     onCompose: { actions.newTask(nil) },
                     onVoice: actions.startVoice,

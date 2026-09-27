@@ -19,7 +19,6 @@ struct HomeNavigationView: View {
     @State var isStartingNewSession = false
     @State var isStartingVoice = false
     @State var actionErrorMessage: String?
-    @State var homeInputMode: HomeInputMode = .collapsed
     @State var hydratingPinnedHomeThreadIds: Set<String> = []
     @State var pinnedThreadListingRepairTasks: [String: Task<Bool, Never>] = [:]
     @State var hasSeededInitialConversationRoute = false
@@ -99,15 +98,6 @@ struct HomeNavigationView: View {
         }
         .onChange(of: navigationPath.count) { _, newCount in
             updateHomeDashboardActivity()
-            // [baozi-fork] Popping the conversation off this NavigationStack
-            // reveals the home sessions scroll, whose orphaned (no parent VC)
-            // UIHostingController rows stop rendering off-screen and come back
-            // blank — only the background shows — until the user nudges the
-            // scroll. count → 0 means we're back at the home root: force a
-            // redraw so the rows paint immediately.
-            if newCount == 0 {
-                NotificationCenter.default.post(name: HomeSessionsScrollUIView.homeBecameActive, object: nil)
-            }
         }
         .onChange(of: pinnedThreadHydrationSignature) { _, _ in
             hydratePinnedThreadsIfNeeded()

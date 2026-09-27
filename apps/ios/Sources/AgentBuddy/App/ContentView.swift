@@ -116,18 +116,11 @@ struct ContentView: View {
                 themeManager.syncSystemColorScheme(colorScheme)
             }
         }
-        .onChange(of: appModel.snapshot?.activeThread) { _, newThread in
+        .onChange(of: appModel.snapshot?.activeThread) { _, _ in
             appState.selectedModel = ""
             appState.selectedAgentRuntimeKind = nil
             appState.reasoningEffort = ""
             appState.showModelSelector = false
-            // [baozi-fork] Returning to the home screen (activeThread → nil)
-            // via a NavigationStack pop leaves the home sessions scroll's
-            // UIHostingController-backed rows blank until a manual scroll.
-            // Kick a redraw on the now-visible home list.
-            if newThread == nil {
-                NotificationCenter.default.post(name: HomeSessionsScrollUIView.homeBecameActive, object: nil)
-            }
         }
         .onChange(of: appModel.snapshot) { _, nextSnapshot in
             appRuntime.handleSnapshot(nextSnapshot)

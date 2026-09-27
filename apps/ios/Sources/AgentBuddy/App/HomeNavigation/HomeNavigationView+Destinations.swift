@@ -19,8 +19,7 @@ extension HomeNavigationView {
                 // split layout still floats the orb over the detail pane.
                 if isHomeRouteActive,
                    isEmbeddedInSplit,
-                   experimentalFeatures.isEnabled(.realtimeVoice),
-                   homeInputMode == .collapsed {
+                   experimentalFeatures.isEnabled(.realtimeVoice) {
                     homeVoiceLauncher
                 }
             }

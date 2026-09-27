@@ -8,6 +8,8 @@ struct TasksHomeView: View {
     let actions: HomeShellActions
     let openingKey: ThreadKey?
     let onManageHosts: () -> Void
+    /// Sidebar layout: a compose button replaces the composer pill.
+    var showsComposeButton = false
     /// Extra bottom space so the last row clears the floating composer and tab bar.
     var bottomContentInset: CGFloat = 0
 
@@ -52,7 +54,8 @@ struct TasksHomeView: View {
                     servers: model.connectedServers,
                     selectedServerId: model.selectedServerId,
                     actions: actions,
-                    onManageHosts: onManageHosts
+                    onManageHosts: onManageHosts,
+                    showsComposeButton: showsComposeButton
                 )
                 .padding(.top, BuddySpacing.xs)
 

@@ -1,6 +1,14 @@
 import SwiftUI
 
-/// The three primary destinations on phone: 任务 / 项目 / 主机.
+/// Where the shell is hosted. The iPad / Mac sidebar keeps the split view:
+/// the detail pane owns the composer, so the sidebar shows a compose button
+/// instead of the composer pill.
+enum HomeShellLayout {
+    case phone
+    case sidebar
+}
+
+/// The three primary destinations: 任务 / 项目 / 主机.
 /// Conversations are pushed on top of the shell as their own navigation
 /// layer, so the tab bar never competes with the composer.
 enum HomeShellTab: String, CaseIterable, Identifiable {

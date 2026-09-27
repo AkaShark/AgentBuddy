@@ -64,6 +64,9 @@ struct HostsHomeView: View {
                 }
 
                 addAnotherComputer(isFirst: primary == nil)
+
+                DebugBuildLabel()
+                    .frame(maxWidth: .infinity, alignment: .center)
             }
             .padding(.horizontal, BuddySpacing.xl)
             .padding(.top, BuddySpacing.lg)
