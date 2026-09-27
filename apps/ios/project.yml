@@ -383,8 +383,8 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: true
-        CODE_SIGNING_ALLOWED: false
-        CODE_SIGNING_REQUIRED: false
+        # Signed with the team's automatic signing so unit tests can run on
+        # the physical iPhone (the simulator is not used; see AGENTS.md).
   AgentBuddyUITests:
     type: bundle.ui-testing
     platform: iOS

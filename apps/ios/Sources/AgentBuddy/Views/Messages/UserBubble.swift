@@ -46,6 +46,7 @@ struct UserBubble: View {
                     VStack(alignment: .trailing, spacing: 4) {
                         FormattedText(text: visibleText)
                             .agentBuddyFont(size: contentFontSize)
+                            .lineSpacing(contentFontSize * 0.42)
                             .foregroundColor(AgentBuddyTheme.textPrimary)
                             .textSelection(.enabled)
 
@@ -56,8 +57,9 @@ struct UserBubble: View {
                                 }
                             } label: {
                                 Text(expandedLongText ? "Show less" : "Show more")
-                                    .agentBuddyFont(.caption2, weight: .semibold)
-                                    .foregroundColor(AgentBuddyTheme.accent)
+                                    .agentBuddyFont(.caption, weight: .semibold)
+                                    .foregroundColor(AgentBuddyTheme.link)
+                                    .frame(minHeight: 32)
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel(expandedLongText ? "Show less user message" : "Show more user message")
@@ -65,9 +67,10 @@ struct UserBubble: View {
                     }
                 }
             }
-            .padding(.horizontal, compact ? 12 : 18)
-            .padding(.vertical, compact ? 8 : 14)
-            .modifier(GlassRectModifier(cornerRadius: compact ? 14 : 18, tint: AgentBuddyTheme.accent.opacity(0.3)))
+            .padding(.horizontal, compact ? 12 : BuddySpacing.md)
+            .padding(.vertical, compact ? 8 : BuddySpacing.sm)
+            // Mint: surfaceSoft fill, 19/19/5/19 corners pointing at the sender.
+            .background(AgentBuddyTheme.surfaceSoft, in: BuddyUserBubbleShape())
         }
         .padding(.bottom, 14)
         .onChange(of: text) { _, _ in

@@ -7,6 +7,7 @@ struct ContentView: View {
     @Environment(AppRuntimeController.self) private var appRuntime
     @Environment(ThemeManager.self) private var themeManager
     @State private var appState = AppState()
+    @State private var approvalCoordinator = ApprovalCoordinator()
     @State private var stableSafeAreaInsets = StableSafeAreaInsets()
     @State private var conversationWarmup = ConversationWarmupCoordinator()
     @State private var petOverlay = PetOverlayController.shared
@@ -68,8 +69,12 @@ struct ContentView: View {
             }
         }
         .environment(appState)
+        .environment(approvalCoordinator)
         .environment(conversationWarmup)
         .environment(\.textScale, textScale)
+        .onChange(of: appModel.snapshot?.pendingApprovals ?? []) { _, pending in
+            approvalCoordinator.reconcile(pending: pending)
+        }
         .preferredColorScheme(themeManager.appearanceMode.preferredColorScheme)
         .background {
             InterfaceStyleSynchronizer(style: themeManager.appearanceMode.userInterfaceStyle)
@@ -181,20 +186,14 @@ struct ContentView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
 
-        if let approval = appModel.snapshot?.pendingApprovals.first(where: {
-            $0.kind != .mcpElicitation
-        }) {
-            ApprovalPromptView(approval: approval) { decision in
-                Task {
-                    try? await appModel.store.respondToApproval(
-                        requestId: approval.id,
-                        decision: decision
-                    )
-                }
-            } onViewThread: { threadKey in
-                appState.pendingThreadNavigation = threadKey
-            }
-        }
+        // Requests for the open conversation render inline there; anything
+        // else shows as a non-blocking banner that can be reviewed in place.
+        PendingApprovalBanner(
+            visibleThreadKey: appState.visibleConversationKey,
+            onViewThread: { threadKey in appState.pendingThreadNavigation = threadKey }
+        )
+        .padding(.top, 52)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
         if let warmupID = conversationWarmup.activeWarmupID {
             ConversationWarmupView(warmupID: warmupID) {

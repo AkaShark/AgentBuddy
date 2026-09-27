@@ -21,6 +21,11 @@ enum ConversationTimelineRowDescriptor: Identifiable, Equatable {
         return item.isAssistantItem
     }
 
+    var isUserRow: Bool {
+        guard case .item(let item) = self else { return false }
+        return item.isUserItem
+    }
+
     func preferredExpandedCommandRow(
         latestCommandExecutionItemId: String?,
         commandDisplayMode: ConversationDetailDisplayMode

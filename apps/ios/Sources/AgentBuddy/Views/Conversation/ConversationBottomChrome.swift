@@ -18,7 +18,8 @@ struct ConversationBottomChrome: View {
     @State private var collaborationModeError: String?
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: BuddySpacing.xs) {
+            ConversationApprovalStack(threadKey: composer.threadKey)
             ConversationPinnedContextStrip(
                 items: pinnedContextItems
             )

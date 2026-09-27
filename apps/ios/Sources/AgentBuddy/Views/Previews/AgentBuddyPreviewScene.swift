@@ -42,6 +42,7 @@ struct AgentBuddyPreviewScene<Content: View>: View {
         .environment(appState)
         .environment(ThemeManager.shared)
         .environment(WallpaperManager.shared)
+        .environment(ApprovalCoordinator())
     }
 }
 #endif

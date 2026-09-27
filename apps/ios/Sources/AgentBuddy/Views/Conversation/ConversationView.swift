@@ -108,6 +108,7 @@ struct ConversationView: View {
             }
         }
         .activeThreadKey(activeThreadKey)
+        .environment(\.conversationPartnerLabel, thread.agentRuntimeKind.displayLabel)
         .background { ChatWallpaperBackground(threadKey: activeThreadKey) }
         .overlay(alignment: .top) {
             if thread.isSubagent {

@@ -54,6 +54,10 @@ final class AppState {
     var showModelSelector = false
     var showSettings = false
     var pendingThreadNavigation: ThreadKey?
+    /// Conversation currently on screen (observable mirror of
+    /// `AppRuntimeController.visibleConversationKey`), used by UI that must
+    /// not duplicate what the open conversation already shows.
+    var visibleConversationKey: ThreadKey?
     private var dismissedPendingUserInputIds: Set<String> = []
     private var threadPermissionOverrides: [String: ThreadPermissionOverride] = [:]
     var approvalPolicy: String {

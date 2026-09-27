@@ -84,6 +84,7 @@ struct HomeNavigationView: View {
             seedInitialConversationIfNeeded(activeKey: appModel.snapshot?.activeThread)
             // A recreated stack (e.g. theme change) starts at home again.
             AppRuntimeController.shared.visibleConversationKey = Self.visibleConversationKey(in: navigationPath)
+            appState.visibleConversationKey = Self.visibleConversationKey(in: navigationPath)
             openNotificationThreadIfRequested()
         }
         .onChange(of: appModel.snapshot?.activeThread) { _, newKey in
@@ -91,6 +92,7 @@ struct HomeNavigationView: View {
         }
         .onChange(of: navigationPath) { _, newPath in
             AppRuntimeController.shared.visibleConversationKey = Self.visibleConversationKey(in: newPath)
+            appState.visibleConversationKey = Self.visibleConversationKey(in: newPath)
         }
         .onChange(of: AppRuntimeController.shared.notificationNavigationRequest) { _, _ in
             openNotificationThreadIfRequested()

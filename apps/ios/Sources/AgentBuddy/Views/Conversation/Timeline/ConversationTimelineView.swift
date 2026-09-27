@@ -55,17 +55,24 @@ struct ConversationTurnTimeline: View {
             return item.id
         }.first
 
+        let firstReplyIndex = rows.firstIndex { !$0.isUserRow }
+
         return VStack(alignment: .leading, spacing: 10) {
             ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                rowView(
-                    row,
-                    isLastRow: index == rows.indices.last,
-                    isPreferredExpandedCommandRow: row.preferredExpandedCommandRow(
-                        latestCommandExecutionItemId: latestCommandExecutionItemId,
-                        commandDisplayMode: commandDisplayMode
-                    ),
-                    retainedRichDetailItemIDs: retainedRichDetailItemIDs
-                )
+                VStack(alignment: .leading, spacing: BuddySpacing.sm) {
+                    if index == firstReplyIndex {
+                        AssistantSpeakerHeader()
+                    }
+                    rowView(
+                        row,
+                        isLastRow: index == rows.indices.last,
+                        isPreferredExpandedCommandRow: row.preferredExpandedCommandRow(
+                            latestCommandExecutionItemId: latestCommandExecutionItemId,
+                            commandDisplayMode: commandDisplayMode
+                        ),
+                        retainedRichDetailItemIDs: retainedRichDetailItemIDs
+                    )
+                }
                     .id(row.id)
                     .modifier(RowEntranceModifier(isAssistantRow: row.isAssistantRow))
                     .onGeometryChange(for: CGFloat.self) { geometry in
