@@ -24,4 +24,5 @@ val mintGalleryPages: List<MintGalleryPage> =
         MintGalleryPage("newtask", "新建任务") { GalleryNewTaskPage() },
         MintGalleryPage("approvals", "审批") { GalleryApprovalsPage() },
         MintGalleryPage("approval-banner", "审批横幅") { GalleryApprovalBannerPage() },
+        MintGalleryPage("conversation-header", "会话标题栏") { GalleryConversationHeaderPage() },
     )

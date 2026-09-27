@@ -234,7 +234,7 @@ fun ConversationScreen(
     val hasWallpaper = remember(threadKey, wallpaperVersion) {
         WallpaperManager.resolvedConfig(threadKey)?.type?.let { it != WallpaperType.NONE } == true
     }
-    val headerScrimColor = if (hasWallpaper) AgentBuddyTheme.surface.copy(alpha = 0.75f) else AgentBuddyTheme.surface
+    val headerScrimColor = if (hasWallpaper) AgentBuddyTheme.background.copy(alpha = 0.75f) else AgentBuddyTheme.background
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Wallpaper fills the entire screen edge-to-edge (behind status + nav bars)
@@ -256,6 +256,8 @@ fun ConversationScreen(
                     onInfo = onInfo,
                     showModelSelector = showModelSelector,
                     onToggleModelSelector = { showModelSelector = !showModelSelector },
+                    onShowPermissions = { showPermissionsSheet = true },
+                    onShowCollaborationMode = { showCollaborationModeSelector = true },
                     onReloadError = { reloadErrorMessage = it },
                     transparentBackground = hasWallpaper,
                 )
