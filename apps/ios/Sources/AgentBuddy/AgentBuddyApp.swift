@@ -255,9 +255,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     ) {
         let key = PushNotificationSupport.threadKey(from: notification.request.content.userInfo)
         let options = PushNotificationSupport.presentationOptions(
-            for: key,
-            visibleThread: appRuntime?.visibleConversationKey,
-            isAppActive: UIApplication.shared.applicationState == .active
+            isAppInForeground: UIApplication.shared.applicationState != .background
         )
         LLog.info(
             "push",

@@ -103,14 +103,12 @@ enum PushNotificationSupport {
         return ThreadKey(serverId: serverId, threadId: threadId)
     }
 
-    /// Foreground presentation: stay quiet for the conversation the user is
-    /// reading, show everything else.
+    /// Keep every notification quiet while the app is in the foreground,
+    /// including debug alerts without conversation routing keys.
     static func presentationOptions(
-        for key: ThreadKey?,
-        visibleThread: ThreadKey?,
-        isAppActive: Bool
+        isAppInForeground: Bool
     ) -> UNNotificationPresentationOptions {
-        if isAppActive, let key, key == visibleThread {
+        if isAppInForeground {
             return []
         }
         return [.banner, .list, .sound]

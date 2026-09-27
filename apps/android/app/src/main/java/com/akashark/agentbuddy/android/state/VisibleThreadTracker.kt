@@ -5,8 +5,7 @@ import uniffi.codex_mobile_client.ThreadKey
 /**
  * What the user is looking at right now. Written by MainActivity (started /
  * stopped) and the Compose nav stack (conversation on screen); read from the
- * FCM service thread to skip a completion notification for the conversation
- * already visible.
+ * notification posting code to keep alerts quiet while the app is visible.
  */
 object VisibleThreadTracker {
     @Volatile

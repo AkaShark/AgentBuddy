@@ -3,7 +3,6 @@ package com.akashark.agentbuddy.android.push
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import com.akashark.agentbuddy.android.state.AppModel
-import com.akashark.agentbuddy.android.state.VisibleThreadTracker
 import com.akashark.agentbuddy.android.util.LLog
 
 /**
@@ -30,16 +29,6 @@ class AgentBuddyFirebaseMessagingService : FirebaseMessagingService() {
         val notification = remoteMessage.notification
         when (val payload = parsePushPayload(remoteMessage.data, hasNotification = notification != null)) {
             is PushPayload.TurnTerminal -> {
-                if (shouldSuppressTurnNotification(
-                        serverId = payload.serverId,
-                        threadId = payload.threadId,
-                        appInForeground = VisibleThreadTracker.appInForeground,
-                        visibleThread = VisibleThreadTracker.visibleThread,
-                    )
-                ) {
-                    LLog.i(TAG, "turn ${payload.kind} for the visible thread; not notifying event=${payload.eventId}")
-                    return
-                }
                 val (fallbackTitle, fallbackBody) = turnNotificationFallbackText(payload.kind)
                 PushNotifications.post(
                     context = this,

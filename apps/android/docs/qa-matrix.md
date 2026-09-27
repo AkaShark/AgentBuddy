@@ -54,11 +54,10 @@ Rust `PushManager` subscribes on `TurnStarted` for alleycat hosts advertising `p
 | Permission denied | Registration is `null` (Rust revokes); chat and turns work normally; no notification |
 | Token rotation | `onNewToken` persists the token and, if the app process is live, hands it to Rust immediately |
 | Background completion | System shows the Worker notification on channel `turn_complete` (「任务完成通知」, high importance); title 「任务已完成」/「任务未完成」 |
-| Foreground, other screen | `onMessageReceived` posts the same notification locally with the Worker tag (id 0), replacing any duplicate |
-| Foreground, viewing that thread | No notification (same `serverId` + `threadId` on screen) |
+| Foreground, any screen | No notification or sound, including other threads/hosts and alerts without routing keys; matches iOS |
 | Tap (warm or cold start) | MainActivity reads `agentbuddy.notification.serverId` / `threadId` extras, waits up to 20 s for that host to connect, then loads and authoritatively refreshes the thread; nothing is inferred from the push |
 | Same threadId on two hosts | Separate notifications and routing (tag and routing include the host) |
-| Debug alert (`/debug/push` alert) | Shown in the foreground too, tag `agentbuddy-debug` when no routing keys |
+| Debug alert (`/debug/push` alert) | Suppressed in the foreground; displayed in the background, tag `agentbuddy-debug` when no routing keys |
 | Debug background (`/debug/push` background) | No UI; logcat `AgentBuddyFCM: debug background push received` |
 | Legacy host without `push.v1` | No subscription and no silent keepalive fallback; while notifications are enabled the conversation screen shows 「该主机版本不支持完成通知，升级桌面 App 后可用」 above the composer (`AppClient.hostPushSupport` = `UNSUPPORTED_HOST`), dismissible per server (SharedPreferences `agentbuddy_push`) |
 

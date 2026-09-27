@@ -4,7 +4,6 @@ import java.security.MessageDigest
 import uniffi.codex_mobile_client.AppHostPushSupport
 import uniffi.codex_mobile_client.AppPushPlatform
 import uniffi.codex_mobile_client.AppPushRegistration
-import uniffi.codex_mobile_client.ThreadKey
 
 /**
  * Pure (Android-free) pieces of host-reported turn completion notifications
@@ -111,16 +110,8 @@ fun turnNotificationFallbackText(kind: TurnPushKind): Pair<String, String> = whe
     TurnPushKind.FAILED -> "任务未完成" to "任务失败或已中断，点击查看详情"
 }
 
-/** Foreground only: skip the notification for the conversation already on screen. */
-fun shouldSuppressTurnNotification(
-    serverId: String,
-    threadId: String,
-    appInForeground: Boolean,
-    visibleThread: ThreadKey?,
-): Boolean = appInForeground &&
-    visibleThread != null &&
-    visibleThread.serverId == serverId &&
-    visibleThread.threadId == threadId
+/** Keep all alerts quiet while the app is in the foreground, on any screen. */
+fun shouldSuppressNotification(appInForeground: Boolean): Boolean = appInForeground
 
 /**
  * Registration handed to Rust. `null` (no token, or notifications disabled /

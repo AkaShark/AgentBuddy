@@ -12,6 +12,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.akashark.agentbuddy.android.MainActivity
+import com.akashark.agentbuddy.android.state.VisibleThreadTracker
 import com.akashark.agentbuddy.android.util.LLog
 import uniffi.codex_mobile_client.AppClient
 
@@ -70,6 +71,11 @@ object PushNotifications {
         serverId: String?,
         threadId: String?,
     ) {
+        // Applies to both turn notifications and debug alerts on every screen.
+        if (shouldSuppressNotification(VisibleThreadTracker.appInForeground)) {
+            LLog.i("PushNotifications", "app in foreground; dropping tag=$tag")
+            return
+        }
         ensureChannel(context)
         if (!areEnabled(context)) {
             LLog.i("PushNotifications", "notifications disabled; dropping tag=$tag")

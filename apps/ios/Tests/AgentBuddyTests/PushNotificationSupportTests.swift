@@ -106,39 +106,18 @@ final class PushNotificationSupportTests: XCTestCase {
         ]))
     }
 
-    func testForegroundNotificationForVisibleThreadIsSuppressed() {
-        let key = ThreadKey(serverId: "alleycat:abc", threadId: "thread-1")
-
+    func testAllForegroundNotificationsAreSuppressed() {
         XCTAssertEqual(
-            PushNotificationSupport.presentationOptions(for: key, visibleThread: key, isAppActive: true),
+            PushNotificationSupport.presentationOptions(isAppInForeground: true),
             []
         )
     }
 
-    func testOtherNotificationsArePresented() {
-        let key = ThreadKey(serverId: "alleycat:abc", threadId: "thread-1")
-        let otherThread = ThreadKey(serverId: "alleycat:abc", threadId: "thread-2")
-        let sameThreadOtherHost = ThreadKey(serverId: "alleycat:def", threadId: "thread-1")
+    func testBackgroundNotificationsArePresented() {
         let presented: UNNotificationPresentationOptions = [.banner, .list, .sound]
 
         XCTAssertEqual(
-            PushNotificationSupport.presentationOptions(for: key, visibleThread: otherThread, isAppActive: true),
-            presented
-        )
-        XCTAssertEqual(
-            PushNotificationSupport.presentationOptions(for: key, visibleThread: sameThreadOtherHost, isAppActive: true),
-            presented
-        )
-        XCTAssertEqual(
-            PushNotificationSupport.presentationOptions(for: key, visibleThread: nil, isAppActive: true),
-            presented
-        )
-        XCTAssertEqual(
-            PushNotificationSupport.presentationOptions(for: key, visibleThread: key, isAppActive: false),
-            presented
-        )
-        XCTAssertEqual(
-            PushNotificationSupport.presentationOptions(for: nil, visibleThread: nil, isAppActive: true),
+            PushNotificationSupport.presentationOptions(isAppInForeground: false),
             presented
         )
     }

@@ -8,7 +8,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import uniffi.codex_mobile_client.AppHostPushSupport
 import uniffi.codex_mobile_client.AppPushPlatform
-import uniffi.codex_mobile_client.ThreadKey
 
 class TurnCompletionPushTest {
 
@@ -130,21 +129,16 @@ class TurnCompletionPushTest {
         assertTrue(turnNotificationTag(serverId, "thread-1", null).matches(Regex("t-[0-9a-f]{32}")))
     }
 
-    // --- shouldSuppressTurnNotification ---------------------------------------
+    // --- shouldSuppressNotification -------------------------------------------
 
     @Test
-    fun `suppressed only when foreground and viewing the same thread`() {
-        val visible = ThreadKey(serverId = serverId, threadId = "thread-1")
-        assertTrue(shouldSuppressTurnNotification(serverId, "thread-1", appInForeground = true, visibleThread = visible))
-        assertFalse(shouldSuppressTurnNotification(serverId, "thread-1", appInForeground = false, visibleThread = visible))
-        assertFalse(shouldSuppressTurnNotification(serverId, "thread-2", appInForeground = true, visibleThread = visible))
-        assertFalse(shouldSuppressTurnNotification(serverId, "thread-1", appInForeground = true, visibleThread = null))
+    fun `all foreground notifications are suppressed`() {
+        assertTrue(shouldSuppressNotification(appInForeground = true))
     }
 
     @Test
-    fun `same threadId on another host is not suppressed`() {
-        val visible = ThreadKey(serverId = "alleycat:${"0".repeat(64)}", threadId = "thread-1")
-        assertFalse(shouldSuppressTurnNotification(serverId, "thread-1", appInForeground = true, visibleThread = visible))
+    fun `background notifications are not suppressed`() {
+        assertFalse(shouldSuppressNotification(appInForeground = false))
     }
 
     // --- pushRegistrationFor --------------------------------------------------
