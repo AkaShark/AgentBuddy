@@ -36,6 +36,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.akashark.agentbuddy.android.ui.AgentBuddySystemBars
 import com.akashark.agentbuddy.android.core.bridge.GhosttyRendererBridge
 import com.akashark.agentbuddy.android.state.ActiveTerminalRegistry
 import com.akashark.agentbuddy.android.state.AndroidProotBootstrap
@@ -54,6 +55,8 @@ fun TerminalScreen(
     preferredAlleycatNodeId: String? = null,
     onBack: () -> Unit,
 ) {
+    // The terminal is dark in both appearances; keep the bar icons light.
+    AgentBuddySystemBars.ForceDarkBars()
     val context = LocalContext.current
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()

@@ -16,6 +16,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.DisposableEffect
@@ -284,7 +285,9 @@ fun AgentBuddyAppTheme(content: @Composable () -> Unit) {
     }
 
     val activeTheme = AgentBuddyThemeManager.activeTheme
-    AgentBuddySystemBarsEffect(useDarkTheme = activeTheme.type == AgentBuddyColorThemeType.DARK)
+    AgentBuddySystemBarsEffect(
+        useDarkTheme = activeTheme.type == AgentBuddyColorThemeType.DARK || AgentBuddySystemBars.forcesDark,
+    )
 
     val colorScheme = remember(activeTheme) { activeTheme.toMaterialColorScheme() }
 
@@ -305,6 +308,26 @@ fun AgentBuddyAppTheme(content: @Composable () -> Unit) {
             typography = typography,
             content = content,
         )
+    }
+}
+
+/**
+ * Screens that are dark in every appearance (the terminal) ask for light
+ * status / navigation bar icons while they are on screen.
+ */
+object AgentBuddySystemBars {
+    private var darkRequests by mutableIntStateOf(0)
+
+    val forcesDark: Boolean
+        get() = darkRequests > 0
+
+    /** Keeps the system bar icons light while the calling composable is shown. */
+    @Composable
+    fun ForceDarkBars() {
+        DisposableEffect(Unit) {
+            darkRequests += 1
+            onDispose { darkRequests -= 1 }
+        }
     }
 }
 
