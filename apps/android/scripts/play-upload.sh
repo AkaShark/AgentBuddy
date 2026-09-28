@@ -6,6 +6,16 @@ REPO_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 ANDROID_DIR="$REPO_DIR/apps/android"
 GRADLEW="$ANDROID_DIR/gradlew"
 
+# Explicit overrides can also disable local config in CI/tests.
+ENV_FILE="${PLAY_UPLOAD_ENV_FILE:-${HOME}/.agentBuddy/signing/android/play-upload.env}"
+if [[ -z "${PLAY_UPLOAD_ENV_FILE:-}" && ! -f "$ENV_FILE" ]]; then
+    ENV_FILE="${HOME}/.config/litter/play-upload.env"
+fi
+if [[ -f "$ENV_FILE" ]]; then
+    # shellcheck disable=SC1090
+    source "$ENV_FILE"
+fi
+
 VARIANT="${VARIANT:-Release}"
 UPLOAD="${UPLOAD:-1}"
 TRACK="${LITTER_PLAY_TRACK:-internal}"
@@ -14,8 +24,8 @@ TRACK="${LITTER_PLAY_TRACK:-internal}"
 # the source `TRACK` as the origin. Empty = upload only, no promotion.
 PROMOTE_TRACK="${LITTER_PLAY_PROMOTE_TRACK:-}"
 # Release status applied to the *final* landing track (promote dest when
-# promoting, else the upload track). The initial upload to the source track
-# always goes out at 100% COMPLETED so internal testers see it immediately.
+# promoting, else the upload track). Only promotion requires the source
+# upload to be COMPLETED before the destination release is created.
 RELEASE_STATUS="${LITTER_PLAY_RELEASE_STATUS:-}"
 USER_FRACTION="${LITTER_PLAY_USER_FRACTION:-}"
 GRADLE_MAX_WORKERS="${GRADLE_MAX_WORKERS:-}"
@@ -35,12 +45,6 @@ if [[ -n "$GRADLE_EXCLUDED_TASKS" ]]; then
     done
 fi
 
-ENV_FILE="${HOME}/.config/litter/play-upload.env"
-if [[ -f "$ENV_FILE" ]]; then
-    # shellcheck disable=SC1090
-    source "$ENV_FILE"
-fi
-
 require_env() {
     local name="$1"
     if [[ -z "${!name:-}" ]]; then
@@ -49,6 +53,16 @@ require_env() {
         exit 1
     fi
 }
+
+require_env "LITTER_UPLOAD_STORE_FILE"
+require_env "LITTER_UPLOAD_STORE_PASSWORD"
+require_env "LITTER_UPLOAD_KEY_ALIAS"
+require_env "LITTER_UPLOAD_KEY_PASSWORD"
+
+if [[ ! -f "$LITTER_UPLOAD_STORE_FILE" ]]; then
+    echo "Upload keystore not found: $LITTER_UPLOAD_STORE_FILE" >&2
+    exit 1
+fi
 
 # Shared signing + service-account props used by every Gradle invocation.
 # Note: -PLITTER_PLAY_PROMOTE_TRACK is NOT set here; it's added per-promote
@@ -73,31 +87,29 @@ if [[ "$UPLOAD" != "1" ]]; then
         GRADLE_TASKS+=("${EXTRA_TASKS[@]}")
     fi
     GRADLE_TASKS+=("$TASK")
-    "$GRADLEW" -p "$ANDROID_DIR" "${GRADLE_ARGS[@]}" "${GRADLE_TASKS[@]}"
+    "$GRADLEW" -p "$ANDROID_DIR" "${GRADLE_ARGS[@]}" "${GRADLE_TASKS[@]}" "${BASE_PROPS[@]}"
     echo "==> Done"
     exit 0
 fi
 
 require_env "LITTER_PLAY_SERVICE_ACCOUNT_JSON"
-require_env "LITTER_UPLOAD_STORE_FILE"
-require_env "LITTER_UPLOAD_STORE_PASSWORD"
-require_env "LITTER_UPLOAD_KEY_ALIAS"
-require_env "LITTER_UPLOAD_KEY_PASSWORD"
-
 if [[ ! -f "$LITTER_PLAY_SERVICE_ACCOUNT_JSON" ]]; then
     echo "Service account JSON not found: $LITTER_PLAY_SERVICE_ACCOUNT_JSON" >&2
     exit 1
 fi
-if [[ ! -f "$LITTER_UPLOAD_STORE_FILE" ]]; then
-    echo "Upload keystore not found: $LITTER_UPLOAD_STORE_FILE" >&2
-    exit 1
-fi
 
-# ── Step 1: publish to the source track at 100% COMPLETED ───────────────────
-# We always want the source track (e.g. internal) to have a fully-rolled-out
-# release so internal testers and the promotion step both see the build.
+# With promotion, complete the source release before promoting it. Otherwise
+# preserve the requested status, especially draft for initial Play setup.
+PUBLISH_STATUS="${RELEASE_STATUS:-completed}"
+PUBLISH_PROPS=()
+if [[ -n "$PROMOTE_TRACK" ]]; then
+    PUBLISH_STATUS=completed
+elif [[ -n "$USER_FRACTION" ]]; then
+    PUBLISH_PROPS+=(-PLITTER_PLAY_USER_FRACTION="$USER_FRACTION")
+fi
+PUBLISH_PROPS+=(-PLITTER_PLAY_RELEASE_STATUS="$PUBLISH_STATUS")
 PUBLISH_TASK=":app:publish${VARIANT}Bundle"
-echo "==> Publishing $VARIANT bundle to Google Play track '$TRACK' (100% rollout)"
+echo "==> Publishing $VARIANT bundle to Google Play track '$TRACK' [status=$PUBLISH_STATUS]"
 
 declare -a PUBLISH_TASKS=()
 if [[ -n "$EXTRA_GRADLE_TASKS" ]]; then
@@ -108,7 +120,7 @@ fi
 PUBLISH_TASKS+=("$PUBLISH_TASK")
 
 "$GRADLEW" -p "$ANDROID_DIR" "${GRADLE_ARGS[@]}" "${PUBLISH_TASKS[@]}" "${BASE_PROPS[@]}" \
-    -PLITTER_PLAY_RELEASE_STATUS=completed
+    "${PUBLISH_PROPS[@]}"
 
 # ── Step 2: optionally promote to one or more tracks ───────────────────────
 # Each destination is an independent Play release, so fan out.
