@@ -26,4 +26,17 @@ class AppShellStateTest {
         shell.pushConversation(key)
         assertEquals(listOf(Route.Home, Route.Conversation(key)), shell.navStack)
     }
+
+    @Test
+    fun `编辑连接 opens Settings on that host and a plain open does not`() {
+        val shell = AppShellState(initialServerId = null)
+        shell.openSettings(editServerId = "mac")
+        assertEquals(true, shell.showSettings)
+        assertEquals("mac", shell.settingsEditServerId)
+        shell.closeSettings()
+        assertEquals(null, shell.settingsEditServerId)
+        shell.openSettings(editServerId = "mac")
+        shell.openSettings()
+        assertEquals(null, shell.settingsEditServerId)
+    }
 }

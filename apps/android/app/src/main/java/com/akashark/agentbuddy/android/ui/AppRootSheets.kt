@@ -100,6 +100,8 @@ fun AppRootSheets(
                     shell.showAccountForServer = serverId
                 },
                 initialSubScreen = shell.settingsStartDestination,
+                initialEditServerId = shell.settingsEditServerId,
+                onInitialEditShown = { shell.settingsEditServerId = null },
                 onOpenApps = {
                     shell.closeSettings()
                     shell.navigate(Route.Apps)

@@ -26,6 +26,9 @@ fun SettingsSheet(
     onOpenAccount: (serverId: String) -> Unit,
     initialSubScreen: SettingsStartDestination = SettingsStartDestination.TopLevel,
     onOpenApps: (() -> Unit)? = null,
+    /** Opens that host's connection editor right away (home host menu 「编辑连接」). */
+    initialEditServerId: String? = null,
+    onInitialEditShown: () -> Unit = {},
 ) {
     // Sub-screen navigation
     var subScreen by remember(initialSubScreen) {
@@ -54,6 +57,8 @@ fun SettingsSheet(
             onOpenAccount = onOpenAccount,
             onOpenApps = onOpenApps,
             listState = topLevelListState,
+            initialEditServerId = initialEditServerId,
+            onInitialEditShown = onInitialEditShown,
         )
     }
 }

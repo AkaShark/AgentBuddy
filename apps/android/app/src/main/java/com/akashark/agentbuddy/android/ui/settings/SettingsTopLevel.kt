@@ -43,6 +43,8 @@ internal fun SettingsTopLevel(
     onOpenAccount: (serverId: String) -> Unit,
     onOpenApps: (() -> Unit)?,
     listState: LazyListState,
+    initialEditServerId: String? = null,
+    onInitialEditShown: () -> Unit = {},
 ) {
     val appModel = LocalAppModel.current
     val context = LocalContext.current
@@ -164,6 +166,14 @@ internal fun SettingsTopLevel(
         )
     }
     fun serverById(id: String) = snapshot?.servers?.firstOrNull { it.serverId == id }
+
+    // Opened from a host's 「编辑连接」: show its editor once, then forget the
+    // request so returning from a sub-screen does not reopen it.
+    LaunchedEffect(initialEditServerId) {
+        val id = initialEditServerId ?: return@LaunchedEffect
+        editTarget = serverById(id)
+        onInitialEditShown()
+    }
 
     SettingsTopLevelContent(
         state = SettingsTopLevelState(

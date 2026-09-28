@@ -201,7 +201,9 @@ private fun HostMenuButton(
             if (host.canRename) {
                 HostMenuItem("重命名", Icons.Outlined.DriveFileRenameOutline) { close(); handlers.onRename(host) }
             }
-            HostMenuItem("编辑连接", Icons.Outlined.Settings) { close(); handlers.onEdit(host) }
+            if (host.canEditConnection) {
+                HostMenuItem("编辑连接", Icons.Outlined.Settings) { close(); handlers.onEdit(host) }
+            }
             if (host.hasTerminal) {
                 HostMenuItem("终端", Icons.Outlined.Terminal) { close(); handlers.onTerminal(host) }
             }

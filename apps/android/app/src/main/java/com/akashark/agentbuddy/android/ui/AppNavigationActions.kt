@@ -114,6 +114,6 @@ class AppNavigationActions(
             showApps = { shell.navigate(Route.Apps) },
             showTerminal = if (terminalEnabled) ({ shell.navigate(Route.Terminal()) }) else null,
             openHostTerminal = { nodeId -> shell.navigate(Route.Terminal(preferredAlleycatNodeId = nodeId)) },
-            editHost = { shell.openSettings() },
+            editHost = { serverId -> shell.openSettings(editServerId = serverId) },
         )
 }

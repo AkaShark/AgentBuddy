@@ -22,6 +22,9 @@ data class HostSummary(
     /** Remote hosts can be renamed; the in-process local server cannot. */
     val canRename: Boolean get() = !isLocal
 
+    /** The in-process local server has no saved connection to edit. */
+    val canEditConnection: Boolean get() = !isLocal
+
     val runningSummary: String
         get() = if (runningCount > 0) "$runningCount 个任务进行中" else "当前没有运行中的任务"
 }

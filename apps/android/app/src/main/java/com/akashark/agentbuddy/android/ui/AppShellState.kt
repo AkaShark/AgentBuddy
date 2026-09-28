@@ -24,6 +24,9 @@ class AppShellState(initialServerId: String?) {
     var showQrPairing by mutableStateOf(false)
     var showSettings by mutableStateOf(false)
     var settingsStartDestination by mutableStateOf(SettingsStartDestination.TopLevel)
+
+    /** Host whose connection editor Settings opens with; cleared once shown. */
+    var settingsEditServerId by mutableStateOf<String?>(null)
     var showAccountForServer by mutableStateOf<String?>(null)
     var directoryPickerServerId by mutableStateOf<String?>(null)
     var directoryPickerForProject by mutableStateOf(false)
@@ -64,14 +67,19 @@ class AppShellState(initialServerId: String?) {
         navStack = navStack.filterNot(predicate)
     }
 
-    fun openSettings(destination: SettingsStartDestination = SettingsStartDestination.TopLevel) {
+    fun openSettings(
+        destination: SettingsStartDestination = SettingsStartDestination.TopLevel,
+        editServerId: String? = null,
+    ) {
         settingsStartDestination = destination
+        settingsEditServerId = editServerId
         showSettings = true
     }
 
     fun closeSettings() {
         showSettings = false
         settingsStartDestination = SettingsStartDestination.TopLevel
+        settingsEditServerId = null
     }
 
     val interceptsBack: Boolean
