@@ -70,16 +70,13 @@ internal fun ComposerVoiceControl(
             val voiceController = remember { VoiceRuntimeController.shared }
             val voiceSession by voiceController.activeVoiceSession.collectAsState()
             val snapshot by appModel.snapshot.collectAsState()
-            Box(Modifier.size(BuddySize.minHitTarget), contentAlignment = Alignment.Center) {
-                InlineVoiceButton(
-                    phase = snapshot?.voiceSession?.phase,
-                    inputLevel = voiceSession?.inputLevel ?: 0f,
-                    isAvailable = true,
-                    onStart = { scope.launch { voiceController.startVoiceOnThread(appModel, threadKey) } },
-                    onStop = { scope.launch { voiceController.stopActiveVoiceSession(appModel) } },
-                    modifier = Modifier.size(36.dp),
-                )
-            }
+            InlineVoiceButton(
+                phase = snapshot?.voiceSession?.phase,
+                inputLevel = voiceSession?.inputLevel ?: 0f,
+                isAvailable = true,
+                onStart = { scope.launch { voiceController.startVoiceOnThread(appModel, threadKey) } },
+                onStop = { scope.launch { voiceController.stopActiveVoiceSession(appModel) } },
+            )
         }
         else -> ComposerDictationButton(onClick = onStartDictation)
     }

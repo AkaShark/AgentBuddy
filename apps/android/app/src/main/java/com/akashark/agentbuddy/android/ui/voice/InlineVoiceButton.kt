@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
@@ -18,13 +19,22 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.Canvas
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySize
 import uniffi.codex_mobile_client.AppVoiceSessionPhase
 import kotlin.math.abs
 import kotlin.math.max
 
+/**
+ * Realtime voice toggle: a [diameter] disc inside a 48dp hit area that is part
+ * of layout. TalkBack reads 「开始实时语音」 / 「结束实时语音」 as a button.
+ */
 @Composable
 fun InlineVoiceButton(
     phase: AppVoiceSessionPhase?,
@@ -33,16 +43,12 @@ fun InlineVoiceButton(
     onStart: () -> Unit,
     onStop: () -> Unit,
     modifier: Modifier = Modifier,
+    diameter: Dp = 36.dp,
 ) {
     if (!isAvailable) return
 
     val isActive = phase != null && phase != AppVoiceSessionPhase.ERROR
-
-    val buttonSize by animateDpAsState(
-        targetValue = if (isActive) 56.dp else 36.dp,
-        animationSpec = spring(dampingRatio = 0.75f, stiffness = 400f),
-        label = "inlineVoiceSize",
-    )
+    val label = if (isActive) "结束实时语音" else "开始实时语音"
 
     val iconColor = when (phase) {
         AppVoiceSessionPhase.CONNECTING,
@@ -64,37 +70,55 @@ fun InlineVoiceButton(
 
     Box(
         modifier = modifier
-            .size(buttonSize)
+            .sizeIn(minWidth = BuddySize.minHitTarget, minHeight = BuddySize.minHitTarget)
             .clip(CircleShape)
-            .background(if (isActive) iconColor else AgentBuddyTheme.surfaceLight, CircleShape)
-            .clickable(onClick = if (isActive) onStop else onStart),
+            .clickable(role = Role.Button, onClick = if (isActive) onStop else onStart)
+            .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
     ) {
-        if (phase == AppVoiceSessionPhase.CONNECTING) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(iconSize * 0.9f),
-                strokeWidth = 2.dp,
-                color = Color.White,
-            )
-        } else {
-            val waveformLevel by animateFloatAsState(
-                targetValue = if (isActive) inputLevel else 0f,
-                animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
-                label = "inlineWaveformLevel",
-            )
-            val barCount = if (isActive) 5 else 3
-            val tint = if (isActive) Color.White else iconColor
-
-            WaveformBars(
-                level = waveformLevel,
-                barCount = barCount,
-                tint = tint,
-                modifier = Modifier.size(
-                    width = iconSize,
-                    height = iconSize * 0.8f,
-                ),
-            )
+        Box(
+            modifier = Modifier
+                .size(diameter)
+                .background(if (isActive) iconColor else AgentBuddyTheme.surfaceLight, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            InlineVoiceGlyph(phase = phase, isActive = isActive, inputLevel = inputLevel, iconColor = iconColor, iconSize = iconSize)
         }
+    }
+}
+
+@Composable
+private fun InlineVoiceGlyph(
+    phase: AppVoiceSessionPhase?,
+    isActive: Boolean,
+    inputLevel: Float,
+    iconColor: Color,
+    iconSize: Dp,
+) {
+    if (phase == AppVoiceSessionPhase.CONNECTING) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(iconSize * 0.9f),
+            strokeWidth = 2.dp,
+            color = Color.White,
+        )
+    } else {
+        val waveformLevel by animateFloatAsState(
+            targetValue = if (isActive) inputLevel else 0f,
+            animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
+            label = "inlineWaveformLevel",
+        )
+        val barCount = if (isActive) 5 else 3
+        val tint = if (isActive) Color.White else iconColor
+
+        WaveformBars(
+            level = waveformLevel,
+            barCount = barCount,
+            tint = tint,
+            modifier = Modifier.size(
+                width = iconSize,
+                height = iconSize * 0.8f,
+            ),
+        )
     }
 }
 
