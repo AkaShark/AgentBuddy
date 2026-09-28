@@ -58,7 +58,14 @@ fun GalleryComposerPage() {
         Section("正在停止")
         GalleryComposer(ComposerControlsState(hasContent = false, isConnected = true, isTurnActive = true, isStopping = true))
         Section("断线")
-        ComposerNotices(isConnected = false, sendError = null, onRetrySend = null, stopError = null, onDismissStopError = {})
+        ComposerNotices(
+            isConnected = false,
+            sendError = null,
+            onRetrySend = null,
+            onDismissSendError = {},
+            stopError = null,
+            onDismissStopError = {},
+        )
         GalleryComposer(ComposerControlsState(hasContent = true, isConnected = false, isTurnActive = false), "草稿会保留")
         Section("创建中")
         GalleryComposer(ComposerControlsState(hasContent = false, isConnected = true, isTurnActive = false, isCreating = true))
@@ -67,6 +74,7 @@ fun GalleryComposerPage() {
             isConnected = true,
             sendError = "连接已断开，等搭子重连后再试。",
             onRetrySend = {},
+            onDismissSendError = {},
             stopError = "没能停止任务：主机没有响应。",
             onDismissStopError = {},
         )

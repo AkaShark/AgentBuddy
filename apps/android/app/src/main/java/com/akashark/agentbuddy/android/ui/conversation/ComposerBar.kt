@@ -257,6 +257,7 @@ fun ComposerBar(
             isConnected = isConnected,
             sendError = turnState.failedSend?.message,
             onRetrySend = if (turnState.isCreating) null else retrySend,
+            onDismissSendError = { turnState.failedSend = null },
             stopError = turnState.stopError,
             onDismissStopError = { turnState.stopError = null },
         )
