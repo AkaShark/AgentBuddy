@@ -66,6 +66,7 @@ fun DiscoveryScreen(
     var sshHostKeyChange by sshHostKeyChangeState
     val guidedSshAttemptState = remember { mutableStateOf<GuidedSshAttempt?>(null) }
     var guidedSshAttempt by guidedSshAttemptState
+    var pairedServerId by remember { mutableStateOf<String?>(null) }
 
     val savedServersState = remember { mutableStateOf(SavedServerStore.load(context)) }
     var savedServers by savedServersState
@@ -250,10 +251,21 @@ fun DiscoveryScreen(
                         saveAlleycatPairing(context, result)
                         connectActions.reloadSavedServers()
                         appModel.refreshSnapshot()
-                        pendingAutoNavigateServerId = result.serverId
+                        pairedServerId = result.serverId
                     }
                 },
             )
         }
+    }
+
+    pairedServerId?.let { serverId ->
+        AlleycatPairingWatcher(
+            serverId = serverId,
+            onConnected = {
+                pairedServerId = null
+                onDismiss()
+            },
+            onFinished = { pairedServerId = null },
+        )
     }
 }

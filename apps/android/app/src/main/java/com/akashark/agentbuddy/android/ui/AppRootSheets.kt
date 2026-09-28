@@ -5,17 +5,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyBottomSheet
 import com.akashark.agentbuddy.android.state.AppModel
 import com.akashark.agentbuddy.android.state.LocalAccountLoginRequiredException
 import com.akashark.agentbuddy.android.state.NetworkDiscovery
-import com.akashark.agentbuddy.android.state.SavedServerStore
 import com.akashark.agentbuddy.android.ui.discovery.AlleycatAddServerSheet
+import com.akashark.agentbuddy.android.ui.discovery.AlleycatPairingWatcher
 import com.akashark.agentbuddy.android.ui.discovery.DiscoveryScreen
-import com.akashark.agentbuddy.android.ui.discovery.alleycatWireStorageValue
+import com.akashark.agentbuddy.android.ui.discovery.saveAlleycatPairing
 import com.akashark.agentbuddy.android.ui.home.ProjectPickerSheet
 import com.akashark.agentbuddy.android.ui.sessions.DirectoryPickerSheet
 import com.akashark.agentbuddy.android.ui.settings.AccountSheet
@@ -43,6 +45,7 @@ fun AppRootSheets(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val serverOptions = remember(snapshot) { connectedServerOptions(snapshot) }
+    var pairedServerId by remember { mutableStateOf<String?>(null) }
 
     if (shell.showDiscovery) {
         val discoveredServers by networkDiscovery.servers.collectAsState()
@@ -75,20 +78,21 @@ fun AppRootSheets(
                 onConnected = { result ->
                     shell.showQrPairing = false
                     scope.launch {
-                        SavedServerStore.rememberAlleycat(
-                            context = context,
-                            serverId = result.serverId,
-                            displayName = result.displayName,
-                            nodeId = result.nodeId,
-                            relay = result.params.relay,
-                            agentName = result.agentName,
-                            agentWire = alleycatWireStorageValue(result.agentWire),
-                        )
+                        saveAlleycatPairing(context, result)
                         appModel.refreshSnapshot()
+                        pairedServerId = result.serverId
                     }
                 },
             )
         }
+    }
+    // Same post-pair check as 添加主机: a terminal connect error is shown.
+    pairedServerId?.let { serverId ->
+        AlleycatPairingWatcher(
+            serverId = serverId,
+            onConnected = { pairedServerId = null },
+            onFinished = { pairedServerId = null },
+        )
     }
 
     if (shell.showSettings) {
