@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -118,35 +119,38 @@ internal fun AppsListContent(
                 footer = { SettingsFooter("向右滑动重命名，向左滑动删除。") },
             ) {
                 apps.forEachIndexed { index, app ->
-                    SwipeableRow(
-                        leadingAction =
-                            SwipeAction(
-                                icon = Icons.Outlined.Edit,
-                                label = "重命名",
-                                tint = AgentBuddyTheme.swipeFill(BuddySwipeTone.LINK),
-                                onTrigger = { onRename(app) },
-                            ),
-                        trailingAction =
-                            SwipeAction(
-                                icon = Icons.Outlined.Delete,
-                                label = "删除",
-                                tint = AgentBuddyTheme.swipeFill(BuddySwipeTone.DANGER),
-                                onTrigger = { onDelete(app) },
-                            ),
-                    ) {
-                        SettingsRow(
-                            title = app.title.ifBlank { "未命名应用" },
-                            subtitle = "${relativeTime(app.updatedAtMs)}更新",
-                            onClick = { onOpenApp(app.id) },
-                            // The tile is fixed-size, so its letters stop growing at the chrome cap.
-                            leading = {
-                                BuddyChromeTypeLimit {
-                                    BuddyIconTile(BuddyTileContent.Initial(monogramInitials(app.title)))
-                                }
-                            },
-                            trailing = { BuddyChevron() },
-                            modifier = Modifier.background(AgentBuddyTheme.surface),
-                        )
+                    // Keyed so a row's swipe state stays with its app after a delete.
+                    key(app.id) {
+                        SwipeableRow(
+                            leadingAction =
+                                SwipeAction(
+                                    icon = Icons.Outlined.Edit,
+                                    label = "重命名",
+                                    tint = AgentBuddyTheme.swipeFill(BuddySwipeTone.LINK),
+                                    onTrigger = { onRename(app) },
+                                ),
+                            trailingAction =
+                                SwipeAction(
+                                    icon = Icons.Outlined.Delete,
+                                    label = "删除",
+                                    tint = AgentBuddyTheme.swipeFill(BuddySwipeTone.DANGER),
+                                    onTrigger = { onDelete(app) },
+                                ),
+                        ) {
+                            SettingsRow(
+                                title = app.title.ifBlank { "未命名应用" },
+                                subtitle = "${relativeTime(app.updatedAtMs)}更新",
+                                onClick = { onOpenApp(app.id) },
+                                // The tile is fixed-size, so its letters stop growing at the chrome cap.
+                                leading = {
+                                    BuddyChromeTypeLimit {
+                                        BuddyIconTile(BuddyTileContent.Initial(monogramInitials(app.title)))
+                                    }
+                                },
+                                trailing = { BuddyChevron() },
+                                modifier = Modifier.background(AgentBuddyTheme.surface),
+                            )
+                        }
                     }
                     if (index < apps.lastIndex) {
                         SettingsRowDivider(startIndent = BuddySpacing.md + BuddySize.rowTile + BuddySpacing.sm)
