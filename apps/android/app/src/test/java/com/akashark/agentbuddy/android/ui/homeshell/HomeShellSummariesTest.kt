@@ -8,7 +8,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 import uniffi.codex_mobile_client.AppProject
+import uniffi.codex_mobile_client.AppServerCapabilities
 import uniffi.codex_mobile_client.AppServerHealth
+import uniffi.codex_mobile_client.AppServerSnapshot
+import uniffi.codex_mobile_client.AppServerTransportState
 import uniffi.codex_mobile_client.AppSessionSummary
 import uniffi.codex_mobile_client.AppSubagentStatus
 import uniffi.codex_mobile_client.ThreadKey
@@ -53,6 +56,17 @@ class HomeShellSummariesTest {
         )
         assertEquals("mbp::/p/B", ProjectSummaries.hero(summaries, selectedId = null)?.id)
         assertEquals("mbp::/p/A", ProjectSummaries.hero(summaries, selectedId = "mbp::/p/A")?.id)
+    }
+
+    @Test
+    fun `a stale disconnected entry never hides the connected host on the same address`() {
+        val servers = listOf(
+            server("stale", "Mac", "mac.local", AppServerHealth.DISCONNECTED),
+            server("live", "Mac", "MAC.local", AppServerHealth.CONNECTED),
+            server("mini", "Mini", "mini.local", AppServerHealth.DISCONNECTED),
+            server("air", "Air", "air.local", AppServerHealth.CONNECTED),
+        )
+        assertEquals(listOf("air", "live", "mini"), hostsInDisplayOrder(servers).map { it.serverId })
     }
 
     @Test
@@ -129,5 +143,32 @@ class HomeShellSummariesTest {
         stats = null,
         tokenUsage = null,
         goal = null,
+    )
+
+    private fun server(id: String, name: String, host: String, health: AppServerHealth) = AppServerSnapshot(
+        serverId = id,
+        displayName = name,
+        host = host,
+        port = 8390u,
+        wakeMac = null,
+        isLocal = false,
+        health = health,
+        transportState = if (health == AppServerHealth.CONNECTED) AppServerTransportState.CONNECTED else AppServerTransportState.DISCONNECTED,
+        capabilities = AppServerCapabilities(
+            canUseTransportActions = true,
+            canBrowseDirectories = true,
+            canStartThreads = true,
+            canResumeThreads = true,
+            supportsTurnPagination = true,
+        ),
+        account = null,
+        requiresOpenaiAuth = false,
+        rateLimits = null,
+        rateLimitsByRuntime = emptyList(),
+        availableModels = null,
+        agentRuntimes = emptyList(),
+        connectionProgress = null,
+        usageStats = null,
+        codexVersion = null,
     )
 }

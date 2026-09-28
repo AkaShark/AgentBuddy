@@ -162,16 +162,25 @@ private fun projectsState(
     )
 }
 
+/**
+ * Connected hosts first, then by name, one entry per host:port. Sorting runs
+ * before the dedupe so a stale disconnected entry never hides the connected
+ * one for the same address.
+ */
+internal fun hostsInDisplayOrder(servers: List<AppServerSnapshot>): List<AppServerSnapshot> {
+    val seen = HashSet<String>()
+    return servers
+        .sortedWith(compareBy<AppServerSnapshot> { if (it.health == AppServerHealth.CONNECTED) 0 else 1 }.thenBy { it.displayName.lowercase() })
+        .filter { seen.add("${it.host.lowercase()}:${it.port}") }
+}
+
 private fun hostsState(
     input: HomeShellInputs,
     allServers: List<AppServerSnapshot>,
     sessions: List<AppSessionSummary>,
 ): HostsHomeUiState {
     val savedById = input.savedServers.associateBy { it.id }
-    val seen = HashSet<String>()
-    val hosts = allServers
-        .filter { seen.add("${it.host.lowercase()}:${it.port}") }
-        .sortedWith(compareBy<AppServerSnapshot> { if (it.health == AppServerHealth.CONNECTED) 0 else 1 }.thenBy { it.displayName.lowercase() })
+    val hosts = hostsInDisplayOrder(allServers)
         .map { server ->
             val saved = savedById[server.serverId]
             HostSummary(
