@@ -51,5 +51,9 @@ val mintGalleryPages: List<MintGalleryPage> =
         MintGalleryPage("slingshot", "已连接电脑") { GallerySlingshotPage() },
         MintGalleryPage("tasks-all", "全部任务") { GalleryTasksAllPage() },
         MintGalleryPage("tasks-all-forks", "全部任务（只看分叉）") { GalleryTasksAllPage(GallerySessionsFixtures.state(showOnlyForks = true)) },
+        MintGalleryPage("directory-picker", "选择目录") { GalleryDirectoryPickerPage() },
+        MintGalleryPage("directory-picker-error", "选择目录（无法加载）") { GalleryDirectoryPickerPage(error = true) },
+        MintGalleryPage("project-picker", "项目") { GalleryProjectPickerPage() },
+        MintGalleryPage("project-picker-empty", "项目（暂无）") { GalleryProjectPickerPage(empty = true) },
         MintGalleryPage("tasks-all-empty", "全部任务（无主机）") { GalleryTasksAllPage(GallerySessionsFixtures.state(summaries = emptyList(), connectedHostCount = 0, activeKey = null)) },
     )

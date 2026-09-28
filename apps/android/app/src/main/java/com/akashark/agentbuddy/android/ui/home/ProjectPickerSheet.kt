@@ -1,33 +1,20 @@
 package com.akashark.agentbuddy.android.ui.home
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.CreateNewFolder
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,16 +23,50 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.akashark.agentbuddy.android.ui.AgentBuddyTextStyle
+import com.akashark.agentbuddy.android.state.PathDisplay
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
-import com.akashark.agentbuddy.android.ui.scaled
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyButtonKind
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyContextChip
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyDivider
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyEmptyState
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyIconTile
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddySurfaceTone
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyTileContent
+import com.akashark.agentbuddy.android.ui.designsystem.components.buddyCard
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyShapes
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySize
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySpacing
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyTextStyle
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyTextStyle
+import com.akashark.agentbuddy.android.ui.discovery.DiscoverySheetHeader
+import com.akashark.agentbuddy.android.ui.discovery.DiscoverySheetScaffold
+import com.akashark.agentbuddy.android.ui.sessions.SessionsSearchField
 import uniffi.codex_mobile_client.AppProject
 import uniffi.codex_mobile_client.projectDefaultLabel
 
+/** One project (host + folder) row of the picker, already shaped for display. */
+internal data class ProjectPickerItem(
+    val id: String,
+    val name: String,
+    val hostName: String?,
+    val pathDisplay: String,
+    /** Raw cwd, kept for search. */
+    val cwd: String,
+)
+
+/**
+ * Project picker: search by name, host or path, pick a project (the current
+ * one carries a check), or 「新建项目」 to choose a folder in the directory
+ * picker. Every row shows its host, so the same folder name on two computers
+ * stays distinguishable.
+ */
 @Composable
 fun ProjectPickerSheet(
     projects: List<AppProject>,
@@ -54,127 +75,102 @@ fun ProjectPickerSheet(
     onSelect: (AppProject) -> Unit,
     onCreateNew: () -> Unit,
     onDismiss: () -> Unit,
+    selectedProjectId: String? = null,
 ) {
+    val context = LocalContext.current
     var query by remember { mutableStateOf("") }
-    val filtered = remember(query, projects) {
-        val trimmed = query.trim().lowercase()
-        if (trimmed.isEmpty()) projects
-        else projects.filter { project ->
-            val label = projectDefaultLabel(project.cwd).lowercase()
-            val server = (serverNamesById[project.serverId] ?: "").lowercase()
-            label.contains(trimmed) ||
-                project.cwd.lowercase().contains(trimmed) ||
-                server.contains(trimmed)
+    val items = remember(projects, serverNamesById, isLocalById) {
+        projects.map { project ->
+            ProjectPickerItem(
+                id = project.id,
+                name = projectDefaultLabel(project.cwd),
+                hostName = serverNamesById[project.serverId]?.let { if (it == "This Device") "本设备" else it },
+                pathDisplay = PathDisplay.display(project.cwd, isLocalById[project.serverId] == true, context),
+                cwd = project.cwd,
+            )
+        }
+    }
+    ProjectPickerContent(
+        items = items,
+        query = query,
+        onQueryChange = { query = it },
+        selectedProjectId = selectedProjectId,
+        onSelect = { item ->
+            projects.firstOrNull { it.id == item.id }?.let { project ->
+                onSelect(project)
+                onDismiss()
+            }
+        },
+        onCreateNew = onCreateNew,
+        onDismiss = onDismiss,
+    )
+}
+
+/** Stateless body of [ProjectPickerSheet] (also rendered by the gallery). */
+@Composable
+internal fun ProjectPickerContent(
+    items: List<ProjectPickerItem>,
+    query: String,
+    onQueryChange: (String) -> Unit,
+    selectedProjectId: String?,
+    onSelect: (ProjectPickerItem) -> Unit,
+    onCreateNew: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val trimmed = query.trim().lowercase()
+    val filtered = if (trimmed.isEmpty()) {
+        items
+    } else {
+        items.filter { item ->
+            item.name.lowercase().contains(trimmed) ||
+                item.cwd.lowercase().contains(trimmed) ||
+                (item.hostName ?: "").lowercase().contains(trimmed)
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(AgentBuddyTheme.background),
-    ) {
-        // Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TextButton(onClick = onDismiss) {
-                Text("关闭", color = AgentBuddyTheme.textSecondary)
-            }
-            Spacer(Modifier.weight(1f))
-            Text(
-                text = "项目",
-                color = AgentBuddyTheme.textPrimary,
-                fontSize = AgentBuddyTextStyle.subheadline.scaled,
-                fontWeight = FontWeight.SemiBold,
+    DiscoverySheetScaffold(
+        modifier = modifier,
+        contentSpacing = BuddySpacing.md,
+        header = {
+            DiscoverySheetHeader(
+                title = "项目",
+                actionTitle = "关闭",
+                onAction = onDismiss,
+                trailing = {
+                    BuddyContextChip(text = "新建项目", icon = Icons.Outlined.Add, onClick = onCreateNew)
+                },
             )
-            Spacer(Modifier.weight(1f))
-            IconButton(onClick = onCreateNew) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "新建项目",
-                    tint = AgentBuddyTheme.accent,
-                )
-            }
-        }
-
-        // Search
-        OutlinedTextField(
-            value = query,
-            onValueChange = { query = it },
-            placeholder = { Text("搜索项目", color = AgentBuddyTheme.textMuted) },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = null,
-                    tint = AgentBuddyTheme.textMuted,
-                )
-            },
-            trailingIcon = {
-                if (query.isNotEmpty()) {
-                    IconButton(onClick = { query = "" }) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "清除",
-                            tint = AgentBuddyTheme.textMuted,
-                        )
-                    }
-                }
-            },
-            singleLine = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 4.dp),
-        )
-
-        HorizontalDivider(color = AgentBuddyTheme.textMuted.copy(alpha = 0.15f))
-
+        },
+    ) {
+        SessionsSearchField(query = query, onQueryChange = onQueryChange, placeholder = "搜索项目")
         if (filtered.isEmpty()) {
+            BuddyEmptyState(
+                icon = if (trimmed.isEmpty()) Icons.Outlined.CreateNewFolder else Icons.Outlined.Search,
+                title = if (trimmed.isEmpty()) "暂无项目" else "没有匹配的项目",
+                message = if (trimmed.isEmpty()) {
+                    "在主机上选择一个文件夹，创建你的第一个项目。"
+                } else {
+                    "换个名称、主机或路径试试，或打开新的文件夹。"
+                },
+                actionTitle = "新建项目",
+                actionIcon = Icons.Outlined.Add,
+                actionKind = if (trimmed.isEmpty()) BuddyButtonKind.PRIMARY else BuddyButtonKind.SECONDARY,
+                onAction = onCreateNew,
+            )
+        } else {
             Column(
                 modifier = Modifier
-                    .weight(1f)
                     .fillMaxWidth()
-                    .padding(horizontal = 32.dp, vertical = 60.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                    .buddyCard(BuddySurfaceTone.SURFACE, padding = null),
             ) {
-                Icon(
-                    imageVector = Icons.Default.Folder,
-                    contentDescription = null,
-                    tint = AgentBuddyTheme.textMuted,
-                    modifier = Modifier.size(32.dp),
-                )
-                Text(
-                    text = "暂无项目",
-                    color = AgentBuddyTheme.textSecondary,
-                    fontSize = AgentBuddyTextStyle.body.scaled,
-                    fontWeight = FontWeight.Medium,
-                )
-                Text(
-                    text = "点按 + 选择目录并开始你的第一个会话(线程)。",
-                    color = AgentBuddyTheme.textMuted,
-                    fontSize = AgentBuddyTextStyle.caption.scaled,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                )
-                TextButton(onClick = onCreateNew) {
-                    Text("新建项目", color = AgentBuddyTheme.accent)
-                }
-            }
-        } else {
-            LazyColumn(modifier = Modifier.weight(1f)) {
-                items(filtered, key = { it.id }) { project ->
+                filtered.forEachIndexed { index, item ->
+                    if (index > 0) BuddyDivider(startIndent = BuddySpacing.md + BuddySize.rowTile + BuddySpacing.md)
                     ProjectRow(
-                        project = project,
-                        serverName = serverNamesById[project.serverId],
-                        isLocal = isLocalById[project.serverId] == true,
-                        onClick = {
-                            onSelect(project)
-                            onDismiss()
-                        },
+                        item = item,
+                        selected = item.id == selectedProjectId,
+                        onClick = { onSelect(item) },
                     )
-                    HorizontalDivider(color = AgentBuddyTheme.textMuted.copy(alpha = 0.08f))
                 }
             }
         }
@@ -183,55 +179,49 @@ fun ProjectPickerSheet(
 
 @Composable
 private fun ProjectRow(
-    project: AppProject,
-    serverName: String?,
-    isLocal: Boolean,
+    item: ProjectPickerItem,
+    selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+            .clip(BuddyShapes.card)
+            .clickable(role = Role.Button, onClickLabel = "选择此项目", onClick = onClick)
+            .semantics(mergeDescendants = true) { this.selected = selected }
+            .heightIn(min = BuddySize.listRow)
+            .padding(horizontal = BuddySpacing.md, vertical = BuddySpacing.sm),
+        horizontalArrangement = Arrangement.spacedBy(BuddySpacing.md),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            imageVector = Icons.Default.Folder,
-            contentDescription = null,
-            tint = AgentBuddyTheme.textSecondary,
-            modifier = Modifier
-                .size(18.dp)
-                .padding(top = 2.dp),
+        BuddyIconTile(
+            content = BuddyTileContent.Initial(item.name.firstOrNull()?.uppercaseChar()?.toString() ?: "#"),
+            fill = if (selected) AgentBuddyTheme.brand else AgentBuddyTheme.surfaceSoft,
+            foreground = if (selected) AgentBuddyTheme.onBrand else AgentBuddyTheme.textPrimary,
         )
-        Column(modifier = Modifier.weight(1f)) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
-                text = projectDefaultLabel(project.cwd),
+                text = item.name,
+                style = buddyTextStyle(BuddyTextStyle.HEADING),
                 color = AgentBuddyTheme.textPrimary,
-                fontSize = AgentBuddyTextStyle.body.scaled,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                if (serverName != null) {
-                    Text(
-                        text = serverName,
-                        color = AgentBuddyTheme.accent.copy(alpha = 0.75f),
-                        fontSize = AgentBuddyTextStyle.caption2.scaled,
-                        fontFamily = AgentBuddyTheme.monoFont,
-                        maxLines = 1,
-                    )
-                }
-                Text(
-                    text = com.akashark.agentbuddy.android.state.PathDisplay.display(project.cwd, isLocal, context),
-                    color = AgentBuddyTheme.textMuted,
-                    fontSize = AgentBuddyTextStyle.caption2.scaled,
-                    fontFamily = AgentBuddyTheme.monoFont,
-                    maxLines = 1,
-                )
-            }
+            Text(
+                text = listOfNotNull(item.hostName, item.pathDisplay).joinToString(" · "),
+                style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.Normal),
+                color = AgentBuddyTheme.textSecondary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (selected) {
+            Icon(
+                imageVector = Icons.Filled.CheckCircle,
+                contentDescription = "当前项目",
+                tint = AgentBuddyTheme.action,
+                modifier = Modifier.size(24.dp),
+            )
         }
     }
 }
-

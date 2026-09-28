@@ -1,12 +1,8 @@
 package com.akashark.agentbuddy.android.ui.sessions
 
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -16,13 +12,22 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import com.akashark.agentbuddy.android.state.canBrowseDirectories
 import com.akashark.agentbuddy.android.ui.LocalAppModel
 import com.akashark.agentbuddy.android.ui.RecentDirectoryEntry
 import com.akashark.agentbuddy.android.ui.RecentDirectoryStore
-import com.akashark.agentbuddy.android.state.canBrowseDirectories
+import com.akashark.agentbuddy.android.ui.discovery.MintAlertDialog
+import com.akashark.agentbuddy.android.ui.discovery.MintTextField
 import kotlinx.coroutines.launch
 import uniffi.codex_mobile_client.RemotePath
 
+/**
+ * Folder picker for a new task or project: browse a connected host (or this
+ * device), jump to a path, search folders, pick a recent folder, then
+ * 「选择此文件夹」. Records the choice in [RecentDirectoryStore].
+ */
 @Composable
 fun DirectoryPickerSheet(
     servers: List<DirectoryPickerServerOption>,
@@ -221,56 +226,71 @@ fun DirectoryPickerSheet(
     }
 
     if (showGoToPathDialog) {
-        AlertDialog(
+        MintAlertDialog(
             onDismissRequest = {
                 showGoToPathDialog = false
                 pathInput = ""
             },
-            title = { Text("跳转到路径") },
-            text = {
-                OutlinedTextField(
-                    value = pathInput,
-                    onValueChange = { pathInput = it },
-                    singleLine = true,
-                    placeholder = { Text("D:\\Projects 或 /home/me/project") },
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { navigateToInputPath() }) {
-                    Text("前往")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    showGoToPathDialog = false
-                    pathInput = ""
-                }) {
-                    Text("取消")
-                }
-            },
-        )
+            title = "前往路径",
+            confirmTitle = "前往",
+            onConfirm = { navigateToInputPath() },
+        ) {
+            MintTextField(
+                value = pathInput,
+                onValueChange = { pathInput = it },
+                placeholder = "D:\\Projects 或 /home/me/project",
+                label = "路径",
+                monospaced = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
+                keyboardActions = KeyboardActions(onGo = { navigateToInputPath() }),
+            )
+        }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .fillMaxHeight(0.94f),
-    ) {
-        DirectoryPickerHeader(
-            servers = servers,
-            selectedServer = selectedServer,
-            selectedServerId = selectedServerId,
-            showServerMenu = showServerMenu,
+    val isSelectedLocal = isLocalServer(selectedServerId)
+    val homeAnchorLocal = remember(selectedServerId, context) {
+        if (isSelectedLocal) com.akashark.agentbuddy.android.state.HomeAnchor.path(context) else null
+    }
+    fun displayPath(path: String) = com.akashark.agentbuddy.android.state.PathDisplay.display(
+        path,
+        isSelectedLocal,
+        context,
+    )
+    val recentRows = recentEntries.map { recent ->
+        DirectoryRecentRow(
+            path = recent.path,
+            title = recent.path.substringAfterLast('/').ifBlank { recent.path },
+            pathDisplay = displayPath(recent.path),
+            timeLabel = directoryRelativeTime(recent.lastUsedAtEpochMillis),
+        )
+    }
+    val viewState = DirectoryPickerViewState(
+        servers = servers,
+        selectedServerId = selectedServerId,
+        serverLabel = selectedServer?.let { "${it.name} • ${it.sourceLabel}" },
+        showServerMenu = showServerMenu,
+        showHiddenDirectories = showHiddenDirectories,
+        searchQuery = searchQuery,
+        currentPath = currentPath,
+        currentPathDisplay = if (currentPath.isBlank()) "" else displayPath(currentPath),
+        segments = pathSegments(currentPath).map { DirectoryPathSegment(it.first, it.second) },
+        canGoUp = currentPath != "/" && currentPath.isNotEmpty() && currentPath != homeAnchorLocal,
+        canBrowse = selectedServer != null,
+        isLoading = isLoading,
+        errorMessage = errorMessage,
+        continueEntry = recentRows.firstOrNull(),
+        recents = recentRows,
+        folders = filteredEntries,
+    )
+
+    DirectoryPickerLayout(
+        state = viewState,
+        modifier = Modifier.fillMaxHeight(0.94f),
+        actions = DirectoryPickerCallbacks(
             onShowServerMenuChange = { showServerMenu = it },
             onSelectServer = { selectedServerId = it },
-            showHiddenDirectories = showHiddenDirectories,
             onToggleHiddenDirectories = { showHiddenDirectories = !showHiddenDirectories },
-            searchQuery = searchQuery,
             onSearchQueryChange = { searchQuery = it },
-            currentPath = currentPath,
-            context = context,
-            isLocalServer = { isLocalServer(it) },
-            pathSegments = { pathSegments(it) },
             onNavigateUp = { navigateUp() },
             onOpenGoToPath = {
                 pathInput = com.akashark.agentbuddy.android.state.PathDisplay.display(
@@ -282,28 +302,12 @@ fun DirectoryPickerSheet(
                 showGoToPathDialog = true
             },
             onOpenPath = { path -> scope.launch { listDirectory(selectedServerId, path) } },
-        )
-
-        DirectoryPickerContent(
-            isLoading = isLoading,
-            errorMessage = errorMessage,
-            recentEntries = recentEntries,
-            filteredEntries = filteredEntries,
-            searchQuery = searchQuery,
-            selectedServerId = selectedServerId,
-            context = context,
-            isLocalServer = { isLocalServer(it) },
-            completeSelection = { serverId, path -> completeSelection(serverId, path) },
-            navigateInto = { navigateInto(it) },
-            onRetry = { scope.launch { listDirectory(selectedServerId, currentPath.ifEmpty { "/" }) } },
-            onShowServerMenu = { showServerMenu = true },
+            onOpenFolder = { navigateInto(it) },
+            onSelectRecent = { path -> completeSelection(selectedServerId, path) },
             onClearRecents = { recentEntries = recentStore.clear(selectedServerId, limit = 8) },
-        )
-
-        DirectoryPickerFooter(
-            currentPath = currentPath,
+            onRetry = { scope.launch { listDirectory(selectedServerId, currentPath.ifEmpty { "/" }) } },
             onDismiss = onDismiss,
             onSelectCurrentPath = { completeSelection(selectedServerId, currentPath) },
-        )
-    }
+        ),
+    )
 }
