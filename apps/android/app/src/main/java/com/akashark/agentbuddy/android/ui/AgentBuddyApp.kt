@@ -27,15 +27,13 @@ import com.akashark.agentbuddy.android.state.NetworkDiscovery
 import com.akashark.agentbuddy.android.state.PetOverlayController
 import com.akashark.agentbuddy.android.state.SavedProjectStore
 import com.akashark.agentbuddy.android.state.VisibleThreadTracker
-import com.akashark.agentbuddy.android.ui.conversation.ApprovalOverlay
+import com.akashark.agentbuddy.android.ui.approvals.PendingApprovalBannerHost
 import com.akashark.agentbuddy.android.ui.home.DashboardZoomPrefs
 import com.akashark.agentbuddy.android.ui.home.HomeDashboardSupport
 import com.akashark.agentbuddy.android.ui.pets.PetOverlayView
 import com.akashark.agentbuddy.android.ui.sessions.SessionsUiState
 import com.akashark.agentbuddy.android.ui.settings.SettingsStartDestination
 import uniffi.codex_mobile_client.ApprovalKind
-import uniffi.codex_mobile_client.PendingUserInputRequest
-import uniffi.codex_mobile_client.ThreadKey
 import uniffi.codex_mobile_client.deriveProjects
 
 /**
@@ -177,30 +175,13 @@ fun AgentBuddyApp(
                 )
             }
 
-            // Global approval overlay
+            // Approvals for conversations that are not on screen: a compact top
+            // banner. The open conversation shows its own inline approval stack.
             val approvals = snapshot?.pendingApprovals.orEmpty().filter {
                 it.kind != ApprovalKind.MCP_ELICITATION
             }
-            val currentThreadKey = when (val route = currentRoute) {
-                is Route.Conversation -> route.key
-                is Route.ConversationInfo -> route.key
-                is Route.WallpaperSelection -> route.key
-                is Route.WallpaperAdjust -> route.key
-                is Route.RealtimeVoice -> route.key
-                else -> null
-            }
-            val userInputs = snapshot?.pendingUserInputs.orEmpty().filter {
-                currentThreadKey != null &&
-                    it.isRelevantToThread(currentThreadKey) &&
-                    !dismissedUserInputs.isDismissed(it.id)
-            }
-            if (approvals.isNotEmpty() || userInputs.isNotEmpty()) {
-                ApprovalOverlay(
-                    approvals = approvals,
-                    userInputs = userInputs,
-                    appStore = appModel.store,
-                    onDismissUserInput = { id -> dismissedUserInputs.dismiss(id) },
-                )
+            if (approvals.isNotEmpty()) {
+                PendingApprovalBannerHost(appModel = appModel, approvals = approvals)
             }
         }
 
@@ -252,13 +233,6 @@ private fun HomeProjectReconcileEffect(shell: AppShellState, projects: List<unif
         val persistedId = SavedProjectStore.selectedProjectId(context)
         shell.selectedProject = serverProjects.firstOrNull { it.id == persistedId } ?: serverProjects.firstOrNull()
     }
-}
-
-private fun PendingUserInputRequest.isRelevantToThread(threadKey: ThreadKey): Boolean {
-    if (serverId != threadKey.serverId) return false
-
-    val requestThreadId = threadId.trim()
-    return requestThreadId.isEmpty() || requestThreadId == threadKey.threadId
 }
 
 private fun android.content.Context.animationsDisabled(): Boolean {

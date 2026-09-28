@@ -11,16 +11,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyBottomSheet
 import com.akashark.agentbuddy.android.state.AppModel
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
 import com.akashark.agentbuddy.android.ui.AgentBuddyTextStyle
@@ -54,11 +53,7 @@ internal fun ConversationSheets(
     onSlashError: (String) -> Unit,
 ) {
     if (showPermissionsSheet) {
-        ModalBottomSheet(
-            onDismissRequest = onDismissPermissionsSheet,
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = AgentBuddyTheme.background,
-        ) {
+        BuddyBottomSheet(onDismissRequest = onDismissPermissionsSheet) {
             ComposerPermissionsSheet(
                 threadKey = threadKey,
                 onDismiss = onDismissPermissionsSheet,
@@ -67,11 +62,7 @@ internal fun ConversationSheets(
     }
 
     if (showCollaborationModeSelector) {
-        ModalBottomSheet(
-            onDismissRequest = onDismissCollaborationModeSelector,
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = AgentBuddyTheme.background,
-        ) {
+        BuddyBottomSheet(onDismissRequest = onDismissCollaborationModeSelector) {
             CollaborationModeSheet(
                 presets = collaborationModePresets.ifEmpty { fallbackCollaborationModePresets() },
                 selectedMode = thread?.collaborationMode ?: uniffi.codex_mobile_client.AppModeKind.DEFAULT,
@@ -92,11 +83,7 @@ internal fun ConversationSheets(
     }
 
     if (showExperimentalSheet) {
-        ModalBottomSheet(
-            onDismissRequest = onDismissExperimentalSheet,
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = AgentBuddyTheme.background,
-        ) {
+        BuddyBottomSheet(onDismissRequest = onDismissExperimentalSheet) {
             ComposerExperimentalSheet(
                 serverId = threadKey.serverId,
                 onDismiss = onDismissExperimentalSheet,
@@ -106,11 +93,7 @@ internal fun ConversationSheets(
     }
 
     if (showSkillsSheet) {
-        ModalBottomSheet(
-            onDismissRequest = onDismissSkillsSheet,
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = AgentBuddyTheme.background,
-        ) {
+        BuddyBottomSheet(onDismissRequest = onDismissSkillsSheet) {
             ComposerSkillsSheet(
                 serverId = threadKey.serverId,
                 cwd = thread?.info?.cwd ?: appModel.launchState.snapshot.value.currentCwd.ifBlank { "/" },
@@ -121,11 +104,7 @@ internal fun ConversationSheets(
     }
 
     if (showSessionDiffSheet && !pinnedContext?.diffSections.isNullOrEmpty()) {
-        ModalBottomSheet(
-            onDismissRequest = onDismissSessionDiffSheet,
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = AgentBuddyTheme.background,
-        ) {
+        BuddyBottomSheet(onDismissRequest = onDismissSessionDiffSheet) {
             SessionDiffSheet(
                 sections = pinnedContext?.diffSections.orEmpty(),
                 onDismiss = onDismissSessionDiffSheet,

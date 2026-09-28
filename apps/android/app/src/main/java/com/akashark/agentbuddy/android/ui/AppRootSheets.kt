@@ -1,8 +1,6 @@
 package com.akashark.agentbuddy.android.ui
 
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -10,6 +8,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyBottomSheet
 import com.akashark.agentbuddy.android.state.AppModel
 import com.akashark.agentbuddy.android.state.LocalAccountLoginRequiredException
 import com.akashark.agentbuddy.android.state.NetworkDiscovery
@@ -55,11 +54,7 @@ fun AppRootSheets(
             networkDiscovery.stopScanning()
         }
         LaunchedEffect(Unit) { networkDiscovery.startScanning(context) }
-        ModalBottomSheet(
-            onDismissRequest = closeDiscovery,
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = AgentBuddyTheme.background,
-        ) {
+        BuddyBottomSheet(onDismissRequest = closeDiscovery) {
             DiscoveryScreen(
                 discoveredServers = discoveredServers,
                 isScanning = isScanning,
@@ -73,11 +68,7 @@ fun AppRootSheets(
 
     // 「扫码连接」 opens QR pairing directly, without the Discovery chooser.
     if (shell.showQrPairing) {
-        ModalBottomSheet(
-            onDismissRequest = { shell.showQrPairing = false },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = AgentBuddyTheme.background,
-        ) {
+        BuddyBottomSheet(onDismissRequest = { shell.showQrPairing = false }) {
             AlleycatAddServerSheet(
                 onDismiss = { shell.showQrPairing = false },
                 startScanningOnAppear = true,
@@ -101,11 +92,7 @@ fun AppRootSheets(
     }
 
     if (shell.showSettings) {
-        ModalBottomSheet(
-            onDismissRequest = { shell.showSettings = false },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = AgentBuddyTheme.background,
-        ) {
+        BuddyBottomSheet(onDismissRequest = { shell.showSettings = false }) {
             SettingsSheet(
                 onDismiss = shell::closeSettings,
                 onOpenAccount = { serverId ->
@@ -126,11 +113,7 @@ fun AppRootSheets(
             shell.directoryPickerServerId = null
             shell.directoryPickerForProject = false
         }
-        ModalBottomSheet(
-            onDismissRequest = close,
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = AgentBuddyTheme.background,
-        ) {
+        BuddyBottomSheet(onDismissRequest = close) {
             DirectoryPickerSheet(
                 servers = serverOptions,
                 initialServerId = initialServerId,
@@ -158,11 +141,7 @@ fun AppRootSheets(
     }
 
     if (shell.showProjectPicker) {
-        ModalBottomSheet(
-            onDismissRequest = { shell.showProjectPicker = false },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = AgentBuddyTheme.background,
-        ) {
+        BuddyBottomSheet(onDismissRequest = { shell.showProjectPicker = false }) {
             val serverNames = remember(snapshot) { snapshot?.servers?.associate { it.serverId to it.displayName }.orEmpty() }
             val isLocalById = remember(snapshot) { snapshot?.servers?.associate { it.serverId to it.isLocal }.orEmpty() }
             ProjectPickerSheet(
@@ -183,11 +162,7 @@ fun AppRootSheets(
     }
 
     shell.showAccountForServer?.let { serverId ->
-        ModalBottomSheet(
-            onDismissRequest = { shell.showAccountForServer = null },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = AgentBuddyTheme.background,
-        ) {
+        BuddyBottomSheet(onDismissRequest = { shell.showAccountForServer = null }) {
             AccountSheet(serverId = serverId, onDismiss = { shell.showAccountForServer = null })
         }
     }
