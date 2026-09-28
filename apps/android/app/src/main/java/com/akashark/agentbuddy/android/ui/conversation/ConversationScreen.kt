@@ -10,12 +10,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -31,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyReduceMotion
 import com.akashark.agentbuddy.android.push.PUSH_PREFS
 import com.akashark.agentbuddy.android.push.PushNotifications
 import com.akashark.agentbuddy.android.push.shouldShowUnsupportedHostHint
@@ -67,6 +64,7 @@ fun ConversationScreen(
     val appModel = LocalAppModel.current
     val snapshot by appModel.snapshot.collectAsState()
     val scope = rememberCoroutineScope()
+    val reduceMotion = buddyReduceMotion
     val context = androidx.compose.ui.platform.LocalContext.current
 
     ConversationRenderPrewarm(appModel = appModel, context = context)
@@ -221,7 +219,7 @@ fun ConversationScreen(
     LaunchedEffect(threadKey, displayedTurnCount, transcriptTailSignature, followScrollToken, streamingRenderTick) {
         if (shouldFollowTail && displayedTurns.isNotEmpty()) {
             val bottomAnchorIndex = conversationBottomAnchorIndex(displayedTurnCount)
-            if (hasPositionedInitialTail) {
+            if (hasPositionedInitialTail && !reduceMotion) {
                 listState.animateScrollToItem(bottomAnchorIndex)
             } else {
                 listState.scrollToItem(bottomAnchorIndex)
@@ -303,22 +301,19 @@ fun ConversationScreen(
                     )
                 }
 
-                // Scroll-to-bottom FAB
+                // 「回到最新」 when the reader has scrolled up.
                 if (!isAtBottom && displayedTurns.isNotEmpty()) {
-                    SmallFloatingActionButton(
+                    ConversationScrollToLatestButton(
                         onClick = {
                             scope.launch {
-                                listState.animateScrollToItem(conversationBottomAnchorIndex(displayedTurnCount))
+                                val target = conversationBottomAnchorIndex(displayedTurnCount)
+                                if (reduceMotion) listState.scrollToItem(target) else listState.animateScrollToItem(target)
                             }
                         },
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .padding(bottom = 8.dp),
-                        containerColor = AgentBuddyTheme.surface,
-                        contentColor = AgentBuddyTheme.textPrimary,
-                    ) {
-                        Icon(Icons.Default.KeyboardArrowDown, "滚动到底部", modifier = Modifier.size(20.dp))
-                    }
+                    )
                 }
             }
 
