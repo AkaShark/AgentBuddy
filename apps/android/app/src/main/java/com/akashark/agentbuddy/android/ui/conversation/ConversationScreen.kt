@@ -17,12 +17,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -39,6 +41,7 @@ import com.akashark.agentbuddy.android.ui.LocalAppModel
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
 import com.akashark.agentbuddy.android.ui.WallpaperManager
 import com.akashark.agentbuddy.android.ui.WallpaperType
+import com.akashark.agentbuddy.android.ui.approvals.KeepApprovalBannerBelow
 import com.akashark.agentbuddy.android.ui.isNearListBottom
 import com.akashark.agentbuddy.android.ui.rememberStickyFollowTail
 import kotlinx.coroutines.launch
@@ -233,6 +236,9 @@ fun ConversationScreen(
         WallpaperManager.resolvedConfig(threadKey)?.type?.let { it != WallpaperType.NONE } == true
     }
     val headerScrimColor = if (hasWallpaper) AgentBuddyTheme.background.copy(alpha = 0.75f) else AgentBuddyTheme.background
+    // The app-level approval banner stays below this header (back / 「…」).
+    var headerHeightPx by remember { mutableIntStateOf(0) }
+    KeepApprovalBannerBelow(headerHeightPx)
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Wallpaper fills the entire screen edge-to-edge (behind status + nav bars)
@@ -245,6 +251,7 @@ fun ConversationScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .onSizeChanged { headerHeightPx = it.height }
                     .background(headerScrimColor),
             ) {
                 Spacer(Modifier.statusBarsPadding())

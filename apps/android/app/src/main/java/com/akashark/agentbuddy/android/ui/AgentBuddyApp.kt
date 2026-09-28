@@ -175,13 +175,19 @@ fun AgentBuddyApp(
                 )
             }
 
-            // Approvals for conversations that are not on screen: a compact top
-            // banner. The open conversation shows its own inline approval stack.
+            // Approvals whose inline stack is not on screen: a compact top
+            // banner. The open conversation shows its own inline approval stack;
+            // the voice screen answers in the banner so the call keeps running.
             val approvals = snapshot?.pendingApprovals.orEmpty().filter {
                 it.kind != ApprovalKind.MCP_ELICITATION
             }
             if (approvals.isNotEmpty()) {
-                PendingApprovalBannerHost(appModel = appModel, approvals = approvals)
+                PendingApprovalBannerHost(
+                    appModel = appModel,
+                    approvals = approvals,
+                    onScreenThread = visibleThreadKey,
+                    keepCurrentScreen = currentRoute is Route.RealtimeVoice,
+                )
             }
         }
 
