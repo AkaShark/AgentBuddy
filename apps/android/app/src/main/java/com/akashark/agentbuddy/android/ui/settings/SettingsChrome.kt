@@ -279,7 +279,7 @@ internal fun SettingsSegmentedControl(
                 modifier =
                     Modifier
                         .weight(1f)
-                        .heightIn(min = 40.dp)
+                        .heightIn(min = BuddySize.minHitTarget)
                         .then(
                             if (selected) {
                                 Modifier.background(AgentBuddyTheme.surface, BuddyShapes.control)
