@@ -7,14 +7,19 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.Check
@@ -30,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -99,10 +105,15 @@ internal fun ComposerPendingInputHost(
     )
 }
 
+/** Share of the visible height (screen minus keyboard) the question card may take. */
+private const val PENDING_INPUT_MAX_FRACTION = 0.45f
+
 /**
  * Inline request_user_input card above the composer (radius 20). Answers come
  * from [userInputAnswers], which the composer keys by request id so they never
- * leak into the next request.
+ * leak into the next request. The questions scroll inside a card capped at
+ * [PENDING_INPUT_MAX_FRACTION] of the visible height, so 「提交」 (outside the
+ * scroll) stays on screen with many questions or the keyboard up.
  */
 @Composable
 internal fun ComposerPendingInputCard(
@@ -115,10 +126,13 @@ internal fun ComposerPendingInputCard(
     onSubmit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val imeBottom = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
+    val maxHeight = (LocalConfiguration.current.screenHeightDp.dp - imeBottom) * PENDING_INPUT_MAX_FRACTION
     Column(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = BuddySpacing.md, vertical = BuddySpacing.xxs)
+            .heightIn(max = maxHeight)
             .buddyCard(BuddySurfaceTone.SURFACE, shape = BuddyShapes.confirmCard, padding = null)
             .padding(start = BuddySpacing.md, end = BuddySpacing.xxs, bottom = BuddySpacing.md),
         verticalArrangement = Arrangement.spacedBy(BuddySpacing.sm),
@@ -156,7 +170,10 @@ internal fun ComposerPendingInputCard(
             )
         }
         Column(
-            modifier = Modifier.padding(end = BuddySpacing.sm),
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .verticalScroll(rememberScrollState())
+                .padding(end = BuddySpacing.sm),
             verticalArrangement = Arrangement.spacedBy(BuddySpacing.md),
         ) {
             for (question in pendingUserInput.questions) {
@@ -166,6 +183,11 @@ internal fun ComposerPendingInputCard(
                     onAnswerChange = { onAnswerChange(question.id, it) },
                 )
             }
+        }
+        Column(
+            modifier = Modifier.padding(end = BuddySpacing.sm),
+            verticalArrangement = Arrangement.spacedBy(BuddySpacing.sm),
+        ) {
             pendingUserInputSubmitError?.let { message ->
                 BuddyBanner(tone = BuddyBannerTone.DANGER, message = message)
             }
