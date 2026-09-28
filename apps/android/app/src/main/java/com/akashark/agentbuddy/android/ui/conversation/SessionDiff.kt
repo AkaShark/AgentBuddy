@@ -332,28 +332,28 @@ private fun SessionDiffSectionHeader(
         Text(
             text = section.title.uppercase(),
             color = AgentBuddyTheme.textSecondary,
-            fontSize = AgentBuddyTextStyle.caption2.scaled,
+            fontSize = AgentBuddyTextStyle.caption.scaled,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.weight(1f),
         )
         Text(
             text = "+${section.summary.additions}",
             color = AgentBuddyTheme.success,
-            fontSize = AgentBuddyTextStyle.caption2.scaled,
+            fontSize = AgentBuddyTextStyle.caption.scaled,
             fontWeight = FontWeight.SemiBold,
             fontFamily = BerkeleyMono,
         )
         Text(
             text = "-${section.summary.deletions}",
             color = AgentBuddyTheme.danger,
-            fontSize = AgentBuddyTextStyle.caption2.scaled,
+            fontSize = AgentBuddyTextStyle.caption.scaled,
             fontWeight = FontWeight.SemiBold,
             fontFamily = BerkeleyMono,
         )
         Text(
             text = if (expanded) "▲" else "▼",
             color = AgentBuddyTheme.textMuted,
-            fontSize = AgentBuddyTextStyle.caption2.scaled,
+            fontSize = AgentBuddyTextStyle.caption.scaled,
             fontWeight = FontWeight.Bold,
         )
     }

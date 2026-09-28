@@ -47,4 +47,17 @@ class ComposerBarSlashCommandTest {
     fun parseSlashCommandInvocationRejectsUnknownCommands() {
         assertNull(parseSlashCommandInvocation("/definitely-not-real"))
     }
+
+    @Test
+    fun hostCommandsAreMarkedSoOfflineSendsKeepTheirText() {
+        val needsHost = listOf("/goal pause", "/fork", "/review", "/rename Ship It")
+            .mapNotNull(::parseSlashCommandInvocation)
+            .map { it.needsHost }
+        assertEquals(listOf(true, true, true, true), needsHost)
+
+        val local = listOf("/plan", "/model", "/rename", "/skills", "/permissions", "/resume")
+            .mapNotNull(::parseSlashCommandInvocation)
+            .map { it.needsHost }
+        assertEquals(List(6) { false }, local)
+    }
 }

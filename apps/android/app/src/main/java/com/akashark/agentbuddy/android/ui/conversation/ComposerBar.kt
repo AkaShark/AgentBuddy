@@ -253,7 +253,10 @@ fun ComposerBar(
         when (gate) {
             ComposerSendGate.SLASH_COMMAND -> {
                 if (pendingUserInput != null) onDismissPendingUserInput?.invoke()
-                if (invocation != null && dispatchSlashCommand(invocation.command.name, invocation.args)) clearComposer()
+                if (invocation != null && dispatchSlashCommand(invocation.command.name, invocation.args)) {
+                    // Offline, host commands fail: keep the text so it can be sent again.
+                    if (isConnected || !invocation.needsHost) clearComposer()
+                }
             }
             ComposerSendGate.SEND -> {
                 if (pendingUserInput != null) onDismissPendingUserInput?.invoke()

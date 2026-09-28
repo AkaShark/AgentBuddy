@@ -19,7 +19,19 @@ import com.akashark.agentbuddy.android.ui.scaled
 
 /** Slash command definitions matching iOS. */
 internal data class SlashCommand(val name: String, val description: String)
-internal data class SlashInvocation(val command: SlashCommand, val args: String?)
+internal data class SlashInvocation(val command: SlashCommand, val args: String?) {
+    /**
+     * Commands that call the host (rather than opening a local sheet). Offline
+     * they fail, so the composer keeps their text for another try.
+     */
+    val needsHost: Boolean
+        get() =
+            when (command.name) {
+                "goal", "fork", "review" -> true
+                "rename" -> !args.isNullOrBlank()
+                else -> false
+            }
+}
 
 private val SLASH_COMMANDS = listOf(
     SlashCommand("plan", "切换协作模式"),
