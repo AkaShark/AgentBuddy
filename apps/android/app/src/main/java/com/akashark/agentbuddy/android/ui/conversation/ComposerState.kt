@@ -2,6 +2,7 @@ package com.akashark.agentbuddy.android.ui.conversation
 
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import com.akashark.agentbuddy.android.state.AppModel
 
 /** What the primary composer control does right now. */
 internal enum class ComposerSendAction {
@@ -104,6 +105,19 @@ internal fun composerSendGate(
  */
 internal fun shouldRestoreFailedDraft(currentText: String, hasCurrentAttachments: Boolean): Boolean =
     currentText.isEmpty() && !hasCurrentAttachments
+
+/**
+ * A draft that appeared in the per-thread store without this composer writing
+ * it (a failed send restored after the activity was recreated) fills the
+ * composer only while it is empty, like [shouldRestoreFailedDraft].
+ */
+internal fun shouldAdoptStoredDraft(
+    stored: AppModel.ComposerDraft,
+    lastWritten: AppModel.ComposerDraft?,
+    currentText: String,
+    hasCurrentAttachments: Boolean,
+): Boolean =
+    !stored.isEmpty && stored != lastWritten && shouldRestoreFailedDraft(currentText, hasCurrentAttachments)
 
 internal fun insertComposerTranscript(current: TextFieldValue, transcript: String): TextFieldValue {
     val insertion = transcript.trim()

@@ -2,6 +2,7 @@ package com.akashark.agentbuddy.android.ui.conversation
 
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import com.akashark.agentbuddy.android.state.AppModel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -127,6 +128,20 @@ class ComposerStateTest {
         assertTrue(shouldRestoreFailedDraft(currentText = "", hasCurrentAttachments = false))
         assertFalse(shouldRestoreFailedDraft(currentText = "typed meanwhile", hasCurrentAttachments = false))
         assertFalse(shouldRestoreFailedDraft(currentText = "", hasCurrentAttachments = true))
+    }
+
+    @Test
+    fun `draft restored into the store from elsewhere fills only an empty composer`() {
+        val restored = AppModel.ComposerDraft(text = "帮我检查登录流程")
+        val empty = AppModel.ComposerDraft()
+        assertTrue(shouldAdoptStoredDraft(restored, lastWritten = empty, currentText = "", hasCurrentAttachments = false))
+        assertTrue(shouldAdoptStoredDraft(restored, lastWritten = null, currentText = "", hasCurrentAttachments = false))
+        // Never over text or attachments added meanwhile.
+        assertFalse(shouldAdoptStoredDraft(restored, lastWritten = empty, currentText = "新的", hasCurrentAttachments = false))
+        assertFalse(shouldAdoptStoredDraft(restored, lastWritten = empty, currentText = "", hasCurrentAttachments = true))
+        // Our own write echoing back (e.g. the user just deleted it) is ignored.
+        assertFalse(shouldAdoptStoredDraft(restored, lastWritten = restored, currentText = "", hasCurrentAttachments = false))
+        assertFalse(shouldAdoptStoredDraft(empty, lastWritten = null, currentText = "", hasCurrentAttachments = false))
     }
 
     @Test

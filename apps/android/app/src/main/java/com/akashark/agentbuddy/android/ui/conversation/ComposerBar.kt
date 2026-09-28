@@ -26,6 +26,8 @@ import com.akashark.agentbuddy.android.state.VoiceTranscriptionManager
 import com.akashark.agentbuddy.android.ui.LocalAppModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import uniffi.codex_mobile_client.AppSearchFilesRequest
 import uniffi.codex_mobile_client.AppThreadGoal
@@ -84,8 +86,26 @@ fun ComposerBar(
     val text = textFieldValue.text
     var attachedImage by remember(threadKey) { mutableStateOf(appModel.composerDraft(threadKey).attachment) }
     var attachedFiles by remember(threadKey) { mutableStateOf(appModel.composerDraft(threadKey).fileAttachments) }
+    // The draft this composer last wrote, so the store watcher below only
+    // reacts to drafts written from elsewhere.
+    val lastWrittenDraft = remember(threadKey) { mutableStateOf<AppModel.ComposerDraft?>(null) }
     LaunchedEffect(threadKey, text, attachedImage, attachedFiles) {
-        appModel.setComposerDraft(threadKey, AppModel.ComposerDraft(text, attachedImage, attachedFiles))
+        val draft = AppModel.ComposerDraft(text, attachedImage, attachedFiles)
+        lastWrittenDraft.value = draft
+        appModel.setComposerDraft(threadKey, draft)
+    }
+    // A failed send puts its draft back into the store. If the activity was
+    // recreated while the send was in flight, this composer seeded before
+    // that happened; pick the draft up (only into an empty composer).
+    LaunchedEffect(threadKey) {
+        appModel.composerDrafts.map { it[threadKey] }.distinctUntilChanged().collect { stored ->
+            val hasAttachments = attachedImage != null || attachedFiles.isNotEmpty()
+            if (stored != null && shouldAdoptStoredDraft(stored, lastWrittenDraft.value, textFieldValue.text, hasAttachments)) {
+                textFieldValue = TextFieldValue(stored.text, selection = TextRange(stored.text.length))
+                attachedImage = stored.attachment
+                attachedFiles = stored.fileAttachments
+            }
+        }
     }
     var showAttachMenu by remember { mutableStateOf(false) }
     var showExpanded by remember { mutableStateOf(false) }
