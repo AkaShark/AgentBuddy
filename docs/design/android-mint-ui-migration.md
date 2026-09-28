@@ -113,7 +113,7 @@
 
 - 构建与测试：`make android`（含 Rust）成功；`make test-android` 全部通过（见 QA 矩阵中的新增测试）；`make rust-test` 通过。
 - 截图来自 DEBUG 状态画廊，使用固定数据，不连接主机。启动方式：`adb shell am start -n com.akashark.agentbuddy.android/.MainActivity --es mint_gallery <页面> [--ez mint_dark true]`（启动前先 `am force-stop`）。页面包括 `components`、`home`、`home-detail`、`home-empty`、`home-notasks`、`home-offline`、`home-search`、`projects`、`hosts`、`newtask`、`conversation`、`conversation-long`、`conversation-header`、`composer`、`approvals`、`approval-banner`、`tasks-all`、`discovery`、`pair`、`ssh-login`、`directory-picker`、`project-picker`、`settings`、`appearance`、`themes`、`wallpaper`、`account`、`server-edit`、`info`、`models`、`apps`、`voice`、`terminal-chrome` 等 50 个。画廊从不启动运行时，也不写入用户的主题设置。
-- 51 个页面都截了浅色和深色；首页、会话、审批、输入框另截了系统字号 2.0 倍（浅色和深色）。大字号下底栏、按钮行、标题栏不出屏，审批按钮改为上下排列。
+- 51 个页面都截了浅色和深色；首页、会话、审批、输入框另截了系统字号 2.0 倍（浅色和深色）。截图与重构前的基线截图保存在本地 `artifacts/android-mint-ui/`（和设计素材一样不在 Git 中）。大字号下底栏、按钮行、标题栏不出屏，审批按钮改为上下排列。
 - 真机运行真实 App：首页（1 台主机在线、无任务的空态）、项目页、主机页（「This Device」显示为「本机」）。
 - 独立审查：两个只读审查代理按行为丢失、P0 行为、Rust 归属、并发和无障碍审查了全部改动，共报告 2 个重要问题（实时语音页无法处理审批；从全部任务分叉可能闪退）和 23 个次要问题。全部核实并修复（第 5 节），另有一个只读验证代理逐项复核了修复。`make test-android` 全部通过（156 项）。
 
