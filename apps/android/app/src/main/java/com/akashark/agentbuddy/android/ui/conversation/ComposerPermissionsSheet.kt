@@ -33,6 +33,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyTextStyle
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyTextStyle
 import com.akashark.agentbuddy.android.ui.LocalAppModel
 import com.akashark.agentbuddy.android.ui.AgentBuddyTextStyle
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
@@ -324,9 +326,8 @@ private fun PermissionSummaryRow(
     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Text(
             text = label,
-            color = AgentBuddyTheme.textMuted,
-            fontSize = 10f.scaled,
-            fontWeight = FontWeight.Medium,
+            color = AgentBuddyTheme.textSecondary,
+            style = buddyTextStyle(BuddyTextStyle.CAPTION, FontWeight.Medium),
         )
         Text(
             text = value,

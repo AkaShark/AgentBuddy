@@ -35,6 +35,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyReduceMotion
 import com.akashark.agentbuddy.android.R
 import kotlin.math.abs
 import kotlin.math.cos
@@ -52,11 +53,15 @@ fun AnimatedSplashScreen() {
     // Frame clock for continuous animation
     val frameTime = remember { mutableLongStateOf(0L) }
     val startTime = remember { System.nanoTime() }
+    // With animations removed the splash stays on its first frame.
+    val reduceMotion = buddyReduceMotion
 
-    LaunchedEffect(Unit) {
-        while (true) {
-            withFrameMillis {
-                frameTime.longValue = it
+    if (!reduceMotion) {
+        LaunchedEffect(Unit) {
+            while (true) {
+                withFrameMillis {
+                    frameTime.longValue = it
+                }
             }
         }
     }
@@ -64,7 +69,7 @@ fun AnimatedSplashScreen() {
     // Force recomposition every frame by reading frameTime
     @Suppress("UNUSED_VARIABLE")
     val currentFrame = frameTime.longValue
-    val elapsed = (System.nanoTime() - startTime) / 1_000_000_000.0
+    val elapsed = if (reduceMotion) 0.0 else (System.nanoTime() - startTime) / 1_000_000_000.0
 
     Box(
         modifier = Modifier
