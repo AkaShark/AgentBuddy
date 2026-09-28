@@ -239,6 +239,7 @@ fun ConversationScreen(
     // The app-level approval banner stays below this header (back / 「…」).
     var headerHeightPx by remember { mutableIntStateOf(0) }
     KeepApprovalBannerBelow(headerHeightPx)
+    var minigameHeightPx by remember { mutableIntStateOf(0) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Wallpaper fills the entire screen edge-to-edge (behind status + nav bars)
@@ -324,9 +325,19 @@ fun ConversationScreen(
                 }
             }
 
-            // Bottom area: gradient fade + pinned context + composer + nav bar inset
-            // Hidden while the thinking-minigame overlay is up.
-            if (!isMinigameActive) ConversationBottomArea(
+            // Bottom area: gradient fade + pinned context + composer + nav bar inset.
+            // While the thinking-minigame overlay covers it, this thread's
+            // approvals and pending question stay reachable just above the game.
+            if (isMinigameActive) {
+                ConversationMinigameAttentionArea(
+                    appModel = appModel,
+                    threadKey = threadKey,
+                    items = items,
+                    pendingInput = pendingInput,
+                    onDismissPendingUserInput = { pendingInput?.let { dismissedUserInputs.dismiss(it.id) } },
+                    minigameHeightPx = minigameHeightPx,
+                )
+            } else ConversationBottomArea(
                 appModel = appModel,
                 threadKey = threadKey,
                 thread = thread,
@@ -388,6 +399,7 @@ fun ConversationScreen(
             items = items,
             isMinigameActive = isMinigameActive,
             minigameOverlay = minigameOverlay,
+            onHeightChanged = { minigameHeightPx = it },
         )
 
         ConversationSheets(

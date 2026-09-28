@@ -38,11 +38,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.akashark.agentbuddy.android.state.AppModel
@@ -227,6 +232,45 @@ internal fun ConversationBottomArea(
     }
 }
 
+/**
+ * Shown instead of [ConversationBottomArea] while the thinking minigame covers
+ * the bottom of the screen: this thread's approval stack and pending question,
+ * sitting just above the game ([minigameHeightPx] from the bottom edge).
+ */
+@Composable
+internal fun ConversationMinigameAttentionArea(
+    appModel: AppModel,
+    threadKey: ThreadKey,
+    items: List<HydratedConversationItem>,
+    pendingInput: PendingUserInputRequest?,
+    onDismissPendingUserInput: () -> Unit,
+    minigameHeightPx: Int,
+) {
+    val scope = rememberCoroutineScope()
+    var answers by remember(pendingInput?.id) { mutableStateOf(mapOf<String, String>()) }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        com.akashark.agentbuddy.android.ui.approvals.ConversationApprovalStack(
+            appModel = appModel,
+            threadKey = threadKey,
+            items = items,
+            modifier = Modifier.align(Alignment.CenterHorizontally).widthIn(max = COMPOSER_MAX_WIDTH),
+        )
+        if (pendingInput != null) {
+            Box(Modifier.align(Alignment.CenterHorizontally).widthIn(max = COMPOSER_MAX_WIDTH)) {
+                ComposerPendingInputHost(
+                    appModel = appModel,
+                    scope = scope,
+                    request = pendingInput,
+                    answers = answers,
+                    onAnswersChange = { answers = it },
+                    onDismiss = onDismissPendingUserInput,
+                )
+            }
+        }
+        Spacer(Modifier.height(with(LocalDensity.current) { minigameHeightPx.toDp() }))
+    }
+}
+
 @Composable
 internal fun BoxScope.ConversationMinigameOverlay(
     appModel: AppModel,
@@ -234,6 +278,7 @@ internal fun BoxScope.ConversationMinigameOverlay(
     items: List<HydratedConversationItem>,
     isMinigameActive: Boolean,
     minigameOverlay: MinigameOverlayState,
+    onHeightChanged: (Int) -> Unit = {},
 ) {
     // Thinking-indicator minigame overlay: bottom 40% of the screen.
     // Slides up from the bottom when appearing and slides back out on
@@ -245,6 +290,7 @@ internal fun BoxScope.ConversationMinigameOverlay(
         exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
         modifier = Modifier
             .align(Alignment.BottomCenter)
+            .onSizeChanged { onHeightChanged(it.height) }
             .fillMaxWidth()
             .fillMaxHeight(0.4f)
             .padding(horizontal = 8.dp, vertical = 8.dp)
