@@ -130,15 +130,18 @@ fun ExplorationGroupRow(
                     .background(previewFill)
                     .drawWithContent {
                         drawContent()
-                        // Soft top fade over entries that scrolled away.
-                        val fadeHeight = BuddySpacing.lg.toPx()
-                        drawRect(
-                            brush = Brush.verticalGradient(
-                                listOf(previewFill, previewFill, Color.Transparent),
-                                endY = fadeHeight,
-                            ),
-                            size = Size(size.width, fadeHeight),
-                        )
+                        // Soft top fade over entries that scrolled away; none
+                        // before scrolling, so the first entry stays crisp.
+                        if (previewScrollState.value > 0) {
+                            val fadeHeight = BuddySpacing.lg.toPx()
+                            drawRect(
+                                brush = Brush.verticalGradient(
+                                    listOf(previewFill, previewFill, Color.Transparent),
+                                    endY = fadeHeight,
+                                ),
+                                size = Size(size.width, fadeHeight),
+                            )
+                        }
                     }
                     .padding(horizontal = BuddySpacing.sm, vertical = BuddySpacing.xs)
                     .verticalScroll(previewScrollState),
