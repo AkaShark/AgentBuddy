@@ -194,7 +194,7 @@ fun ComposerPermissionsSheet(threadKey: ThreadKey? = null, onDismiss: () -> Unit
                             "该运行时自行管理其权限。"
                         },
                         color = AgentBuddyTheme.textMuted,
-                        fontSize = AgentBuddyTextStyle.caption2.scaled,
+                        style = buddyTextStyle(BuddyTextStyle.CAPTION),
                     )
                 }
                 Text(
@@ -210,7 +210,7 @@ fun ComposerPermissionsSheet(threadKey: ThreadKey? = null, onDismiss: () -> Unit
                     } else {
                         AgentBuddyTheme.accentStrong
                     },
-                    fontSize = AgentBuddyTextStyle.caption2.scaled,
+                    style = buddyTextStyle(BuddyTextStyle.CAPTION),
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier
                         .background(
@@ -309,7 +309,7 @@ private fun PermissionSummaryTile(
         Text(
             text = title,
             color = AgentBuddyTheme.textSecondary,
-            fontSize = AgentBuddyTextStyle.caption2.scaled,
+            style = buddyTextStyle(BuddyTextStyle.CAPTION),
             fontWeight = FontWeight.SemiBold,
         )
         PermissionSummaryRow(label = "批准", value = approval, accent = accent)
@@ -403,7 +403,7 @@ private fun PermissionDropdownField(
                 Text(
                     text = selectedOption?.description ?: "此设置由服务器管理。",
                     color = AgentBuddyTheme.textMuted,
-                    fontSize = AgentBuddyTextStyle.caption2.scaled,
+                    style = buddyTextStyle(BuddyTextStyle.CAPTION),
                     maxLines = 1,
                 )
             }
@@ -432,7 +432,7 @@ private fun PermissionDropdownField(
                             Text(
                                 text = option.description,
                                 color = AgentBuddyTheme.textMuted,
-                                fontSize = AgentBuddyTextStyle.caption2.scaled,
+                                style = buddyTextStyle(BuddyTextStyle.CAPTION),
                             )
                         }
                     },

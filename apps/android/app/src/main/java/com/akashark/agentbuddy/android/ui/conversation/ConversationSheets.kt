@@ -23,6 +23,8 @@ import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyBottomShe
 import com.akashark.agentbuddy.android.state.AppModel
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
 import com.akashark.agentbuddy.android.ui.AgentBuddyTextStyle
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyTextStyle
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyTextStyle
 import com.akashark.agentbuddy.android.ui.scaled
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -305,7 +307,7 @@ private fun CollaborationModeSheet(
                         Text(
                             text = collaborationModeEffortLabel(effort),
                             color = AgentBuddyTheme.textSecondary,
-                            fontSize = AgentBuddyTextStyle.caption2.scaled,
+                            style = buddyTextStyle(BuddyTextStyle.CAPTION),
                         )
                     }
                 }
@@ -313,7 +315,7 @@ private fun CollaborationModeSheet(
                     Text(
                         text = "已选择",
                         color = AgentBuddyTheme.accent,
-                        fontSize = AgentBuddyTextStyle.caption2.scaled,
+                        style = buddyTextStyle(BuddyTextStyle.CAPTION),
                         fontWeight = FontWeight.SemiBold,
                     )
                 }

@@ -87,7 +87,7 @@ fun VoiceCallView(
                         null -> ""
                     },
                     color = AgentBuddyTheme.accent,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                 )
             }
 

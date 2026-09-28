@@ -36,6 +36,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.akashark.agentbuddy.android.ui.LocalAppModel
 import com.akashark.agentbuddy.android.ui.AgentBuddyTextStyle
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyTextStyle
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyTextStyle
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
 import com.akashark.agentbuddy.android.ui.scaled
 import kotlinx.coroutines.launch
@@ -249,7 +251,7 @@ fun ComposerSkillsSheet(
                                     Text(
                                         "已启用",
                                         color = AgentBuddyTheme.accent,
-                                        fontSize = AgentBuddyTextStyle.caption2.scaled,
+                                        style = buddyTextStyle(BuddyTextStyle.CAPTION),
                                         modifier = Modifier
                                             .background(AgentBuddyTheme.accent.copy(alpha = 0.14f), RoundedCornerShape(999.dp))
                                             .padding(horizontal = 6.dp, vertical = 2.dp),
@@ -257,7 +259,7 @@ fun ComposerSkillsSheet(
                                 }
                             }
                             Text(skill.description, color = AgentBuddyTheme.textSecondary, fontSize = AgentBuddyTextStyle.caption.scaled)
-                            Text(skill.path.value, color = AgentBuddyTheme.textMuted, fontSize = AgentBuddyTextStyle.caption2.scaled)
+                            Text(skill.path.value, color = AgentBuddyTheme.textMuted, style = buddyTextStyle(BuddyTextStyle.CAPTION))
                         }
                     }
                 }
