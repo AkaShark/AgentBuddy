@@ -174,6 +174,7 @@ fun ComposerBar(
         isStopping = stoppingTurnId != null,
         isCreating = turnState.isCreating,
         isVoiceBusy = isRecording || isTranscribing,
+        isSlashCommand = parseSlashCommandInvocation(text) != null,
     )
 
     fun clearComposer() {

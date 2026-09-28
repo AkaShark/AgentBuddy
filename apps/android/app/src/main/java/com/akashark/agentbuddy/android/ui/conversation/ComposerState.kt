@@ -24,13 +24,19 @@ internal data class ComposerControlsState(
     val isStopping: Boolean = false,
     val isCreating: Boolean = false,
     val isVoiceBusy: Boolean = false,
+    /** The text is a known slash command; those run locally, even offline. */
+    val isSlashCommand: Boolean = false,
 ) {
-    /** Send (or queue) is possible: content, a live host, no send in flight. */
+    /**
+     * Send (or queue) is possible: content, a live host, no send in flight. A
+     * slash command only needs content and idle dictation.
+     */
     val canSend: Boolean
-        get() = hasContent && isConnected && !isVoiceBusy && !isCreating
+        get() = hasContent && !isVoiceBusy && (isSlashCommand || (isConnected && !isCreating))
 
+    /** A slash command runs now, so it never shows 「排队」. */
     val sendAction: ComposerSendAction
-        get() = if (isTurnActive) ComposerSendAction.QUEUE else ComposerSendAction.SEND
+        get() = if (isTurnActive && !isSlashCommand) ComposerSendAction.QUEUE else ComposerSendAction.SEND
 
     /** A running turn always shows an explicit stop control. */
     val showsStop: Boolean

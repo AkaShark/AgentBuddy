@@ -54,6 +54,26 @@ class ComposerStateTest {
     }
 
     @Test
+    fun `slash command with arguments can be sent offline`() {
+        val offline = ComposerControlsState(hasContent = true, isConnected = false, isTurnActive = false, isSlashCommand = true)
+        assertTrue(offline.canSend)
+        assertEquals(ComposerSendAction.SEND, offline.sendAction)
+        // A normal message stays blocked offline.
+        assertFalse(offline.copy(isSlashCommand = false).canSend)
+        // Dictation still blocks it.
+        assertFalse(offline.copy(isVoiceBusy = true).canSend)
+    }
+
+    @Test
+    fun `slash command during a running turn runs instead of queueing`() {
+        val running = ComposerControlsState(hasContent = true, isConnected = true, isTurnActive = true, isSlashCommand = true)
+        assertEquals(ComposerSendAction.SEND, running.sendAction)
+        assertTrue(running.showsSend)
+        assertTrue(running.showsStop)
+        assertEquals(ComposerSendAction.QUEUE, running.copy(isSlashCommand = false).sendAction)
+    }
+
+    @Test
     fun `creating and dictation block double submits`() {
         val creating = ComposerControlsState(hasContent = true, isConnected = true, isTurnActive = false, isCreating = true)
         assertFalse(creating.canSend)
