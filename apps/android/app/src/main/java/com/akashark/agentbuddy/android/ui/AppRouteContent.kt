@@ -50,7 +50,7 @@ fun AppRouteContent(
                 serverId = route.serverId,
                 title = route.title,
                 sessionsUiState = sessionsUiState,
-                onOpenConversation = shell::navigateToConversation,
+                onOpenConversation = shell::pushConversation,
                 onNewSession = { navActions.openDirectoryPicker(route.serverId) },
                 onBack = shell::navigateBack,
                 onInfo = route.serverId?.let { serverId -> { shell.navigate(Route.ServerInfo(serverId)) } },

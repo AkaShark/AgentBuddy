@@ -48,6 +48,17 @@ class AppShellState(initialServerId: String?) {
         navStack = listOf(Route.Home, Route.Conversation(key))
     }
 
+    /**
+     * Opens a conversation on top of the current route so back returns there
+     * (全部任务, reached from home or `/resume`). A no-op when that
+     * conversation is already on top, e.g. after the active-thread
+     * auto-navigation handled a fork first.
+     */
+    fun pushConversation(key: ThreadKey) {
+        if ((currentRoute as? Route.Conversation)?.key == key) return
+        navigate(Route.Conversation(key))
+    }
+
     /** Drops routes matching [predicate] (wallpaper flows pop back to their origin). */
     fun popRoutes(predicate: (Route) -> Boolean) {
         navStack = navStack.filterNot(predicate)
