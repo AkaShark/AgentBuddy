@@ -122,6 +122,21 @@ fun GalleryApprovalBannerPage() {
             onOpen = {},
             onClose = {},
         )
+        BuddySectionHeader("在当前页处理（实时语音、小游戏）")
+        PendingApprovalBannerContent(
+            count = 1,
+            detail = approvalBannerDetail(GalleryApprovalFixtures.HOST, "让登录体验更流畅"),
+            actionTitle = "收起",
+            onOpen = {},
+            onClose = {},
+        )
+        ApprovalCard(
+            approval = GalleryApprovalFixtures.command,
+            hostName = GalleryApprovalFixtures.HOST,
+            submittingDecision = null,
+            failure = null,
+            onDecision = {},
+        )
         Box(Modifier.fillMaxWidth().height(BuddySpacing.xl))
         Text(
             text = "横幅不遮挡页面，关闭只隐藏横幅，不等于拒绝。",

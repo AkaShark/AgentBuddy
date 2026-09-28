@@ -20,6 +20,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import com.akashark.agentbuddy.android.ui.conversation.ComposerControlsState
 import com.akashark.agentbuddy.android.ui.conversation.ComposerDictationButton
 import com.akashark.agentbuddy.android.ui.conversation.ComposerEditorCard
+import com.akashark.agentbuddy.android.ui.conversation.ComposerExpandedDialog
 import com.akashark.agentbuddy.android.ui.conversation.ComposerIndicatorsRow
 import com.akashark.agentbuddy.android.ui.conversation.ComposerNotices
 import com.akashark.agentbuddy.android.ui.conversation.ComposerPendingInputCard
@@ -67,6 +68,11 @@ fun GalleryComposerPage() {
             onDismissStopError = {},
         )
         GalleryComposer(ComposerControlsState(hasContent = true, isConnected = false, isTurnActive = false), "草稿会保留")
+        Section("断线 · 斜杠命令仍可运行")
+        GalleryComposer(
+            ComposerControlsState(hasContent = true, isConnected = false, isTurnActive = true, isSlashCommand = true),
+            "/rename 新标题",
+        )
         Section("创建中")
         GalleryComposer(ComposerControlsState(hasContent = false, isConnected = true, isTurnActive = false, isCreating = true))
         Section("发送失败")
@@ -100,8 +106,44 @@ fun GalleryComposerPage() {
             onSubmit = {},
         )
         GalleryComposer(ComposerControlsState(hasContent = false, isConnected = true, isTurnActive = true))
+        Section("等待你的回答 · 多个问题（卡片内滚动）")
+        ComposerPendingInputCard(
+            pendingUserInput = galleryPendingInput.copy(
+                id = "input-2",
+                questions = galleryPendingInput.questions + (1..4).map { n ->
+                    PendingUserInputQuestion(
+                        id = "extra-$n",
+                        header = "补充 $n",
+                        question = "第 $n 个补充问题：这里需要注意什么？",
+                        isOtherAllowed = true,
+                        isSecret = false,
+                        options = emptyList(),
+                    )
+                },
+            ),
+            userInputAnswers = answers,
+            onAnswerChange = { id, value -> answers = answers + (id to value) },
+            pendingUserInputSubmitError = "连接已断开，等搭子重连后再试。",
+            isSubmittingPendingUserInput = false,
+            onDismissPendingUserInput = {},
+            onSubmit = {},
+        )
         ComposerIndicatorsRow(contextPercent = 62, rateLimits = null)
     }
+}
+
+/** The full-screen editor while a turn runs: the send control reads 「排队」. */
+@Composable
+fun GalleryComposerExpandedQueuePage() {
+    var text by remember { mutableStateOf("顺便把退出流程也检查一下，\n然后补一段发布说明。") }
+    ComposerExpandedDialog(
+        text = text,
+        onTextChange = { text = it },
+        onSend = {},
+        onDismiss = {},
+        canSend = true,
+        queues = true,
+    )
 }
 
 @Composable
