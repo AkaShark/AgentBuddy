@@ -57,7 +57,6 @@ fun ComposerExpandedDialog(
     notice: String? = null,
 ) {
     val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -67,6 +66,10 @@ fun ComposerExpandedDialog(
             dismissOnClickOutside = false,
         ),
     ) {
+        // Inside the dialog's own composition, so the editor's focus target is
+        // attached before focus is requested (from outside it could run first
+        // and throw "FocusRequester is not initialized").
+        LaunchedEffect(Unit) { focusRequester.requestFocus() }
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = AgentBuddyTheme.background,
