@@ -61,6 +61,13 @@ private val BuddyPlatformTextStyle = PlatformTextStyle(includeFontPadding = fals
 fun buddyFontFamily(style: BuddyTextStyle): FontFamily =
     if (style.isMonospaced || AgentBuddyThemeManager.monoFontEnabled) BerkeleyMono else FontFamily.Default
 
+/** Smallest Mint text size in sp: the spec allows nothing below 12. */
+const val BUDDY_MIN_TEXT_SIZE = 12f
+
+/** [size] scaled by the app text size, floored at [BUDDY_MIN_TEXT_SIZE] (极小 / 小 shrink the scale). */
+fun buddyScaledTextSize(size: Float, textScale: Float): Float =
+    (size * textScale).coerceAtLeast(BUDDY_MIN_TEXT_SIZE)
+
 /** A Mint text style: font, weight and line height, scaled with system and app text size. */
 @Composable
 @ReadOnlyComposable
@@ -72,7 +79,7 @@ fun buddyTextStyle(
     return TextStyle(
         fontFamily = buddyFontFamily(style),
         fontWeight = weight ?: style.weight,
-        fontSize = (style.size * scale).sp,
+        fontSize = buddyScaledTextSize(style.size, scale).sp,
         // Relative line height keeps the ratio under Android's non-linear font scaling.
         lineHeight = (style.lineHeight / style.size).em,
         platformStyle = BuddyPlatformTextStyle,
