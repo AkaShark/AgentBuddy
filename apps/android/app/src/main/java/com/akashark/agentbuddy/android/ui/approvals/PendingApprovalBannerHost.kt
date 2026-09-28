@@ -118,7 +118,7 @@ internal fun PendingApprovalBannerHost(
                         ApprovalCard(
                             approval = approval,
                             hostName = hostName,
-                            submittingDecision = coordinator.submitting[approval.id],
+                            submittingDecision = coordinator.lockedDecisions[approval.id],
                             failure = coordinator.failures[approval.id],
                             onDecision = { decision -> submitApprovalDecision(appModel, coordinator, approval, decision) },
                         )

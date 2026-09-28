@@ -72,7 +72,7 @@ internal fun ConversationApprovalStack(
         pending = pending,
         selectedIndex = index,
         hostName = hostDisplayName(server?.displayName),
-        submitting = coordinator.submitting,
+        submitting = coordinator.lockedDecisions,
         failures = coordinator.failures,
         outcome = coordinator.outcome(threadKey)?.kind,
         onSelect = { next ->

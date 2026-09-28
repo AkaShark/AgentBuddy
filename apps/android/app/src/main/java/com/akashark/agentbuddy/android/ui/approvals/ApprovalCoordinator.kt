@@ -57,14 +57,28 @@ class ApprovalCoordinator(
     var outcomes: Map<String, ApprovalOutcome> by mutableStateOf(emptyMap())
         private set
 
+    /**
+     * Requests this phone already answered that the snapshot still lists, and
+     * the decision sent. Their card stays locked until the request leaves.
+     */
+    var decided: Map<String, ApprovalDecisionValue> by mutableStateOf(emptyMap())
+        private set
+
     private var lastPending: Map<String, PendingApproval> = emptyMap()
-    private val decidedLocally = mutableSetOf<String>()
 
     fun isSubmitting(approvalId: String): Boolean = submitting.containsKey(approvalId)
 
     /**
+     * The decision in flight or already sent for each request; a card with an
+     * entry here keeps its actions disabled.
+     */
+    val lockedDecisions: Map<String, ApprovalDecisionValue>
+        get() = decided + submitting
+
+    /**
      * Sends [decision] through [respond]. Returns false without calling
-     * [respond] when a decision for this request is already in flight.
+     * [respond] when a decision for this request is already in flight or was
+     * already sent.
      */
     suspend fun submit(
         approval: PendingApproval,
@@ -72,7 +86,7 @@ class ApprovalCoordinator(
         respond: suspend (requestId: String, decision: ApprovalDecisionValue) -> Unit,
     ): Boolean {
         val id = approval.id
-        if (submitting.containsKey(id)) return false
+        if (submitting.containsKey(id) || decided.containsKey(id)) return false
         submitting = submitting + (id to decision)
         failures = failures - id
         try {
@@ -80,7 +94,7 @@ class ApprovalCoordinator(
             recordOutcome(approval, outcomeKindFor(decision))
             // If the snapshot already dropped the request while we were
             // waiting, reconcile has run and there is nothing left to match.
-            if (lastPending.containsKey(id)) decidedLocally += id
+            if (lastPending.containsKey(id)) decided = decided + (id to decision)
             return true
         } catch (error: CancellationException) {
             throw error
@@ -107,12 +121,14 @@ class ApprovalCoordinator(
         pending.forEach { current.putIfAbsent(it.id, it) }
         var nextFailures = failures
         var nextOutcomes = outcomes
+        var nextDecided = decided
         for ((id, approval) in lastPending) {
             if (current.containsKey(id)) continue
             nextFailures = nextFailures - id
-            val decided = decidedLocally.remove(id)
+            val decidedHere = nextDecided.containsKey(id)
+            nextDecided = nextDecided - id
             // A decision still in flight records its own outcome when it returns.
-            if (!decided && !submitting.containsKey(id)) {
+            if (!decidedHere && !submitting.containsKey(id)) {
                 approval.outcomeKey()?.let { key ->
                     nextOutcomes = nextOutcomes +
                         (key to ApprovalOutcome(id, ApprovalOutcomeKind.RESOLVED_ELSEWHERE, approval.kind, clock()))
@@ -121,6 +137,7 @@ class ApprovalCoordinator(
         }
         if (nextFailures != failures) failures = nextFailures
         if (nextOutcomes != outcomes) outcomes = nextOutcomes
+        if (nextDecided != decided) decided = nextDecided
         lastPending = current
     }
 

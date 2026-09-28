@@ -94,6 +94,44 @@ class ApprovalCoordinatorTest {
     }
 
     @Test
+    fun `answered request stays locked until the snapshot drops it`() = runBlocking {
+        val coordinator = ApprovalCoordinator()
+        val request = approval("1")
+        coordinator.reconcile(listOf(request))
+        var calls = 0
+
+        assertTrue(coordinator.submit(request, ApprovalDecisionValue.ACCEPT) { _, _ -> calls += 1 })
+        assertTrue(coordinator.submitting.isEmpty())
+        assertEquals(mapOf("1" to ApprovalDecisionValue.ACCEPT), coordinator.lockedDecisions)
+
+        // The snapshot still lists it: a second tap sends nothing.
+        coordinator.reconcile(listOf(request))
+        assertFalse(coordinator.submit(request, ApprovalDecisionValue.DECLINE) { _, _ -> calls += 1 })
+        assertEquals(1, calls)
+        assertEquals(ApprovalOutcomeKind.ALLOWED_ONCE, coordinator.outcome(threadA)?.kind)
+
+        coordinator.reconcile(emptyList())
+        assertTrue(coordinator.lockedDecisions.isEmpty())
+        assertEquals(ApprovalOutcomeKind.ALLOWED_ONCE, coordinator.outcome(threadA)?.kind)
+    }
+
+    @Test
+    fun `in-flight decision is locked too`() = runBlocking {
+        val coordinator = ApprovalCoordinator()
+        val request = approval("1")
+        coordinator.reconcile(listOf(request))
+        val gate = CompletableDeferred<Unit>()
+
+        val first = async { coordinator.submit(request, ApprovalDecisionValue.DECLINE) { _, _ -> gate.await() } }
+        yield()
+        assertEquals(mapOf("1" to ApprovalDecisionValue.DECLINE), coordinator.lockedDecisions)
+
+        gate.complete(Unit)
+        assertTrue(first.await())
+        assertEquals(mapOf("1" to ApprovalDecisionValue.DECLINE), coordinator.lockedDecisions)
+    }
+
+    @Test
     fun `failed submission keeps the request with a retryable failure`() = runBlocking {
         val coordinator = ApprovalCoordinator()
         val request = approval("1")
@@ -107,6 +145,7 @@ class ApprovalCoordinatorTest {
         assertEquals(ApprovalFailure("host said no", ApprovalDecisionValue.ACCEPT_FOR_SESSION), coordinator.failures["1"])
         assertNull(coordinator.outcome(threadA))
         assertTrue(coordinator.submitting.isEmpty())
+        assertTrue(coordinator.lockedDecisions.isEmpty())
 
         // A successful retry clears the failure.
         assertTrue(coordinator.submit(request, ApprovalDecisionValue.ACCEPT_FOR_SESSION) { _, _ -> })
