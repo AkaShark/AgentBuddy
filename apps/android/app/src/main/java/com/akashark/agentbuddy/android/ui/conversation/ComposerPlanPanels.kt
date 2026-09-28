@@ -3,10 +3,12 @@ package com.akashark.agentbuddy.android.ui.conversation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,12 +25,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.akashark.agentbuddy.android.ui.BerkeleyMono
 import com.akashark.agentbuddy.android.ui.AgentBuddyTextStyle
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySize
 import com.akashark.agentbuddy.android.ui.scaled
 
 @Composable
@@ -102,27 +106,34 @@ internal fun CollaborationModeChip(
         AgentBuddyTheme.textPrimary
     }
 
-    Row(
+    // Compact pill inside a 48dp hit area that is part of layout.
+    Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(999.dp))
-            .background(container)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .heightIn(min = BuddySize.minHitTarget)
+            .clickable(role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = label,
-            color = contentColor,
-            fontSize = AgentBuddyTextStyle.caption.scaled,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Icon(
-            Icons.Default.KeyboardArrowDown,
-            contentDescription = "打开协作模式选择器",
-            tint = contentColor,
-            modifier = Modifier.size(14.dp),
-        )
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(999.dp))
+                .background(container)
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = label,
+                color = contentColor,
+                fontSize = AgentBuddyTextStyle.caption.scaled,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Icon(
+                Icons.Default.KeyboardArrowDown,
+                contentDescription = "打开协作模式选择器",
+                tint = contentColor,
+                modifier = Modifier.size(14.dp),
+            )
+        }
     }
 }
 
@@ -160,7 +171,8 @@ internal fun PlanProgressPanel(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { expanded = !expanded },
+                .heightIn(min = BuddySize.minHitTarget)
+                .clickable(role = Role.Button, onClickLabel = if (expanded) "收起计划" else "展开计划") { expanded = !expanded },
         ) {
             Text(
                 text = if (expanded) "计划进度" else "计划",

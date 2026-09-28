@@ -24,7 +24,10 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.outlined.NotificationsOff
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyBanner
 import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyBannerTone
 import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySize
@@ -401,23 +404,32 @@ private fun lastUserAndAssistantText(
     return lastUser to lastAssistant
 }
 
+/** 36dp launcher disc inside a 48dp hit area that is part of layout. */
 @Composable
 private fun MinigameLaunchButton(onClick: () -> Unit) {
-    androidx.compose.material3.Surface(
-        onClick = onClick,
-        shape = androidx.compose.foundation.shape.CircleShape,
-        color = AgentBuddyTheme.surface.copy(alpha = 0.9f),
-        border = androidx.compose.foundation.BorderStroke(0.5.dp, AgentBuddyTheme.accent.copy(alpha = 0.3f)),
-        shadowElevation = 2.dp,
-        modifier = Modifier.size(36.dp),
+    Box(
+        modifier = Modifier
+            .size(BuddySize.minHitTarget)
+            .clip(CircleShape)
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = "等待时玩个小游戏" },
+        contentAlignment = Alignment.Center,
     ) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = Icons.Filled.SportsEsports,
-                contentDescription = "等待时玩个小游戏",
-                tint = AgentBuddyTheme.accent,
-                modifier = Modifier.size(18.dp),
-            )
+        androidx.compose.material3.Surface(
+            shape = CircleShape,
+            color = AgentBuddyTheme.surface.copy(alpha = 0.9f),
+            border = androidx.compose.foundation.BorderStroke(0.5.dp, AgentBuddyTheme.accent.copy(alpha = 0.3f)),
+            shadowElevation = 2.dp,
+            modifier = Modifier.size(36.dp),
+        ) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Filled.SportsEsports,
+                    contentDescription = null,
+                    tint = AgentBuddyTheme.accent,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
         }
     }
 }

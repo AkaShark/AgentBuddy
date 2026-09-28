@@ -1,7 +1,6 @@
 package com.akashark.agentbuddy.android.ui.conversation
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,23 +40,14 @@ internal fun GoalTextInputDialog(
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
-            Text(
-                text = confirmLabel,
-                color = AgentBuddyTheme.accent,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier
-                    .clickable { onConfirm(value) }
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-            )
+            TextButton(onClick = { onConfirm(value) }) {
+                Text(text = confirmLabel, color = AgentBuddyTheme.accent, fontWeight = FontWeight.SemiBold)
+            }
         },
         dismissButton = {
-            Text(
-                text = "取消",
-                color = AgentBuddyTheme.textPrimary,
-                modifier = Modifier
-                    .clickable(onClick = onDismiss)
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-            )
+            TextButton(onClick = onDismiss) {
+                Text(text = "取消", color = AgentBuddyTheme.textPrimary)
+            }
         },
         title = {
             Text(title, color = AgentBuddyTheme.textPrimary, fontWeight = FontWeight.SemiBold)

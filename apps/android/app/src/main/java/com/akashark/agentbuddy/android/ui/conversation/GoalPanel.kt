@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -30,8 +31,8 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,12 +42,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.akashark.agentbuddy.android.ui.BerkeleyMono
 import com.akashark.agentbuddy.android.ui.AgentBuddyTextStyle
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyIconButton
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySize
 import com.akashark.agentbuddy.android.ui.scaled
 import uniffi.codex_mobile_client.AppThreadGoal
 import uniffi.codex_mobile_client.AppThreadGoalStatus
@@ -145,54 +149,65 @@ internal fun GoalPanel(goal: AppThreadGoal, actions: GoalCardActions) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Status pill — tappable to pause/resume (or override cap when
-            // BUDGET_LIMITED). Disabled once the goal is COMPLETE.
-            Row(
+            // BUDGET_LIMITED). Disabled once the goal is COMPLETE. The pill
+            // keeps its size inside a 48dp hit area.
+            Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(tint.copy(alpha = 0.14f))
-                    .border(0.5.dp, tint.copy(alpha = 0.35f), RoundedCornerShape(999.dp))
-                    .clickable(enabled = canTogglePause) { actions.togglePause() }
-                    .padding(horizontal = 8.dp, vertical = 3.dp),
-                horizontalArrangement = Arrangement.spacedBy(5.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .heightIn(min = BuddySize.minHitTarget)
+                    .clickable(enabled = canTogglePause, role = Role.Button, onClickLabel = pauseResumeLabel) {
+                        actions.togglePause()
+                    },
+                contentAlignment = Alignment.Center,
             ) {
-                Box(
+                Row(
                     modifier = Modifier
-                        .size(6.dp)
-                        .background(tint.copy(alpha = statusDotAlpha), CircleShape),
-                )
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(tint.copy(alpha = 0.14f))
+                        .border(0.5.dp, tint.copy(alpha = 0.35f), RoundedCornerShape(999.dp))
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .background(tint.copy(alpha = statusDotAlpha), CircleShape),
+                    )
+                    Text(
+                        text = statusLabel.uppercase(),
+                        color = tint,
+                        fontSize = AgentBuddyTextStyle.caption.scaled,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = BerkeleyMono,
+                    )
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = BuddySize.minHitTarget)
+                    .clickable(role = Role.Button, onClickLabel = "编辑目标") { showEditDialog = true },
+                contentAlignment = Alignment.CenterStart,
+            ) {
                 Text(
-                    text = statusLabel.uppercase(),
-                    color = tint,
+                    text = goal.objective,
+                    color = AgentBuddyTheme.textPrimary,
                     fontSize = AgentBuddyTextStyle.caption.scaled,
-                    fontWeight = FontWeight.SemiBold,
-                    fontFamily = BerkeleyMono,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
 
-            Text(
-                text = goal.objective,
-                color = AgentBuddyTheme.textPrimary,
-                fontSize = AgentBuddyTextStyle.caption.scaled,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable { showEditDialog = true },
-            )
-
             Box {
-                IconButton(
+                BuddyIconButton(
+                    icon = Icons.Default.MoreHoriz,
+                    contentDescription = "目标操作",
                     onClick = { showMenu = true },
-                    modifier = Modifier.size(24.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.MoreHoriz,
-                        contentDescription = "目标操作",
-                        tint = AgentBuddyTheme.textSecondary,
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
+                    diameter = 24.dp,
+                    iconSize = 16.dp,
+                    tint = AgentBuddyTheme.textSecondary,
+                )
                 DropdownMenu(
                     expanded = showMenu,
                     onDismissRequest = { showMenu = false },
@@ -376,26 +391,19 @@ internal fun GoalPanel(goal: AppThreadGoal, actions: GoalCardActions) {
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { showClearConfirm = false },
             confirmButton = {
-                Text(
-                    text = "清除目标",
-                    color = AgentBuddyTheme.danger,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier
-                        .clickable {
-                            showClearConfirm = false
-                            actions.clear()
-                        }
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                )
+                TextButton(
+                    onClick = {
+                        showClearConfirm = false
+                        actions.clear()
+                    },
+                ) {
+                    Text(text = "清除目标", color = AgentBuddyTheme.danger, fontWeight = FontWeight.SemiBold)
+                }
             },
             dismissButton = {
-                Text(
-                    text = "取消",
-                    color = AgentBuddyTheme.textPrimary,
-                    modifier = Modifier
-                        .clickable { showClearConfirm = false }
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                )
+                TextButton(onClick = { showClearConfirm = false }) {
+                    Text(text = "取消", color = AgentBuddyTheme.textPrimary)
+                }
             },
             title = {
                 Text("清除这个目标？", color = AgentBuddyTheme.textPrimary, fontWeight = FontWeight.SemiBold)
