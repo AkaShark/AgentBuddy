@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.CloseFullscreen
 import androidx.compose.material3.Surface
@@ -40,7 +41,8 @@ import androidx.compose.ui.unit.dp
  * expand icon; shares the same `text` state so edits round-trip back when
  * the dialog is dismissed. Matches `ConversationComposerExpandedView` on iOS.
  * Send goes through the caller's single send path and is disabled while
- * [canSend] is false (the draft is never cleared by a blocked send).
+ * [canSend] is false (the draft is never cleared by a blocked send). With
+ * [queues] (a turn is running) it reads 「排队」, as in the inline composer.
  */
 @Composable
 fun ComposerExpandedDialog(
@@ -49,6 +51,7 @@ fun ComposerExpandedDialog(
     onSend: () -> Unit,
     onDismiss: () -> Unit,
     canSend: Boolean,
+    queues: Boolean = false,
     placeholder: String = "消息…",
     /** Shown under the toolbar when sending is blocked (e.g. the host is disconnected). */
     notice: String? = null,
@@ -87,19 +90,30 @@ fun ComposerExpandedDialog(
                         iconSize = 20.dp,
                     )
                     Spacer(Modifier.weight(1f))
-                    BuddyIconButton(
-                        icon = Icons.Outlined.ArrowUpward,
-                        contentDescription = "发送",
-                        onClick = {
-                            if (canSend) {
-                                onSend()
-                                onDismiss()
-                            }
-                        },
-                        tone = BuddyIconButtonTone.ACTION,
-                        diameter = 40.dp,
-                        enabled = canSend,
-                    )
+                    val send = {
+                        if (canSend) {
+                            onSend()
+                            onDismiss()
+                        }
+                    }
+                    if (queues) {
+                        ComposerPill(
+                            text = "排队",
+                            icon = Icons.AutoMirrored.Outlined.PlaylistAdd,
+                            enabled = canSend,
+                            contentDescription = "加入队列，当前步骤完成后发送",
+                            onClick = send,
+                        )
+                    } else {
+                        BuddyIconButton(
+                            icon = Icons.Outlined.ArrowUpward,
+                            contentDescription = "发送",
+                            onClick = send,
+                            tone = BuddyIconButtonTone.ACTION,
+                            diameter = 40.dp,
+                            enabled = canSend,
+                        )
+                    }
                 }
                 if (notice != null) {
                     BuddyBanner(

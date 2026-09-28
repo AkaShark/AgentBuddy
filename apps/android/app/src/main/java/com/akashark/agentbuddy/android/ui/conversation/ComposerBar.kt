@@ -372,6 +372,7 @@ fun ComposerBar(
                     }
                 },
                 canSend = controls.canSend,
+                queues = controls.sendAction == ComposerSendAction.QUEUE,
                 placeholder = COMPOSER_PLACEHOLDER,
                 notice = if (isConnected) null else COMPOSER_DISCONNECTED_MESSAGE,
             )

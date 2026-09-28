@@ -123,7 +123,7 @@ internal fun ComposerStopButton(
 
 /** Action-filled capsule (36dp visual) inside a 48dp hit area. */
 @Composable
-private fun ComposerPill(
+internal fun ComposerPill(
     text: String,
     icon: ImageVector,
     enabled: Boolean,
