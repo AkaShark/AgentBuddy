@@ -146,6 +146,7 @@ fun AppRootSheets(
             val isLocalById = remember(snapshot) { snapshot?.servers?.associate { it.serverId to it.isLocal }.orEmpty() }
             ProjectPickerSheet(
                 projects = projects,
+                selectedProjectId = shell.selectedProject?.id,
                 serverNamesById = serverNames,
                 isLocalById = isLocalById,
                 onSelect = { project ->
