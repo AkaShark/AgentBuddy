@@ -1,4 +1,4 @@
-Initial Android release of Litter.
-- On-device and remote runtime support
+Initial Android release of AgentBuddy.
+- Connect to your coding hosts and manage assistant sessions
 - Improved conversation readability and text sizing
 - Stronger server discovery and connection behavior
