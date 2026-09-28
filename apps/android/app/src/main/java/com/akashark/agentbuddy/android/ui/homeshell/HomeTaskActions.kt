@@ -8,6 +8,7 @@ import com.akashark.agentbuddy.android.state.VoiceRuntimeController
 import com.akashark.agentbuddy.android.state.isConnected
 import com.akashark.agentbuddy.android.ui.homeshell.tasks.HomeTaskList
 import com.akashark.agentbuddy.android.ui.homeshell.tasks.HomeTaskPresentation
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -86,19 +87,9 @@ class HomeTaskActions(
     fun fork(session: AppSessionSummary, navigate: (ThreadKey) -> Unit) {
         scope.launch {
             try {
-                val sourceKey = appModel.hydrateThreadPermissions(session.key) ?: session.key
-                val newKey = appModel.client.forkThread(
-                    sourceKey.serverId,
-                    appModel.launchState.threadForkRequest(
-                        sourceThreadId = sourceKey.threadId,
-                        cwdOverride = session.cwd,
-                        threadKey = sourceKey,
-                    ),
-                )
-                appModel.store.setActiveThread(newKey)
-                appModel.refreshThreadSnapshot(newKey)
-                appModel.launchState.updateCurrentCwd(session.cwd)
-                navigate(newKey)
+                navigate(forkSessionThread(appModel, session))
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 onError("分叉失败", e.message ?: "分叉任务失败")
             }
@@ -152,6 +143,27 @@ class HomeTaskActions(
             }
         }
     }
+}
+
+/**
+ * Head-of-thread fork shared by home and 全部任务: duplicates the thread on its
+ * server, makes the copy active and returns its key. Throws when the host
+ * refuses or drops; callers report the error.
+ */
+suspend fun forkSessionThread(appModel: AppModel, session: AppSessionSummary): ThreadKey {
+    val sourceKey = appModel.hydrateThreadPermissions(session.key) ?: session.key
+    val newKey = appModel.client.forkThread(
+        sourceKey.serverId,
+        appModel.launchState.threadForkRequest(
+            sourceThreadId = sourceKey.threadId,
+            cwdOverride = session.cwd,
+            threadKey = sourceKey,
+        ),
+    )
+    appModel.store.setActiveThread(newKey)
+    appModel.refreshThreadSnapshot(newKey)
+    appModel.launchState.updateCurrentCwd(session.cwd)
+    return newKey
 }
 
 /**

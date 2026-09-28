@@ -2,6 +2,7 @@ package com.akashark.agentbuddy.android.ui.sessions
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Archive
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,6 +58,24 @@ internal fun SessionArchiveDialog(
         confirmTitle = "归档",
         confirmKind = BuddyButtonKind.DESTRUCTIVE,
         onConfirm = onConfirm,
+    )
+}
+
+/** 「分叉失败」: the host refused the fork or dropped while forking. */
+@Composable
+internal fun SessionForkErrorDialog(
+    message: String,
+    onDismiss: () -> Unit,
+) {
+    MintAlertDialog(
+        onDismissRequest = onDismiss,
+        icon = Icons.Outlined.ErrorOutline,
+        iconTint = AgentBuddyTheme.danger,
+        title = "分叉失败",
+        message = message,
+        confirmTitle = "好",
+        onConfirm = onDismiss,
+        dismissTitle = null,
     )
 }
 

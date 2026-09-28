@@ -16,6 +16,8 @@ import com.akashark.agentbuddy.android.state.isConnected
 import com.akashark.agentbuddy.android.ui.LocalAppModel
 import com.akashark.agentbuddy.android.ui.RecentDirectoryEntry
 import com.akashark.agentbuddy.android.ui.RecentDirectoryStore
+import com.akashark.agentbuddy.android.ui.homeshell.forkSessionThread
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import uniffi.codex_mobile_client.AppSessionSummary
 import uniffi.codex_mobile_client.ThreadKey
@@ -54,6 +56,7 @@ fun SessionsScreen(
     val voiceController = remember { VoiceRuntimeController.shared }
     var isLoading by remember { mutableStateOf(false) }
     var isForkingActiveThread by remember { mutableStateOf(false) }
+    var forkError by remember { mutableStateOf<String?>(null) }
     var hasLoadedInitialSessions by remember { mutableStateOf(false) }
     var pendingActiveSessionScroll by remember { mutableStateOf(false) }
     val derived = remember(
@@ -141,19 +144,11 @@ fun SessionsScreen(
         if (isForkingActiveThread) return
         isForkingActiveThread = true
         try {
-            val sourceKey = appModel.hydrateThreadPermissions(summary.key) ?: summary.key
-            val newKey = appModel.client.forkThread(
-                sourceKey.serverId,
-                appModel.launchState.threadForkRequest(
-                    sourceThreadId = sourceKey.threadId,
-                    cwdOverride = summary.cwd,
-                    threadKey = sourceKey,
-                ),
-            )
-            appModel.store.setActiveThread(newKey)
-            appModel.refreshThreadSnapshot(newKey)
-            appModel.launchState.updateCurrentCwd(summary.cwd)
-            onOpenConversation(newKey)
+            onOpenConversation(forkSessionThread(appModel, summary))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            forkError = e.message ?: "分叉任务失败"
         } finally {
             isForkingActiveThread = false
         }
@@ -302,6 +297,10 @@ fun SessionsScreen(
                 scope.launch { renameSession(appModel, summary, newName) }
             },
         )
+    }
+
+    forkError?.let { message ->
+        SessionForkErrorDialog(message = message, onDismiss = { forkError = null })
     }
 
     archiveTarget?.let { summary ->
