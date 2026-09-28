@@ -1,6 +1,5 @@
 package com.akashark.agentbuddy.android.ui.gallery
 
-import android.view.ViewGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,11 +13,8 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import com.akashark.agentbuddy.android.ui.conversation.AssistantMessageLayout
 import com.akashark.agentbuddy.android.ui.conversation.AssistantRenderBlocks
@@ -44,7 +40,6 @@ import com.akashark.agentbuddy.android.ui.conversation.TodoListRow
 import com.akashark.agentbuddy.android.ui.conversation.ToolCardShell
 import com.akashark.agentbuddy.android.ui.conversation.UserMessageRow
 import com.akashark.agentbuddy.android.ui.gallery.GalleryConversationFixtures as F
-import kotlinx.coroutines.delay
 import uniffi.codex_mobile_client.AppOperationStatus
 import uniffi.codex_mobile_client.HydratedNoteData
 import uniffi.codex_mobile_client.HydratedProposedPlanData
@@ -124,27 +119,11 @@ fun GalleryConversationLongPage() {
 
 @Composable
 private fun GalleryTranscript(content: @Composable ColumnScope.() -> Unit) {
-    val scrollState = rememberScrollState()
-    val view = LocalView.current
-    // Selectable Markdown TextViews take View focus on launch and bring their
-    // cursor into view, so the page would open part-way down. The gallery
-    // blocks View focus for its embedded views and starts from the top.
-    DisposableEffect(view) {
-        val group = view as? ViewGroup
-        val previous = group?.descendantFocusability
-        group?.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
-        group?.findFocus()?.clearFocus()
-        onDispose { if (group != null && previous != null) group.descendantFocusability = previous }
-    }
-    LaunchedEffect(Unit) {
-        delay(1500)
-        scrollState.scrollTo(0)
-    }
     Column(
         modifier = Modifier
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.safeDrawing)
-            .verticalScroll(scrollState)
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
         content = content,
