@@ -13,6 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.akashark.agentbuddy.android.state.PathDisplay
+import com.akashark.agentbuddy.android.state.currentConnectionStep
 import com.akashark.agentbuddy.android.state.displayModelLabel
 import com.akashark.agentbuddy.android.state.displayTitle
 import com.akashark.agentbuddy.android.state.hasActiveTurn
@@ -23,11 +24,12 @@ import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyConnectio
 import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyTaskState
 import com.akashark.agentbuddy.android.ui.settings.SettingsAlertDialog
 import com.akashark.agentbuddy.android.ui.settings.SettingsTextField
+import com.akashark.agentbuddy.android.ui.settings.mintConnectionStatus
 import kotlinx.coroutines.launch
 import uniffi.codex_mobile_client.Account
+import uniffi.codex_mobile_client.AppConnectionStepState
 import uniffi.codex_mobile_client.AppRenameThreadRequest
 import uniffi.codex_mobile_client.AppServerSnapshot
-import uniffi.codex_mobile_client.AppServerTransportState
 import uniffi.codex_mobile_client.AppThreadSnapshot
 import uniffi.codex_mobile_client.PlanType
 import uniffi.codex_mobile_client.ThreadKey
@@ -186,19 +188,25 @@ private fun taskInfoHero(
     )
 }
 
+/**
+ * Server status for task info. The text is the host's status label with its
+ * connection step (installing, tunnelling …, as in Settings); the tone follows
+ * the conversation header, so an unresponsive host reads 连接中 in both. A
+ * connected host that still needs something (需要登录, a pending step) keeps
+ * the warning dot.
+ */
+internal fun taskInfoConnection(server: AppServerSnapshot): Pair<BuddyConnectionState, String> {
+    val (statusTone, title) = server.mintConnectionStatus()
+    val headerTone = conversationConnectionState(
+        transportState = server.transportState,
+        connectionFailed = server.currentConnectionStep?.state == AppConnectionStepState.FAILED,
+    )
+    val pending = headerTone == BuddyConnectionState.CONNECTED && statusTone == BuddyConnectionState.CONNECTING
+    return (if (pending) BuddyConnectionState.CONNECTING else headerTone) to title
+}
+
 private fun taskInfoServer(server: AppServerSnapshot): TaskInfoServer {
-    val (connection, connectionTitle) = when (server.transportState) {
-        AppServerTransportState.CONNECTED ->
-            if (!server.isLocal && server.account == null) {
-                BuddyConnectionState.CONNECTING to "需要登录"
-            } else {
-                BuddyConnectionState.CONNECTED to BuddyConnectionState.CONNECTED.title
-            }
-        AppServerTransportState.CONNECTING -> BuddyConnectionState.CONNECTING to BuddyConnectionState.CONNECTING.title
-        AppServerTransportState.UNRESPONSIVE -> BuddyConnectionState.FAILED to "无响应"
-        AppServerTransportState.DISCONNECTED -> BuddyConnectionState.DISCONNECTED to BuddyConnectionState.DISCONNECTED.title
-        AppServerTransportState.UNKNOWN -> BuddyConnectionState.DISCONNECTED to "未知"
-    }
+    val (connection, connectionTitle) = taskInfoConnection(server)
     val account = server.account
     return TaskInfoServer(
         name = serverDisplayName(server.displayName),

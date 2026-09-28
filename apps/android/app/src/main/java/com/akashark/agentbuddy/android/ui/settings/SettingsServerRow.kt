@@ -56,33 +56,41 @@ internal data class SettingsServerItem(
 internal fun settingsServerDisplayName(server: AppServerSnapshot): String =
     if (server.displayName == "This Device") "本设备" else server.displayName
 
+/**
+ * Mint connection status of a server: the current connection step first
+ * (installing, tunnelling …), then 需要登录, then the transport — the same
+ * precedence as `statusLabel`, in Chinese, with the settings pill tone.
+ */
+internal fun AppServerSnapshot.mintConnectionStatus(): Pair<BuddyConnectionState, String> {
+    val step = currentConnectionStep
+    return when {
+        step?.state == AppConnectionStepState.FAILED -> BuddyConnectionState.FAILED to "连接失败"
+        step?.state == AppConnectionStepState.AWAITING_USER_INPUT -> BuddyConnectionState.CONNECTING to "等待你操作"
+        step != null ->
+            when (step.kind) {
+                AppConnectionStepKind.CONNECTING_TO_SSH -> BuddyConnectionState.CONNECTING to "正在连接 SSH…"
+                AppConnectionStepKind.FINDING_CODEX -> BuddyConnectionState.CONNECTING to "正在查找 Codex…"
+                AppConnectionStepKind.INSTALLING_CODEX -> BuddyConnectionState.CONNECTING to "正在安装 Codex…"
+                AppConnectionStepKind.STARTING_APP_SERVER -> BuddyConnectionState.CONNECTING to "正在启动服务…"
+                AppConnectionStepKind.OPENING_TUNNEL -> BuddyConnectionState.CONNECTING to "正在建立隧道…"
+                AppConnectionStepKind.CONNECTED -> BuddyConnectionState.CONNECTED to "已连接"
+            }
+        transportState == AppServerTransportState.CONNECTED && !isLocal && account == null ->
+            BuddyConnectionState.CONNECTING to "需要登录"
+        else ->
+            when (transportState) {
+                AppServerTransportState.CONNECTED -> BuddyConnectionState.CONNECTED to "已连接"
+                AppServerTransportState.CONNECTING -> BuddyConnectionState.CONNECTING to "正在连接…"
+                AppServerTransportState.UNRESPONSIVE -> BuddyConnectionState.FAILED to "无响应"
+                AppServerTransportState.DISCONNECTED -> BuddyConnectionState.DISCONNECTED to "已断开"
+                AppServerTransportState.UNKNOWN -> BuddyConnectionState.DISCONNECTED to "状态未知"
+            }
+    }
+}
+
 /** Maps the typed transport / connection-step state to a Mint connection pill. */
 internal fun AppServerSnapshot.toSettingsServerItem(): SettingsServerItem {
-    val step = currentConnectionStep
-    val (state, title) =
-        when {
-            step?.state == AppConnectionStepState.FAILED -> BuddyConnectionState.FAILED to "连接失败"
-            step?.state == AppConnectionStepState.AWAITING_USER_INPUT -> BuddyConnectionState.CONNECTING to "等待你操作"
-            step != null ->
-                when (step.kind) {
-                    AppConnectionStepKind.CONNECTING_TO_SSH -> BuddyConnectionState.CONNECTING to "正在连接 SSH…"
-                    AppConnectionStepKind.FINDING_CODEX -> BuddyConnectionState.CONNECTING to "正在查找 Codex…"
-                    AppConnectionStepKind.INSTALLING_CODEX -> BuddyConnectionState.CONNECTING to "正在安装 Codex…"
-                    AppConnectionStepKind.STARTING_APP_SERVER -> BuddyConnectionState.CONNECTING to "正在启动服务…"
-                    AppConnectionStepKind.OPENING_TUNNEL -> BuddyConnectionState.CONNECTING to "正在建立隧道…"
-                    AppConnectionStepKind.CONNECTED -> BuddyConnectionState.CONNECTED to "已连接"
-                }
-            transportState == AppServerTransportState.CONNECTED && !isLocal && account == null ->
-                BuddyConnectionState.CONNECTING to "需要登录"
-            else ->
-                when (transportState) {
-                    AppServerTransportState.CONNECTED -> BuddyConnectionState.CONNECTED to "已连接"
-                    AppServerTransportState.CONNECTING -> BuddyConnectionState.CONNECTING to "正在连接…"
-                    AppServerTransportState.UNRESPONSIVE -> BuddyConnectionState.FAILED to "无响应"
-                    AppServerTransportState.DISCONNECTED -> BuddyConnectionState.DISCONNECTED to "已断开"
-                    AppServerTransportState.UNKNOWN -> BuddyConnectionState.DISCONNECTED to "状态未知"
-                }
-        }
+    val (state, title) = mintConnectionStatus()
     return SettingsServerItem(
         id = serverId,
         name = settingsServerDisplayName(this),
