@@ -249,6 +249,15 @@ class ApprovalCoordinatorTest {
     }
 
     @Test
+    fun `stop task is offered only where cancel really stops the task`() {
+        assertTrue(ApprovalKind.COMMAND.offersStopTask)
+        assertTrue(ApprovalKind.FILE_CHANGE.offersStopTask)
+        // Rust answers CANCEL on a permissions request with an empty grant (same as DECLINE).
+        assertFalse(ApprovalKind.PERMISSIONS.offersStopTask)
+        assertFalse(ApprovalKind.MCP_ELICITATION.offersStopTask)
+    }
+
+    @Test
     fun `thread membership and phone answerability`() {
         assertTrue(approval("1").belongsTo(threadA))
         assertFalse(approval("1", threadId = "other").belongsTo(threadA))

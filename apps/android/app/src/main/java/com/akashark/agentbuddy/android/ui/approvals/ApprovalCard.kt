@@ -43,6 +43,7 @@ import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySpacing
 import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyTextStyle
 import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyTextStyle
 import uniffi.codex_mobile_client.ApprovalDecisionValue
+import uniffi.codex_mobile_client.ApprovalKind
 import uniffi.codex_mobile_client.PendingApproval
 
 /** 1-based position of the shown request plus paging callbacks. */
@@ -127,7 +128,7 @@ fun ApprovalCard(
             enabled = !isSubmitting,
             isSessionSubmitting = submittingDecision == ApprovalDecisionValue.ACCEPT_FOR_SESSION,
             onAllowForSession = { showSessionConfirm = true },
-            onStopTask = { decide(ApprovalDecisionValue.CANCEL) },
+            onStopTask = if (approval.kind.offersStopTask) ({ decide(ApprovalDecisionValue.CANCEL) }) else null,
         )
     }
 
@@ -208,12 +209,22 @@ private fun ApprovalDecisionButtons(
     AdaptiveButtonPair(secondary = deny, primary = allow)
 }
 
+/**
+ * Whether 「改为停止任务」 means what it says for this kind. The host has no
+ * cancel for a permissions request: Rust answers CANCEL there with an empty
+ * grant, exactly like 「拒绝」, so the option would promise a stop that never
+ * happens.
+ */
+internal val ApprovalKind.offersStopTask: Boolean
+    get() = this == ApprovalKind.COMMAND || this == ApprovalKind.FILE_CHANGE
+
+/** Session grant entry and, when [onStopTask] is set, the 「…」 menu with 「改为停止任务」. */
 @Composable
 private fun ApprovalSecondaryActions(
     enabled: Boolean,
     isSessionSubmitting: Boolean,
     onAllowForSession: () -> Unit,
-    onStopTask: () -> Unit,
+    onStopTask: (() -> Unit)?,
 ) {
     BuddyChromeTypeLimit {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -225,34 +236,39 @@ private fun ApprovalSecondaryActions(
                 modifier = Modifier.weight(1f, fill = false),
             )
             Spacer(Modifier.weight(1f))
-            var showMenu by remember { mutableStateOf(false) }
-            Box {
-                BuddyIconButton(
-                    icon = Icons.Outlined.MoreHoriz,
-                    contentDescription = ApprovalCopy.MORE_CHOICES,
-                    onClick = { showMenu = true },
-                    enabled = enabled,
-                    tint = AgentBuddyTheme.warning,
-                )
-                DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                ApprovalCopy.STOP_TASK_INSTEAD,
-                                style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.Normal),
-                                color = AgentBuddyTheme.danger,
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(Icons.Outlined.StopCircle, contentDescription = null, tint = AgentBuddyTheme.danger)
-                        },
-                        onClick = {
-                            showMenu = false
-                            onStopTask()
-                        },
+            if (onStopTask != null) StopTaskMenu(enabled = enabled, onStopTask = onStopTask)
+        }
+    }
+}
+
+@Composable
+private fun StopTaskMenu(enabled: Boolean, onStopTask: () -> Unit) {
+    var showMenu by remember { mutableStateOf(false) }
+    Box {
+        BuddyIconButton(
+            icon = Icons.Outlined.MoreHoriz,
+            contentDescription = ApprovalCopy.MORE_CHOICES,
+            onClick = { showMenu = true },
+            enabled = enabled,
+            tint = AgentBuddyTheme.warning,
+        )
+        DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        ApprovalCopy.STOP_TASK_INSTEAD,
+                        style = buddyTextStyle(BuddyTextStyle.LABEL, FontWeight.Normal),
+                        color = AgentBuddyTheme.danger,
                     )
-                }
-            }
+                },
+                leadingIcon = {
+                    Icon(Icons.Outlined.StopCircle, contentDescription = null, tint = AgentBuddyTheme.danger)
+                },
+                onClick = {
+                    showMenu = false
+                    onStopTask()
+                },
+            )
         }
     }
 }
