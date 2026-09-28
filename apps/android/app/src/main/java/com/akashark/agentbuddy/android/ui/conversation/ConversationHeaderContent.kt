@@ -41,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -207,23 +208,24 @@ private fun HeaderMenu(
     initiallyExpanded: Boolean,
 ) {
     var expanded by remember { mutableStateOf(initiallyExpanded) }
+    // While reloading, the spinner sits beside 「…」 so the menu stays reachable.
+    if (state.isReloading) {
+        CircularProgressIndicator(
+            modifier = Modifier
+                .padding(horizontal = BuddySpacing.xxs)
+                .size(20.dp)
+                .semantics { contentDescription = "正在重新加载" },
+            strokeWidth = 2.dp,
+            color = AgentBuddyTheme.textSecondary,
+        )
+    }
     Box {
-        if (state.isReloading) {
-            Box(Modifier.size(BuddySize.minHitTarget), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    strokeWidth = 2.dp,
-                    color = AgentBuddyTheme.textSecondary,
-                )
-            }
-        } else {
-            BuddyIconButton(
-                icon = Icons.Outlined.MoreHoriz,
-                contentDescription = "更多",
-                onClick = { expanded = true },
-                iconSize = 22.dp,
-            )
-        }
+        BuddyIconButton(
+            icon = Icons.Outlined.MoreHoriz,
+            contentDescription = "更多",
+            onClick = { expanded = true },
+            iconSize = 22.dp,
+        )
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
@@ -251,7 +253,7 @@ private fun HeaderMenu(
             item("模型与推理", Icons.Outlined.Tune, true, false, actions.onOpenModelPanel)
             item("权限", Icons.Outlined.Shield, true, false, actions.onOpenPermissions)
             item("计划模式", Icons.Outlined.Checklist, true, state.isPlanMode, actions.onOpenPlanMode)
-            item("重新加载", Icons.Outlined.Refresh, !state.isReloading, false, actions.onReload)
+            item(if (state.isReloading) "正在重新加载…" else "重新加载", Icons.Outlined.Refresh, !state.isReloading, false, actions.onReload)
             if (state.canShowInfo) item("任务信息", Icons.Outlined.Info, true, false, actions.onOpenInfo)
         }
     }
