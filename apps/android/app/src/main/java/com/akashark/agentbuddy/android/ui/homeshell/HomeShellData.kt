@@ -1,6 +1,7 @@
 package com.akashark.agentbuddy.android.ui.homeshell
 
 import com.akashark.agentbuddy.android.state.SavedServer
+import com.akashark.agentbuddy.android.state.isConnected
 import com.akashark.agentbuddy.android.ui.common.AgentRuntimeKind
 import com.akashark.agentbuddy.android.ui.common.runtimeLabel
 import com.akashark.agentbuddy.android.ui.common.runtimeSortIndex
@@ -32,7 +33,7 @@ class HomeShellInputs(
     val snapshot: AppSnapshotRecord?,
     val pinned: List<PinnedThreadKey>,
     val hidden: List<PinnedThreadKey>,
-    val cancelling: Set<String>,
+    val cancelling: Map<String, String>,
     val hydrating: Set<String>,
     val selectedServerId: String?,
     val selectedProject: AppProject?,
@@ -54,15 +55,21 @@ class HomeShellData(
     val tasks: TasksHomeUiState,
     val projects: ProjectsHomeUiState,
     val hosts: HostsHomeUiState,
+    /** Active turn id per task id, for the threads the snapshot has in detail. */
+    val activeTurnIds: Map<String, String?>,
+    val connectedServerIds: Set<String>,
 ) {
     /** Changes when the visible list or a host transport changes (re-hydrate). */
     val hydrationSignature: String =
         visibleSessions.joinToString("|") { HomeTaskPresentation.taskId(it.key) } + "#" +
             servers.sortedBy { it.serverId }.joinToString("|") { "${it.serverId}:${it.transportState}:${it.port}" }
 
-    /** Changes when a visible task starts or stops (prune stop markers). */
+    /** Changes when a visible task starts, stops or switches turn, or a host drops (prune stop markers). */
     val activitySignature: String =
-        visibleSessions.joinToString("|") { "${HomeTaskPresentation.taskId(it.key)}:${it.hasActiveTurn}" }
+        visibleSessions.joinToString("|") {
+            val id = HomeTaskPresentation.taskId(it.key)
+            "$id:${it.hasActiveTurn}:${activeTurnIds[id]}"
+        } + "#" + connectedServerIds.sorted().joinToString("|")
 }
 
 fun buildHomeShellData(input: HomeShellInputs): HomeShellData {
@@ -73,12 +80,16 @@ fun buildHomeShellData(input: HomeShellInputs): HomeShellData {
     val merged = HomeTaskList.merge(input.pinned, input.hidden, servers, allSessions)
     val scopedServerId = input.selectedProject?.serverId ?: input.selectedServerId
     val visible = HomeTaskList.scoped(merged, scopedServerId)
+    val activeTurnIds = snapshot?.threads.orEmpty().associate { thread ->
+        HomeTaskPresentation.taskId(thread.key) to thread.activeTurnId?.trim()?.takeIf { it.isNotEmpty() }
+    }
+    val connectedServerIds = snapshot?.servers.orEmpty().filter { it.isConnected }.mapTo(HashSet()) { it.serverId }
     val items = HomeTaskPresentation.items(
         sessions = visible,
         pendingApprovals = snapshot?.pendingApprovals.orEmpty(),
         pendingInputs = snapshot?.pendingUserInputs.orEmpty(),
         pinnedKeys = input.pinned,
-        cancellingIds = input.cancelling,
+        cancellingIds = HomeTaskPresentation.pruneCancelling(input.cancelling, visible, activeTurnIds, connectedServerIds).keys,
         hydratingIds = input.hydrating,
         lineageByKey = HomeDashboardSupport.computeLineageMap(allSessions),
     )
@@ -109,6 +120,8 @@ fun buildHomeShellData(input: HomeShellInputs): HomeShellData {
         tasks = tasks,
         projects = projectsState(input, allServers, allSessions),
         hosts = hostsState(input, allServers, allSessions),
+        activeTurnIds = activeTurnIds,
+        connectedServerIds = connectedServerIds,
     )
 }
 

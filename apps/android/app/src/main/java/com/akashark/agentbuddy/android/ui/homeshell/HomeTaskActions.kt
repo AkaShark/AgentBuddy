@@ -64,21 +64,27 @@ class HomeTaskActions(
         scope.launch { runCatching { appModel.store.unsubscribeThread(key) } }
     }
 
-    /** Marks the task as stopping, then interrupts the active turn. */
+    /**
+     * Marks the active turn as stopping, then interrupts it. The marker is
+     * keyed by turn so a queued follow-up that starts right away is not shown
+     * as stopping (see [HomeTaskPresentation.pruneCancelling]).
+     */
     fun stop(key: ThreadKey) {
         val id = HomeTaskPresentation.taskId(key)
-        memory.cancelling = memory.cancelling + id
+        val turnId = appModel.threadSnapshot(key)?.activeTurnId?.trim()?.takeIf { it.isNotEmpty() }
+        if (turnId == null) {
+            onError("停止失败", "暂时无法停止：还没拿到当前这一轮的状态，请稍后再试。")
+            return
+        }
+        memory.cancelling = memory.cancelling + (id to turnId)
         scope.launch {
-            val turnId = appModel.threadSnapshot(key)?.activeTurnId
-            if (turnId == null) {
-                memory.cancelling = memory.cancelling - id
-                return@launch
-            }
-            runCatching {
+            try {
                 appModel.client.interruptTurn(key.serverId, AppInterruptTurnRequest(threadId = key.threadId, turnId = turnId))
-            }.onFailure { error ->
-                memory.cancelling = memory.cancelling - id
-                onError("停止失败", error.message ?: "无法停止这个任务。")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (memory.cancelling[id] == turnId) memory.cancelling = memory.cancelling - id
+                onError("停止失败", e.message ?: "无法停止这个任务。")
             }
         }
     }

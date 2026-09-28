@@ -127,8 +127,47 @@ class HomeTaskPresentationTest {
     @Test
     fun `stop markers are pruned once the turn ends`() {
         val sessions = listOf(session("t1", active = true), session("t2", active = false))
-        val pruned = HomeTaskPresentation.pruneCancelling(setOf("s1/t1", "s1/t2", "s1/gone"), sessions)
-        assertEquals(setOf("s1/t1"), pruned)
+        val pruned = HomeTaskPresentation.pruneCancelling(
+            cancelling = mapOf("s1/t1" to "turn-1", "s1/t2" to "turn-2", "s1/gone" to "turn-3"),
+            sessions = sessions,
+            activeTurnIds = mapOf("s1/t1" to "turn-1", "s1/t2" to null),
+            connectedServerIds = setOf("s1"),
+        )
+        assertEquals(mapOf("s1/t1" to "turn-1"), pruned)
+    }
+
+    @Test
+    fun `a stop marker ends when a queued follow-up starts a new turn`() {
+        val pruned = HomeTaskPresentation.pruneCancelling(
+            cancelling = mapOf("s1/t1" to "turn-1"),
+            sessions = listOf(session("t1", active = true)),
+            activeTurnIds = mapOf("s1/t1" to "turn-2"),
+            connectedServerIds = setOf("s1"),
+        )
+        assertTrue(pruned.isEmpty())
+    }
+
+    @Test
+    fun `a stop marker ends when the host disconnects`() {
+        val pruned = HomeTaskPresentation.pruneCancelling(
+            cancelling = mapOf("s1/t1" to "turn-1"),
+            sessions = listOf(session("t1", active = true)),
+            activeTurnIds = mapOf("s1/t1" to "turn-1"),
+            connectedServerIds = emptySet(),
+        )
+        assertTrue(pruned.isEmpty())
+    }
+
+    @Test
+    fun `a stop marker stays while its turn runs, also without thread detail`() {
+        val cancelling = mapOf("s1/t1" to "turn-1", "s1/t2" to "turn-9")
+        val pruned = HomeTaskPresentation.pruneCancelling(
+            cancelling = cancelling,
+            sessions = listOf(session("t1", active = true), session("t2", active = true)),
+            activeTurnIds = mapOf("s1/t1" to "turn-1"),
+            connectedServerIds = setOf("s1"),
+        )
+        assertEquals(cancelling, pruned)
     }
 
     @Test

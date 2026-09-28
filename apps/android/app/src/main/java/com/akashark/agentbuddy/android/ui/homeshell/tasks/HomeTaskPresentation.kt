@@ -130,11 +130,27 @@ object HomeTaskPresentation {
         return HomeTaskSections(attention, active, recent)
     }
 
-    /** Stop markers only live while their turn is still running. */
-    fun pruneCancelling(cancellingIds: Set<String>, sessions: List<AppSessionSummary>): Set<String> {
-        if (cancellingIds.isEmpty()) return cancellingIds
-        val stillActive = sessions.filter { it.hasActiveTurn }.mapTo(HashSet()) { taskId(it.key) }
-        return cancellingIds.intersect(stillActive)
+    /**
+     * Stop markers (task id → turn id the stop was sent for) that still apply,
+     * mirroring the composer's rule: a marker ends when its turn ends, when a
+     * different turn is active (a queued follow-up started) or when the host
+     * is no longer connected. [activeTurnIds] holds the snapshot's threads by
+     * task id; a thread without a detail snapshot keeps its marker while its
+     * summary still reports a running turn.
+     */
+    fun pruneCancelling(
+        cancelling: Map<String, String>,
+        sessions: List<AppSessionSummary>,
+        activeTurnIds: Map<String, String?>,
+        connectedServerIds: Set<String>,
+    ): Map<String, String> {
+        if (cancelling.isEmpty()) return cancelling
+        val running = sessions
+            .filter { it.hasActiveTurn && it.key.serverId in connectedServerIds }
+            .mapTo(HashSet()) { taskId(it.key) }
+        return cancelling.filter { (id, turnId) ->
+            id in running && (id !in activeTurnIds || activeTurnIds[id] == turnId)
+        }
     }
 
     /** Hero subtitle, e.g. 「1 个任务进行中，1 个等待你确认。」 */

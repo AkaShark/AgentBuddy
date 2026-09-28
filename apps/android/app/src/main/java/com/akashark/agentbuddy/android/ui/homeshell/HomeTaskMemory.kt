@@ -11,16 +11,17 @@ import uniffi.codex_mobile_client.PinnedThreadKey
 /**
  * UI-only home memory that outlives the home screen's composition (it lives
  * at the app root): the observable copy of the pinned / hidden lists from
- * [SavedThreadsStore], the "stop requested" markers that turn a running card
- * into 「正在停止…」 until the snapshot confirms the turn ended, the pinned
- * threads being hydrated, and the new-task draft.
+ * [SavedThreadsStore], the "stop requested" markers (task id → the turn the
+ * stop was sent for) that turn a running card into 「正在停止…」 until that
+ * turn ends, another turn starts or the host drops, the pinned threads being
+ * hydrated, and the new-task draft.
  */
 class HomeTaskMemory {
     var pinned by mutableStateOf<List<PinnedThreadKey>>(emptyList())
         private set
     var hidden by mutableStateOf<List<PinnedThreadKey>>(emptyList())
         private set
-    var cancelling by mutableStateOf<Set<String>>(emptySet())
+    var cancelling by mutableStateOf<Map<String, String>>(emptyMap())
     var hydrating by mutableStateOf<Set<String>>(emptySet())
 
     /** New-task draft, kept while the sheet is closed and after a failed creation. */

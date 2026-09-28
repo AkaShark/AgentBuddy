@@ -104,7 +104,12 @@ fun HomeShellScreen(
         taskActions.hydratePinned(data.visibleSessions, data.servers)
     }
     LaunchedEffect(data.activitySignature) {
-        memory.cancelling = HomeTaskPresentation.pruneCancelling(memory.cancelling, data.visibleSessions)
+        memory.cancelling = HomeTaskPresentation.pruneCancelling(
+            memory.cancelling,
+            data.visibleSessions,
+            data.activeTurnIds,
+            data.connectedServerIds,
+        )
     }
 
     val taskHandlers = TaskActionHandlers(
