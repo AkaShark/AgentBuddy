@@ -80,9 +80,7 @@ fun buildHomeShellData(input: HomeShellInputs): HomeShellData {
     val merged = HomeTaskList.merge(input.pinned, input.hidden, servers, allSessions)
     val scopedServerId = input.selectedProject?.serverId ?: input.selectedServerId
     val visible = HomeTaskList.scoped(merged, scopedServerId)
-    val activeTurnIds = snapshot?.threads.orEmpty().associate { thread ->
-        HomeTaskPresentation.taskId(thread.key) to thread.activeTurnId?.trim()?.takeIf { it.isNotEmpty() }
-    }
+    val activeTurnIds = HomeTaskPresentation.activeTurnIds(snapshot?.threads.orEmpty())
     val connectedServerIds = snapshot?.servers.orEmpty().filter { it.isConnected }.mapTo(HashSet()) { it.serverId }
     val items = HomeTaskPresentation.items(
         sessions = visible,

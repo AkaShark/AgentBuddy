@@ -52,6 +52,7 @@ internal object GallerySessionsFixtures {
                 collapsedGroupKeys = emptySet(),
                 collapsedNodeKeys = emptySet(),
                 pathLabel = { _, cwd -> cwd.replace("/Users/me", "~").replace("/Users/studio", "~") },
+                approvalIds = setOf("mac/t1"),
             ),
             isLoading = false,
             hasLoadedInitialSessions = true,

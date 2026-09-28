@@ -17,6 +17,7 @@ import com.akashark.agentbuddy.android.ui.LocalAppModel
 import com.akashark.agentbuddy.android.ui.RecentDirectoryEntry
 import com.akashark.agentbuddy.android.ui.RecentDirectoryStore
 import com.akashark.agentbuddy.android.ui.homeshell.forkSessionThread
+import com.akashark.agentbuddy.android.ui.homeshell.tasks.HomeTaskPresentation
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import uniffi.codex_mobile_client.AppSessionSummary
@@ -36,6 +37,8 @@ fun SessionsScreen(
     onNewSession: (() -> Unit)? = null,
     onBack: () -> Unit,
     onInfo: (() -> Unit)? = null,
+    /** The home's 「正在停止…」 markers (task id → turn id), so both lists agree. */
+    stopMarkers: Map<String, String> = emptyMap(),
 ) {
     val appModel = LocalAppModel.current
     val context = LocalContext.current
@@ -218,6 +221,12 @@ fun SessionsScreen(
     fun summaryFor(key: ThreadKey): AppSessionSummary? = summaries.firstOrNull { it.key == key }
     val activeSummary = snapshot?.activeThread?.let { activeKey -> summaries.firstOrNull { it.key == activeKey } }
     val localServerIds = snapshot?.servers?.filter { it.isLocal }?.map { it.serverId }?.toSet().orEmpty()
+    val stoppingIds = HomeTaskPresentation.pruneCancelling(
+        cancelling = stopMarkers,
+        sessions = summaries,
+        activeTurnIds = HomeTaskPresentation.activeTurnIds(snapshot?.threads.orEmpty()),
+        connectedServerIds = connectedServerIds.toSet(),
+    ).keys
     val viewState = SessionsViewState(
         title = title,
         totalCount = derived.totalCount,
@@ -232,6 +241,9 @@ fun SessionsScreen(
             pathLabel = { groupServerId, cwd ->
                 PathDisplay.display(cwd, groupServerId in localServerIds, context)
             },
+            approvalIds = HomeTaskPresentation.approvalCounts(snapshot?.pendingApprovals.orEmpty()).keys,
+            inputIds = HomeTaskPresentation.inputIds(snapshot?.pendingUserInputs.orEmpty()),
+            stoppingIds = stoppingIds,
         ),
         isLoading = isLoading,
         hasLoadedInitialSessions = hasLoadedInitialSessions,

@@ -4,6 +4,7 @@ import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyTaskState
 import com.akashark.agentbuddy.android.ui.home.ThreadLineage
 import uniffi.codex_mobile_client.ApprovalKind
 import uniffi.codex_mobile_client.AppSessionSummary
+import uniffi.codex_mobile_client.AppThreadSnapshot
 import uniffi.codex_mobile_client.PendingApproval
 import uniffi.codex_mobile_client.PendingUserInputRequest
 import uniffi.codex_mobile_client.PinnedThreadKey
@@ -129,6 +130,10 @@ object HomeTaskPresentation {
         }
         return HomeTaskSections(attention, active, recent)
     }
+
+    /** Active turn id per task id for the threads the snapshot has in detail. */
+    fun activeTurnIds(threads: List<AppThreadSnapshot>): Map<String, String?> =
+        threads.associate { thread -> taskId(thread.key) to thread.activeTurnId?.trim()?.takeIf { it.isNotEmpty() } }
 
     /**
      * Stop markers (task id → turn id the stop was sent for) that still apply,

@@ -2,6 +2,7 @@ package com.akashark.agentbuddy.android.ui.sessions
 
 import com.akashark.agentbuddy.android.state.displayTitle
 import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyTaskState
+import com.akashark.agentbuddy.android.ui.homeshell.tasks.HomeTaskPresentation
 import uniffi.codex_mobile_client.AppSessionSummary
 import uniffi.codex_mobile_client.AppSubagentStatus
 import uniffi.codex_mobile_client.ThreadKey
@@ -60,17 +61,32 @@ internal data class SessionsViewState(
     val hasActiveFilters: Boolean get() = serverFilterId != null || showOnlyForks
 }
 
-/** Render-only projection of a summary to the Mint task state (mirrors iOS rows). */
-internal fun sessionTaskState(summary: AppSessionSummary): BuddyTaskState = when {
-    summary.hasActiveTurn -> BuddyTaskState.RUNNING
-    summary.isSubagent -> when (summary.agentStatus) {
+/**
+ * Render-only projection of a summary to the Mint task state, the same as the
+ * home cards ([HomeTaskPresentation.state]: stopping, waiting on the user,
+ * running). An idle sub-agent shows its own reported status (mirrors iOS rows).
+ */
+internal fun sessionTaskState(
+    summary: AppSessionSummary,
+    approvalIds: Set<String>,
+    inputIds: Set<String>,
+    stoppingIds: Set<String>,
+): BuddyTaskState {
+    val state = HomeTaskPresentation.state(
+        taskId = HomeTaskPresentation.taskId(summary.key),
+        hasActiveTurn = summary.hasActiveTurn,
+        lastTurnEndMs = summary.lastTurnEndMs,
+        approvalIds = approvalIds,
+        inputIds = inputIds,
+        cancellingIds = stoppingIds,
+    )
+    if (!summary.isSubagent || (state != BuddyTaskState.IDLE && state != BuddyTaskState.COMPLETED)) return state
+    return when (summary.agentStatus) {
         AppSubagentStatus.COMPLETED -> BuddyTaskState.COMPLETED
         AppSubagentStatus.ERRORED -> BuddyTaskState.FAILED
         AppSubagentStatus.SHUTDOWN, AppSubagentStatus.INTERRUPTED -> BuddyTaskState.INTERRUPTED
         AppSubagentStatus.PENDING_INIT, AppSubagentStatus.RUNNING, AppSubagentStatus.UNKNOWN -> BuddyTaskState.IDLE
     }
-    summary.lastTurnEndMs == null -> BuddyTaskState.IDLE
-    else -> BuddyTaskState.COMPLETED
 }
 
 /** The stored "This Device" sentinel is shown as 本设备; never translated in storage. */
@@ -92,7 +108,9 @@ internal fun sessionsRelativeTime(epochSeconds: Long?, nowMillis: Long = System.
 
 /**
  * Shapes the derived session tree into rows and sections. [pathLabel] turns a
- * group's cwd into its display path (e.g. `~/…` on this device).
+ * group's cwd into its display path (e.g. `~/…` on this device). The id sets
+ * are task ids ([HomeTaskPresentation.taskId]) with a pending approval, a
+ * pending question, or a stop in flight.
  */
 internal fun buildSessionsGroups(
     derived: SessionsDerivedData,
@@ -101,6 +119,9 @@ internal fun buildSessionsGroups(
     collapsedGroupKeys: Set<String>,
     collapsedNodeKeys: Set<ThreadKey>,
     pathLabel: (serverId: String, cwd: String) -> String,
+    approvalIds: Set<String> = emptySet(),
+    inputIds: Set<String> = emptySet(),
+    stoppingIds: Set<String> = emptySet(),
     nowMillis: Long = System.currentTimeMillis(),
 ): List<SessionsGroupUi> {
     val byThread = allSummaries.associateBy { it.key.serverId to it.key.threadId }
@@ -110,16 +131,17 @@ internal fun buildSessionsGroups(
             val summary = node.summary
             val parent = derived.parentByKey[summary.key]
             val forkSource = summary.forkedFromId?.let { byThread[summary.key.serverId to it] }
+            val state = sessionTaskState(summary, approvalIds, inputIds, stoppingIds)
             SessionRowUi(
                 key = summary.key,
                 title = summary.displayTitle,
-                subtitle = sessionRowSubtitle(summary, group.workspaceLabel, nowMillis),
+                subtitle = sessionRowSubtitle(summary, state, group.workspaceLabel, nowMillis),
                 relationLine = when {
                     parent != null -> "来自 ${parent.displayTitle}"
                     forkSource != null -> "分叉自 ${forkSource.displayTitle}"
                     else -> null
                 },
-                state = sessionTaskState(summary),
+                state = state,
                 isActive = summary.key == activeKey,
                 isFork = summary.isFork,
                 subagentLabel = if (summary.isSubagent) summary.agentDisplayLabel ?: "子代理" else null,
@@ -140,10 +162,17 @@ internal fun buildSessionsGroups(
     }
 }
 
-private fun sessionRowSubtitle(summary: AppSessionSummary, projectLabel: String, nowMillis: Long): String {
-    val state = sessionTaskState(summary)
-    return buildList {
+private fun sessionRowSubtitle(
+    summary: AppSessionSummary,
+    state: BuddyTaskState,
+    projectLabel: String,
+    nowMillis: Long,
+): String =
+    buildList {
         when (state) {
+            BuddyTaskState.AWAITING_APPROVAL -> add("等待你确认")
+            BuddyTaskState.AWAITING_INPUT -> add("等待你回复")
+            BuddyTaskState.STOPPING -> add("正在停止…")
             BuddyTaskState.RUNNING -> add("进行中")
             BuddyTaskState.FAILED -> add("失败")
             BuddyTaskState.INTERRUPTED -> add("已停止")
@@ -155,7 +184,6 @@ private fun sessionRowSubtitle(summary: AppSessionSummary, projectLabel: String,
         sessionsRelativeTime(summary.updatedAt, nowMillis)?.let { add("${it}更新") }
         summary.model.takeIf { it.isNotBlank() }?.let { add(it.substringAfterLast('/')) }
     }.joinToString(" · ")
-}
 
 private fun countNodes(nodes: List<SessionTreeNode>): Int =
     nodes.sumOf { 1 + countNodes(it.children) }
