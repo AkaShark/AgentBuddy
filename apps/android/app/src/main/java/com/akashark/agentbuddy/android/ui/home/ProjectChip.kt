@@ -1,73 +1,35 @@
 package com.akashark.agentbuddy.android.ui.home
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.UnfoldMore
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.UnfoldMore
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.akashark.agentbuddy.android.ui.AgentBuddyTextStyle
-import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
-import com.akashark.agentbuddy.android.ui.scaled
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyContextChip
 import uniffi.codex_mobile_client.AppProject
 import uniffi.codex_mobile_client.projectDefaultLabel
 
+/** Project context chip of the new-task composer; opens the project picker. */
 @Composable
 fun ProjectChip(
     project: AppProject?,
     disabled: Boolean,
     onTap: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val label = when {
         project != null -> projectDefaultLabel(project.cwd)
-        disabled -> "no server"
-        else -> "pick project"
+        disabled -> "未连接主机"
+        else -> "选择项目"
     }
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(AgentBuddyTheme.surface.copy(alpha = 0.9f))
-            .border(0.8.dp, AgentBuddyTheme.textMuted.copy(alpha = 0.55f), RoundedCornerShape(20.dp))
-            .clickable(enabled = !disabled, onClick = onTap)
-            .padding(horizontal = 10.dp, vertical = 5.dp)
-            .alpha(if (disabled) 0.5f else 1f),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Icon(
-            imageVector = Icons.Default.Folder,
-            contentDescription = null,
-            tint = if (project != null) AgentBuddyTheme.accent else AgentBuddyTheme.textMuted,
-            modifier = Modifier.size(12.dp),
-        )
-        Text(
-            text = label,
-            color = if (project != null) AgentBuddyTheme.textPrimary else AgentBuddyTheme.textSecondary,
-            fontSize = AgentBuddyTextStyle.caption.scaled,
-            fontWeight = FontWeight.Medium,
-            fontFamily = AgentBuddyTheme.monoFont,
-            maxLines = 1,
-        )
-        Icon(
-            imageVector = Icons.Default.UnfoldMore,
-            contentDescription = null,
-            tint = AgentBuddyTheme.textMuted,
-            modifier = Modifier.size(12.dp),
-        )
-    }
+    BuddyContextChip(
+        text = label,
+        onClick = onTap,
+        icon = Icons.Outlined.Folder,
+        trailingIcon = Icons.Outlined.UnfoldMore,
+        enabled = !disabled,
+        modifier = modifier.semantics { contentDescription = "项目：$label" },
+    )
 }

@@ -1,98 +1,51 @@
 package com.akashark.agentbuddy.android.ui.conversation
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.NotificationsOff
-import androidx.compose.material.icons.filled.SportsEsports
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SmallFloatingActionButton
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyReduceMotion
 import com.akashark.agentbuddy.android.push.PUSH_PREFS
 import com.akashark.agentbuddy.android.push.PushNotifications
 import com.akashark.agentbuddy.android.push.shouldShowUnsupportedHostHint
 import com.akashark.agentbuddy.android.push.unsupportedHostHintDismissedKey
-import com.akashark.agentbuddy.android.state.contextPercent
-import com.akashark.agentbuddy.android.state.hasActiveTurn
 import com.akashark.agentbuddy.android.state.isActiveStatus
-import com.akashark.agentbuddy.android.ui.BerkeleyMono
 import com.akashark.agentbuddy.android.ui.ChatWallpaperBackground
 import com.akashark.agentbuddy.android.ui.ConversationPrefs
 import com.akashark.agentbuddy.android.ui.LocalAppModel
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
-import com.akashark.agentbuddy.android.ui.AgentBuddyTextStyle
-import com.akashark.agentbuddy.android.ui.scaled
 import com.akashark.agentbuddy.android.ui.WallpaperManager
 import com.akashark.agentbuddy.android.ui.WallpaperType
+import com.akashark.agentbuddy.android.ui.approvals.KeepApprovalBannerBelow
 import com.akashark.agentbuddy.android.ui.isNearListBottom
 import com.akashark.agentbuddy.android.ui.rememberStickyFollowTail
 import kotlinx.coroutines.launch
 import uniffi.codex_mobile_client.AppHostPushSupport
-import uniffi.codex_mobile_client.HydratedConversationItemContent
 import uniffi.codex_mobile_client.AppRenameThreadRequest
 import uniffi.codex_mobile_client.PendingUserInputRequest
 import uniffi.codex_mobile_client.ThreadKey
@@ -114,25 +67,10 @@ fun ConversationScreen(
     val appModel = LocalAppModel.current
     val snapshot by appModel.snapshot.collectAsState()
     val scope = rememberCoroutineScope()
+    val reduceMotion = buddyReduceMotion
     val context = androidx.compose.ui.platform.LocalContext.current
 
-    // Pre-warm Markwon and MessageParser on conversation open
-    val warmMarkwon = remember(context) {
-        try {
-            val prism4j = io.noties.prism4j.Prism4j(com.akashark.agentbuddy.android.ui.Prism4jGrammarLocator())
-            io.noties.markwon.Markwon.builder(context)
-                .usePlugin(io.noties.markwon.syntax.SyntaxHighlightPlugin.create(prism4j, io.noties.markwon.syntax.Prism4jThemeDarkula.create()))
-                .build()
-        } catch (_: Exception) {
-            io.noties.markwon.Markwon.create(context)
-        }
-    }
-    LaunchedEffect(Unit) {
-        // Trigger a lightweight parse to JIT-warm the Rust MessageParser
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-            appModel.parser.extractRenderBlocksTyped("")
-        }
-    }
+    ConversationRenderPrewarm(appModel = appModel, context = context)
 
     val thread = remember(snapshot, threadKey) {
         appModel.threadSnapshot(threadKey)
@@ -173,14 +111,7 @@ fun ConversationScreen(
         )
     }
     val transcriptTailSignature = remember(items, normalizedActiveTurnId, isThinking) {
-        var hash = 17
-        items.takeLast(4).forEach { item ->
-            hash = 31 * hash + item.hashCode()
-        }
-        hash = 31 * hash + items.size
-        hash = 31 * hash + (normalizedActiveTurnId?.hashCode() ?: 0)
-        hash = 31 * hash + if (isThinking) 1 else 0
-        hash
+        conversationTranscriptTailSignature(items, normalizedActiveTurnId, isThinking)
     }
     // Server-paginated windowing: the Rust reducer owns which turns are
     // currently loaded for this thread. Kotlin just renders whatever is in
@@ -223,57 +154,11 @@ fun ConversationScreen(
         lastObservedUpdatedAt = updatedAt
     }
 
-    // Reuse already-loaded thread content on re-entry, and only fall back to
-    // resume/read flows when the conversation isn't available locally yet.
-    LaunchedEffect(threadKey) {
-        appModel.dismissMinigame()
-        try {
-            val resolvedThreadKey = appModel.hydrateThreadPermissions(threadKey) ?: threadKey
-            appModel.activateThread(resolvedThreadKey)
-            // Always call externalResumeThread so the server attaches a
-            // streaming listener for this connection. Rust skips the RPC when
-            // state is already fresh.
-            try {
-                appModel.externalResumeThread(resolvedThreadKey)
-            } catch (_: Exception) {
-                // Fall back to client.resumeThread for servers that need
-                // launch config overrides.
-                val cwdOverride = appModel.threadSnapshot(resolvedThreadKey)?.info?.cwd
-                appModel.client.resumeThread(
-                    resolvedThreadKey.serverId,
-                    appModel.launchState.threadResumeRequest(
-                        resolvedThreadKey.threadId,
-                        cwdOverride = cwdOverride,
-                        threadKey = resolvedThreadKey,
-                    ),
-                )
-                appModel.refreshThreadSnapshot(resolvedThreadKey)
-            }
-            if (appModel.threadSnapshot(resolvedThreadKey) == null) {
-                appModel.ensureThreadLoaded(resolvedThreadKey)
-            }
-            appModel.loadConversationMetadataIfNeeded(resolvedThreadKey.serverId)
-        } catch (_: Exception) {}
-    }
-
-    LaunchedEffect(
-        thread?.info?.cwd,
-        thread?.effectiveApprovalPolicy,
-        thread?.effectiveSandboxPolicy,
-    ) {
-        appModel.launchState.syncFromThread(thread)
-    }
-
-    // Initial turn load. Runs on the AppModel scope so it
-    // survives recomposition — when Rust applies the page it flips
-    // `initialTurnsLoaded` to true, which recomposes this view and would
-    // otherwise cancel a LaunchedEffect mid-RPC. Rust owns the pagination
-    // capability decision and falls back to embedded resume turns when needed.
-    LaunchedEffect(threadKey, thread?.initialTurnsLoaded) {
-        if (thread != null && !thread.initialTurnsLoaded) {
-            appModel.loadInitialTurnsIfNeeded(threadKey)
-        }
-    }
+    ConversationThreadEffects(
+        appModel = appModel,
+        threadKey = threadKey,
+        thread = thread,
+    )
 
     var showModelSelector by remember { mutableStateOf(false) }
     var showCollaborationModeSelector by remember { mutableStateOf(false) }
@@ -316,85 +201,10 @@ fun ConversationScreen(
         }
     }
 
-    val activeTaskSummary = remember(items) {
-        items.asReversed().firstNotNullOfOrNull { item ->
-            val content = item.content as? HydratedConversationItemContent.TodoList ?: return@firstNotNullOfOrNull null
-            val steps = content.v1.steps
-            if (steps.isEmpty()) return@firstNotNullOfOrNull null
-
-            val activeSteps = steps.filter {
-                it.status != uniffi.codex_mobile_client.HydratedPlanStepStatus.COMPLETED
-            }
-            if (activeSteps.isEmpty()) return@firstNotNullOfOrNull null
-
-            val completed = steps.count {
-                it.status == uniffi.codex_mobile_client.HydratedPlanStepStatus.COMPLETED
-            }
-            val focusStep = steps.firstOrNull {
-                it.status == uniffi.codex_mobile_client.HydratedPlanStepStatus.IN_PROGRESS
-            } ?: steps.firstOrNull {
-                it.status == uniffi.codex_mobile_client.HydratedPlanStepStatus.PENDING
-            } ?: activeSteps.firstOrNull()
-            val detail = focusStep?.step?.trim().orEmpty()
-
-            ActiveTaskSummary(
-                progress = "$completed/${steps.size}",
-                label = detail.ifBlank {
-                    if (activeSteps.size == 1) "1 个进行中的任务" else "${activeSteps.size} 个进行中的任务"
-                },
-            )
-        }
-    }
+    val activeTaskSummary = remember(items) { conversationActiveTaskSummary(items) }
 
     // Pinned context: latest TODO progress + combined session diff summary
-    val pinnedContext = remember(items) {
-        var todoProgress: String? = null
-        val rawDiffSections = mutableListOf<SessionDiffSection>()
-        for (i in items.indices.reversed()) {
-            when (val c = items[i].content) {
-                is HydratedConversationItemContent.TodoList -> {
-                    if (todoProgress == null) {
-                        val done = c.v1.steps.count {
-                            it.status == uniffi.codex_mobile_client.HydratedPlanStepStatus.COMPLETED
-                        }
-                        todoProgress = "$done/${c.v1.steps.size}"
-                    }
-                }
-                is HydratedConversationItemContent.FileChange -> {
-                    c.v1.changes.forEach { change ->
-                        val diff = change.diff.trim()
-                        if (diff.isBlank()) return@forEach
-                        rawDiffSections += SessionDiffSection(
-                            title = workspaceTitleCompat(change.path),
-                            diff = diff,
-                        )
-                    }
-                }
-                is HydratedConversationItemContent.TurnDiff -> {
-                    rawDiffSections += parseSessionDiffSections(c.v1.diff)
-                }
-                else -> {}
-            }
-        }
-        val diffSections = mergeSessionDiffSections(rawDiffSections)
-        val diffSummary = diffSections
-            .takeIf { it.isNotEmpty() }
-            ?.fold(DiffSummary(additions = 0, deletions = 0)) { acc, section ->
-                DiffSummary(
-                    additions = acc.additions + section.summary.additions,
-                    deletions = acc.deletions + section.summary.deletions,
-                )
-            }
-        if (todoProgress != null || diffSummary != null) {
-            PinnedContextData(
-                todoProgress = todoProgress,
-                diffSummary = diffSummary,
-                diffSections = diffSections,
-            )
-        } else {
-            null
-        }
-    }
+    val pinnedContext = remember(items) { conversationPinnedContext(items) }
 
     // Auto-scroll state
     val listState = rememberLazyListState()
@@ -412,7 +222,7 @@ fun ConversationScreen(
     LaunchedEffect(threadKey, displayedTurnCount, transcriptTailSignature, followScrollToken, streamingRenderTick) {
         if (shouldFollowTail && displayedTurns.isNotEmpty()) {
             val bottomAnchorIndex = conversationBottomAnchorIndex(displayedTurnCount)
-            if (hasPositionedInitialTail) {
+            if (hasPositionedInitialTail && !reduceMotion) {
                 listState.animateScrollToItem(bottomAnchorIndex)
             } else {
                 listState.scrollToItem(bottomAnchorIndex)
@@ -425,7 +235,11 @@ fun ConversationScreen(
     val hasWallpaper = remember(threadKey, wallpaperVersion) {
         WallpaperManager.resolvedConfig(threadKey)?.type?.let { it != WallpaperType.NONE } == true
     }
-    val headerScrimColor = if (hasWallpaper) AgentBuddyTheme.surface.copy(alpha = 0.75f) else AgentBuddyTheme.surface
+    val headerScrimColor = if (hasWallpaper) AgentBuddyTheme.background.copy(alpha = 0.75f) else AgentBuddyTheme.background
+    // The app-level approval banner stays below this header (back / 「…」).
+    var headerHeightPx by remember { mutableIntStateOf(0) }
+    KeepApprovalBannerBelow(headerHeightPx)
+    var minigameHeightPx by remember { mutableIntStateOf(0) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Wallpaper fills the entire screen edge-to-edge (behind status + nav bars)
@@ -438,6 +252,7 @@ fun ConversationScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .onSizeChanged { headerHeightPx = it.height }
                     .background(headerScrimColor),
             ) {
                 Spacer(Modifier.statusBarsPadding())
@@ -447,6 +262,8 @@ fun ConversationScreen(
                     onInfo = onInfo,
                     showModelSelector = showModelSelector,
                     onToggleModelSelector = { showModelSelector = !showModelSelector },
+                    onShowPermissions = { showPermissionsSheet = true },
+                    onShowCollaborationMode = { showCollaborationModeSelector = true },
                     onReloadError = { reloadErrorMessage = it },
                     transparentBackground = hasWallpaper,
                 )
@@ -459,654 +276,168 @@ fun ConversationScreen(
                         CircularProgressIndicator(color = AgentBuddyTheme.accent)
                     }
                 } else {
-                    // Use transparent gradient when wallpaper is set
-                    val fadeColor = if (hasWallpaper) Color.Transparent else AgentBuddyTheme.background
-
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 16.dp)
-                            .then(
-                                if (!hasWallpaper) {
-                                    Modifier.drawWithContent {
-                                        drawContent()
-                                        drawRect(
-                                            brush = Brush.verticalGradient(
-                                                colors = listOf(AgentBuddyTheme.background, Color.Transparent),
-                                                startY = 0f,
-                                                endY = 48f,
-                                            ),
-                                        )
-                                    }
-                                } else Modifier.drawWithContent { drawContent() }
-                            ),
-                    ) {
-                        item { Spacer(Modifier.height(12.dp)) }
-
-                        if (isWaitingForData || isInitialTurnsLoading) {
-                            item {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 40.dp),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    if (isInitialTurnsLoading) {
-                                        CircularProgressIndicator(
-                                            color = AgentBuddyTheme.accent,
-                                            strokeWidth = 2.dp,
-                                            modifier = Modifier.size(20.dp),
-                                        )
-                                    } else {
-                                        Text(
-                                            "正在加载会话…",
-                                            color = AgentBuddyTheme.textMuted,
-                                            fontSize = AgentBuddyTextStyle.caption.scaled,
-                                        )
-                                    }
+                    ConversationTranscriptList(
+                        appModel = appModel,
+                        scope = scope,
+                        threadKey = threadKey,
+                        thread = thread,
+                        items = items,
+                        listState = listState,
+                        hasWallpaper = hasWallpaper,
+                        isWaitingForData = isWaitingForData,
+                        isInitialTurnsLoading = isInitialTurnsLoading,
+                        hasMoreTurnsAbove = hasMoreTurnsAbove,
+                        isLoadingOlderTurns = isLoadingOlderTurns,
+                        onLoadOlderTurns = loadOlderTurns@{
+                            if (isLoadingOlderTurns) return@loadOlderTurns
+                            isLoadingOlderTurns = true
+                            scope.launch {
+                                try {
+                                    appModel.loadOlderTurns(threadKey).join()
+                                } finally {
+                                    isLoadingOlderTurns = false
                                 }
                             }
-                        }
-
-                        if (hasMoreTurnsAbove) {
-                            item {
-                                TextButton(
-                                    enabled = !isLoadingOlderTurns,
-                                    onClick = {
-                                        if (isLoadingOlderTurns) return@TextButton
-                                        isLoadingOlderTurns = true
-                                        scope.launch {
-                                            try {
-                                                appModel.loadOlderTurns(threadKey).join()
-                                            } finally {
-                                                isLoadingOlderTurns = false
-                                            }
-                                        }
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                ) {
-                                    if (isLoadingOlderTurns) {
-                                        CircularProgressIndicator(
-                                            color = AgentBuddyTheme.accent,
-                                            strokeWidth = 2.dp,
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                    } else {
-                                        Text(
-                                            "加载更早的消息",
-                                            color = AgentBuddyTheme.accent,
-                                            fontSize = AgentBuddyTextStyle.caption.scaled,
-                                            fontWeight = FontWeight.SemiBold,
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        itemsIndexed(
-                            items = displayedTurns,
-                            key = { index, turn -> "${turn.id}#$index" },
-                        ) { _, turn ->
-                            val isExpanded = !turn.isCollapsedByDefault || expandedTurnIds.contains(turn.id)
-                            val streamingAssistantItemId = remember(turn.items, turn.isActiveTurn) {
-                                if (!turn.isActiveTurn) {
-                                    null
-                                } else {
-                                    turn.items.lastOrNull {
-                                        it.content is HydratedConversationItemContent.Assistant
-                                    }?.id
-                                }
-                            }
-                            if (isExpanded) {
-                                val timelineEntries = remember(turn.items, turn.isActiveTurn) {
-                                    buildTimelineEntries(turn.items, turn.isActiveTurn)
-                                }
-                                val latestCommandExecutionItemId = remember(timelineEntries) {
-                                    timelineEntries.asReversed().firstNotNullOfOrNull { entry ->
-                                        when (entry) {
-                                            is TimelineEntry.Single -> {
-                                                if (entry.item.content is HydratedConversationItemContent.CommandExecution) {
-                                                    entry.item.id
-                                                } else {
-                                                    null
-                                                }
-                                            }
-
-                                            is TimelineEntry.Exploration -> null
-                                        }
-                                    }
-                                }
-                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    timelineEntries.forEachIndexed { index, entry ->
-                                        when (entry) {
-                                            is TimelineEntry.Single -> {
-                                                ConversationTimelineItem(
-                                                    item = entry.item,
-                                                    serverId = threadKey.serverId,
-                                                    threadId = threadKey.threadId,
-                                                    agentDirectoryVersion = agentDirectoryVersion,
-                                                    latestCommandExecutionItemId = latestCommandExecutionItemId,
-                                                    isLiveTurn = turn.isActiveTurn,
-                                                    isStreamingMessage = entry.item.id == streamingAssistantItemId,
-                                                    onStreamingSnapshotRendered = if (entry.item.id == streamingAssistantItemId) {
-                                                        { streamingRenderTick += 1 }
-                                                    } else {
-                                                        null
-                                                    },
-                                                    onEditMessage = { messageId ->
-                                                        // Resolve the user-message position in the
-                                                        // currently-loaded transcript. The Rust
-                                                        // `editMessage` / `forkThreadFromMessage` APIs
-                                                        // expect an index into `thread.items` filtered
-                                                        // to user messages — recomputing here keeps
-                                                        // the index correct under pagination, where a
-                                                        // cached `sourceTurnIndex` from a prior hydrate
-                                                        // would be stale.
-                                                        loadedUserItemIndex(items, messageId)?.let { turnIndex ->
-                                                            scope.launch {
-                                                                val prefill = appModel.store.editMessage(threadKey, turnIndex)
-                                                                appModel.queueComposerPrefill(threadKey, prefill)
-                                                            }
-                                                        }
-                                                    },
-                                                    onForkFromMessage = { messageId ->
-                                                        loadedUserItemIndex(items, messageId)?.let { turnIndex ->
-                                                            scope.launch {
-                                                                try {
-                                                                    val newKey = appModel.store.forkThreadFromMessage(
-                                                                        threadKey,
-                                                                        turnIndex,
-                                                                        appModel.launchState.forkThreadFromMessageRequest(
-                                                                            cwdOverride = thread.info.cwd,
-                                                                            threadKey = threadKey,
-                                                                        ),
-                                                                    )
-                                                                    appModel.store.setActiveThread(newKey)
-                                                                    appModel.refreshThreadSnapshot(newKey)
-                                                                } catch (_: Exception) {}
-                                                            }
-                                                        }
-                                                    },
-                                                    onOpenSavedApp = onOpenSavedApp,
-                                                    onWidgetPrompt = { text ->
-                                                        scope.launch {
-                                                            try {
-                                                                val payload = com.akashark.agentbuddy.android.state.AppComposerPayload(
-                                                                    text = text,
-                                                                    additionalInputs = emptyList(),
-                                                                    approvalPolicy = appModel.launchState.approvalPolicyValue(threadKey),
-                                                                    sandboxPolicy = appModel.launchState.turnSandboxPolicy(threadKey),
-                                                                    model = appModel.launchState.snapshot.value.selectedModel.trim().ifEmpty { null },
-                                                                    reasoningEffort = null,
-                                                                    serviceTier = null,
-                                                                )
-                                                                appModel.startTurn(threadKey, payload)
-                                                            } catch (_: Exception) {}
-                                                        }
-                                                    },
-                                                )
-                                            }
-
-                                            is TimelineEntry.Exploration -> {
-                                                ExplorationGroupRow(
-                                                    group = entry.group,
-                                                    showsCollapsedPreview = index == timelineEntries.lastIndex,
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    // Debug turn metrics
-                                    if (com.akashark.agentbuddy.android.state.DebugSettings.enabled && com.akashark.agentbuddy.android.state.DebugSettings.showTurnMetrics) {
-                                        val metricsText = remember(turn.items) {
-                                            val dur = turn.totalDurationMs
-                                            val cmds = turn.commandCount
-                                            val files = turn.fileChangeCount
-                                            val itemCount = turn.items.size
-                                            buildString {
-                                                append("$itemCount items")
-                                                if (cmds > 0) append(" \u00b7 $cmds cmds")
-                                                if (files > 0) append(" \u00b7 $files files")
-                                                if (dur > 0) {
-                                                    val durStr = if (dur < 1000) "${dur}ms" else "%.1fs".format(dur / 1000.0)
-                                                    append(" \u00b7 $durStr")
-                                                }
-                                            }
-                                        }
-                                        Text(
-                                            text = metricsText,
-                                            color = AgentBuddyTheme.textMuted.copy(alpha = 0.6f),
-                                            fontSize = 10f.scaled,
-                                            fontFamily = com.akashark.agentbuddy.android.ui.BerkeleyMono,
-                                            modifier = Modifier.padding(top = 2.dp, start = 4.dp),
-                                        )
-                                    }
-
-                                    if (turn.isActiveTurn) {
-                                        StreamingCursor()
-                                    }
-
-                                    if (turn.isCollapsedByDefault) {
-                                        Text(
-                                            text = "收起",
-                                            color = AgentBuddyTheme.textMuted,
-                                            fontSize = AgentBuddyTextStyle.caption2.scaled,
-                                            fontWeight = FontWeight.Medium,
-                                            modifier = Modifier
-                                                .clickable {
-                                                    expandedTurnIds = expandedTurnIds - turn.id
-                                                }
-                                                .padding(top = 2.dp),
-                                        )
-                                    }
-                                }
-                            } else {
-                                CollapsedTurnCard(turn = turn) {
-                                    expandedTurnIds = expandedTurnIds + turn.id
-                                }
-                            }
-                            Spacer(Modifier.height(4.dp))
-                        }
-
-                        item { Spacer(Modifier.height(80.dp)) }
-                    }
+                        },
+                        displayedTurns = displayedTurns,
+                        expandedTurnIds = expandedTurnIds,
+                        onExpandTurn = { turnId -> expandedTurnIds = expandedTurnIds + turnId },
+                        onCollapseTurn = { turnId -> expandedTurnIds = expandedTurnIds - turnId },
+                        agentDirectoryVersion = agentDirectoryVersion,
+                        onStreamingSnapshotRendered = { streamingRenderTick += 1 },
+                        onOpenSavedApp = onOpenSavedApp,
+                    )
                 }
 
-                // Scroll-to-bottom FAB
+                // 「回到最新」 when the reader has scrolled up.
                 if (!isAtBottom && displayedTurns.isNotEmpty()) {
-                    SmallFloatingActionButton(
+                    ConversationScrollToLatestButton(
                         onClick = {
                             scope.launch {
-                                listState.animateScrollToItem(conversationBottomAnchorIndex(displayedTurnCount))
+                                val target = conversationBottomAnchorIndex(displayedTurnCount)
+                                if (reduceMotion) listState.scrollToItem(target) else listState.animateScrollToItem(target)
                             }
                         },
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .padding(bottom = 8.dp),
-                        containerColor = AgentBuddyTheme.surface,
-                        contentColor = AgentBuddyTheme.textPrimary,
-                    ) {
-                        Icon(Icons.Default.KeyboardArrowDown, "滚动到底部", modifier = Modifier.size(20.dp))
-                    }
+                    )
                 }
             }
 
-            // Bottom area: gradient fade + pinned context + composer + nav bar inset
-            // Hidden while the thinking-minigame overlay is up.
-            if (!isMinigameActive) Column(modifier = Modifier.fillMaxWidth()) {
-                // Floating minigame launcher — visible only while thinking,
-                // gated by the experimental flag.
-                val minigameFeatureOn = com.akashark.agentbuddy.android.ui.ExperimentalFeatures.isEnabled(
-                    com.akashark.agentbuddy.android.ui.AgentBuddyFeature.THINKING_MINIGAME,
-                )
-                if (minigameFeatureOn) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 12.dp, end = 12.dp, bottom = 4.dp),
-                        horizontalArrangement = Arrangement.Start,
-                    ) {
-                        MinigameLaunchButton(onClick = {
-                            val (lastUser, lastAssistant) = lastUserAndAssistantText(items)
-                            appModel.requestMinigame(
-                                parentThreadId = threadKey.threadId,
-                                serverId = threadKey.serverId,
-                                lastUserMessage = lastUser,
-                                lastAssistantMessage = lastAssistant,
-                            )
-                        })
-                    }
-                }
-
-                // Gradient fade from transparent to scrim
-                if (hasWallpaper) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(24.dp)
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(Color.Transparent, headerScrimColor),
-                                ),
-                            ),
-                    )
-                }
-
-                // Solid scrim area for controls
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(headerScrimColor),
-                ) {
-                    // Pinned context strip
-                    if (pinnedContext != null) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(AgentBuddyTheme.codeBackground.copy(alpha = if (hasWallpaper) 0.75f else 1f))
-                                .padding(horizontal = 16.dp, vertical = 2.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            pinnedContext.todoProgress?.let { todo ->
-                                PlanContextBadge(progress = todo)
-                            }
-                            pinnedContext.diffSummary?.let { diff ->
-                                DiffSummaryBadge(
-                                    summary = diff,
-                                    onClick = { showSessionDiffSheet = true },
-                                )
-                                CollaborationModeChip(
-                                    mode = thread?.collaborationMode ?: uniffi.codex_mobile_client.AppModeKind.DEFAULT,
-                                    onClick = { showCollaborationModeSelector = true },
-                                )
-                            }
-                        }
-                    }
-
-                    if (showUnsupportedHostHint) {
-                        UnsupportedHostPushHint(
-                            onDismiss = {
-                                context.getSharedPreferences(PUSH_PREFS, android.content.Context.MODE_PRIVATE)
-                                    .edit()
-                                    .putBoolean(unsupportedHostHintDismissedKey(threadKey.serverId), true)
-                                    .apply()
-                                showUnsupportedHostHint = false
-                            },
-                        )
-                    }
-
-                    // Inline voice status strip (above composer when voice active)
-                    run {
-                        val voiceController = remember { com.akashark.agentbuddy.android.state.VoiceRuntimeController.shared }
-                        val voiceLocalSession by voiceController.activeVoiceSession.collectAsState()
-                        val voiceSnap by appModel.snapshot.collectAsState()
-                        val voicePhase = voiceSnap?.voiceSession?.phase
-                        if (voiceLocalSession != null && voicePhase != null) {
-                            com.akashark.agentbuddy.android.ui.voice.InlineVoiceStatusStrip(
-                                phase = voicePhase,
-                                inputLevel = voiceLocalSession?.inputLevel ?: 0f,
-                                outputLevel = voiceLocalSession?.outputLevel ?: 0f,
-                                onToggleSpeaker = {
-                                    val current = voiceController.isSpeakerEnabled()
-                                    voiceController.setSpeakerEnabled(!current)
-                                },
-                            )
-                        }
-                    }
-
-                    // Composer bar
-                    ComposerBar(
-                        threadKey = threadKey,
-                        collaborationMode = thread?.collaborationMode ?: uniffi.codex_mobile_client.AppModeKind.DEFAULT,
-                        activePlanProgress = thread?.activePlanProgress,
-                        activeTurnId = thread?.activeTurnId,
-                        contextPercent = thread?.composerContextPercent(),
-                        isThinking = isThinking,
-                        activeTaskSummary = activeTaskSummary,
-                        queuedFollowUps = thread?.queuedFollowUps ?: emptyList(),
-                        goal = thread?.goal,
-                        rateLimits = thread?.agentRuntimeKind?.let { runtimeKind ->
-                            server?.rateLimitsByRuntime?.firstOrNull { it.runtimeKind == runtimeKind }?.rateLimits
-                        },
-                        showCollaborationModeChip = pinnedContext?.diffSummary == null,
-                        onOpenCollaborationModePicker = { showCollaborationModeSelector = true },
-                        onToggleModelSelector = { showModelSelector = !showModelSelector },
-                        onNavigateToSessions = onNavigateToSessions,
-                        onShowDirectoryPicker = onShowDirectoryPicker,
-                        onShowRenameDialog = { initialName ->
-                            val trimmed = initialName?.trim().orEmpty()
-                            if (trimmed.isNotEmpty()) {
-                                scope.launch {
-                                    try {
-                                        appModel.client.renameThread(
-                                            threadKey.serverId,
-                                            AppRenameThreadRequest(
-                                                threadId = threadKey.threadId,
-                                                name = trimmed,
-                                            ),
-                                        )
-                                        appModel.refreshThreadSnapshot(threadKey)
-                                    } catch (e: Exception) {
-                                        slashErrorMessage = e.message ?: "重命名会话失败"
-                                    }
-                                }
-                            } else {
-                                renameDraft = thread?.info?.title?.takeIf { it.isNotBlank() }.orEmpty()
-                                showRenameDialog = true
-                            }
-                        },
-                        onShowPermissionsSheet = { showPermissionsSheet = true },
-                        onShowExperimentalSheet = { showExperimentalSheet = true },
-                        onShowSkillsSheet = { showSkillsSheet = true },
-                        onSlashError = { slashErrorMessage = it },
-                        pendingUserInput = pendingInput,
-                        onDismissPendingUserInput = {
-                            pendingInput?.let { dismissedUserInputs.dismiss(it.id) }
-                        },
-                    )
-
-                    Spacer(Modifier.navigationBarsPadding())
-                }
-            }
-        }
-
-        // Thinking-indicator minigame overlay: bottom 40% of the screen.
-        // Slides up from the bottom when appearing and slides back out on
-        // dismiss, mirroring iOS ConversationView.swift:148
-        // `.transition(.move(edge: .bottom).combined(with: .opacity))`.
-        AnimatedVisibility(
-            visible = isMinigameActive,
-            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .fillMaxHeight(0.4f)
-                .padding(horizontal = 8.dp, vertical = 8.dp)
-                .navigationBarsPadding(),
-        ) {
-            MinigameOverlay(
-                state = minigameOverlay,
-                onClose = { appModel.dismissMinigame() },
-                onRetry = {
-                    val (lastUser, lastAssistant) = lastUserAndAssistantText(items)
-                    appModel.dismissMinigame()
-                    appModel.requestMinigame(
-                        parentThreadId = threadKey.threadId,
-                        serverId = threadKey.serverId,
-                        lastUserMessage = lastUser,
-                        lastAssistantMessage = lastAssistant,
-                    )
-                },
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-
-        if (showPermissionsSheet) {
-            ModalBottomSheet(
-                onDismissRequest = { showPermissionsSheet = false },
-                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-                containerColor = AgentBuddyTheme.background,
-            ) {
-                ComposerPermissionsSheet(
+            // Bottom area: gradient fade + pinned context + composer + nav bar inset.
+            // While the thinking-minigame overlay covers it, this thread's
+            // approvals and pending question stay reachable just above the game.
+            if (isMinigameActive) {
+                ConversationMinigameAttentionArea(
+                    appModel = appModel,
                     threadKey = threadKey,
-                    onDismiss = { showPermissionsSheet = false },
+                    items = items,
+                    pendingInput = pendingInput,
+                    onDismissPendingUserInput = { pendingInput?.let { dismissedUserInputs.dismiss(it.id) } },
+                    minigameHeightPx = minigameHeightPx,
                 )
-            }
-        }
-
-        if (showCollaborationModeSelector) {
-            ModalBottomSheet(
-                onDismissRequest = { showCollaborationModeSelector = false },
-                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-                containerColor = AgentBuddyTheme.background,
-            ) {
-                CollaborationModeSheet(
-                    presets = collaborationModePresets.ifEmpty { fallbackCollaborationModePresets() },
-                    selectedMode = thread?.collaborationMode ?: uniffi.codex_mobile_client.AppModeKind.DEFAULT,
-                    isLoading = collaborationModesLoading,
-                    onDismiss = { showCollaborationModeSelector = false },
-                    onSelect = { mode ->
-                        showCollaborationModeSelector = false
+            } else ConversationBottomArea(
+                appModel = appModel,
+                threadKey = threadKey,
+                thread = thread,
+                server = server,
+                items = items,
+                hasWallpaper = hasWallpaper,
+                headerScrimColor = headerScrimColor,
+                pinnedContext = pinnedContext,
+                showUnsupportedHostHint = showUnsupportedHostHint,
+                onDismissUnsupportedHostHint = {
+                    context.getSharedPreferences(PUSH_PREFS, android.content.Context.MODE_PRIVATE)
+                        .edit()
+                        .putBoolean(unsupportedHostHintDismissedKey(threadKey.serverId), true)
+                        .apply()
+                    showUnsupportedHostHint = false
+                },
+                activeTaskSummary = activeTaskSummary,
+                pendingInput = pendingInput,
+                onShowSessionDiffSheet = { showSessionDiffSheet = true },
+                onShowCollaborationModeSelector = { showCollaborationModeSelector = true },
+                onToggleModelSelector = { showModelSelector = !showModelSelector },
+                onNavigateToSessions = onNavigateToSessions,
+                onShowDirectoryPicker = onShowDirectoryPicker,
+                onShowRenameDialog = { initialName ->
+                    val trimmed = initialName?.trim().orEmpty()
+                    if (trimmed.isNotEmpty()) {
                         scope.launch {
                             try {
-                                appModel.store.setThreadCollaborationMode(threadKey, mode)
+                                appModel.client.renameThread(
+                                    threadKey.serverId,
+                                    AppRenameThreadRequest(
+                                        threadId = threadKey.threadId,
+                                        name = trimmed,
+                                    ),
+                                )
+                                appModel.refreshThreadSnapshot(threadKey)
                             } catch (e: Exception) {
-                                slashErrorMessage = e.message ?: "切换协作模式失败"
+                                slashErrorMessage = e.message ?: "重命名会话失败"
                             }
                         }
-                    },
-                )
-            }
-        }
-
-        if (showExperimentalSheet) {
-            ModalBottomSheet(
-                onDismissRequest = { showExperimentalSheet = false },
-                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-                containerColor = AgentBuddyTheme.background,
-            ) {
-                ComposerExperimentalSheet(
-                    serverId = threadKey.serverId,
-                    onDismiss = { showExperimentalSheet = false },
-                    onError = { slashErrorMessage = it },
-                )
-            }
-        }
-
-        if (showSkillsSheet) {
-            ModalBottomSheet(
-                onDismissRequest = { showSkillsSheet = false },
-                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-                containerColor = AgentBuddyTheme.background,
-            ) {
-                ComposerSkillsSheet(
-                    serverId = threadKey.serverId,
-                    cwd = thread?.info?.cwd ?: appModel.launchState.snapshot.value.currentCwd.ifBlank { "/" },
-                    onDismiss = { showSkillsSheet = false },
-                    onError = { slashErrorMessage = it },
-                )
-            }
-        }
-
-        if (showSessionDiffSheet && !pinnedContext?.diffSections.isNullOrEmpty()) {
-            ModalBottomSheet(
-                onDismissRequest = { showSessionDiffSheet = false },
-                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-                containerColor = AgentBuddyTheme.background,
-            ) {
-                SessionDiffSheet(
-                    sections = pinnedContext?.diffSections.orEmpty(),
-                    onDismiss = { showSessionDiffSheet = false },
-                )
-            }
-        }
-
-        if (showRenameDialog) {
-            AlertDialog(
-                onDismissRequest = { showRenameDialog = false },
-                title = { Text("重命名会话") },
-                text = {
-                    OutlinedTextField(
-                        value = renameDraft,
-                        onValueChange = { renameDraft = it },
-                        label = { Text("新会话标题") },
-                        singleLine = true,
-                    )
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            val nextTitle = renameDraft.trim()
-                            if (nextTitle.isEmpty()) {
-                                showRenameDialog = false
-                                return@TextButton
-                            }
-                            showRenameDialog = false
-                            scope.launch {
-                                try {
-                                    appModel.client.renameThread(
-                                        threadKey.serverId,
-                                        AppRenameThreadRequest(
-                                            threadId = threadKey.threadId,
-                                            name = nextTitle,
-                                        ),
-                                    )
-                                    appModel.refreshThreadSnapshot(threadKey)
-                                } catch (e: Exception) {
-                                    slashErrorMessage = e.message ?: "Failed to rename conversation"
-                                }
-                            }
-                        },
-                    ) {
-                        Text("重命名")
+                    } else {
+                        renameDraft = thread?.info?.title?.takeIf { it.isNotBlank() }.orEmpty()
+                        showRenameDialog = true
                     }
                 },
-                dismissButton = {
-                    TextButton(onClick = { showRenameDialog = false }) {
-                        Text("取消")
-                    }
+                onShowPermissionsSheet = { showPermissionsSheet = true },
+                onShowExperimentalSheet = { showExperimentalSheet = true },
+                onShowSkillsSheet = { showSkillsSheet = true },
+                onSlashError = { slashErrorMessage = it },
+                onDismissPendingUserInput = {
+                    pendingInput?.let { dismissedUserInputs.dismiss(it.id) }
                 },
             )
         }
 
-        thread?.pendingPlanImplementationPrompt?.let {
-            AlertDialog(
-                onDismissRequest = { appModel.store.dismissPlanImplementationPrompt(threadKey) },
-                title = { Text("执行这个计划？") },
-                text = { Text("切回默认模式并发送 \"Implement the plan.\"") },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            scope.launch {
-                                try {
-                                    appModel.store.implementPlan(threadKey)
-                                } catch (e: Exception) {
-                                    slashErrorMessage = e.message ?: "执行计划失败"
-                                }
-                            }
-                        },
-                    ) {
-                        Text("是，执行")
-                    }
-                },
-                dismissButton = {
-                    TextButton(
-                        onClick = { appModel.store.dismissPlanImplementationPrompt(threadKey) },
-                    ) {
-                        Text("不，留在计划模式")
-                    }
-                },
-            )
-        }
+        ConversationMinigameOverlay(
+            appModel = appModel,
+            threadKey = threadKey,
+            items = items,
+            isMinigameActive = isMinigameActive,
+            minigameOverlay = minigameOverlay,
+            onHeightChanged = { minigameHeightPx = it },
+        )
 
-        slashErrorMessage?.let { message ->
-            AlertDialog(
-                onDismissRequest = { slashErrorMessage = null },
-                title = { Text("斜杠命令错误") },
-                text = { Text(message) },
-                confirmButton = {
-                    TextButton(onClick = { slashErrorMessage = null }) {
-                        Text("确定")
-                    }
-                },
-            )
-        }
+        ConversationSheets(
+            appModel = appModel,
+            scope = scope,
+            threadKey = threadKey,
+            thread = thread,
+            showPermissionsSheet = showPermissionsSheet,
+            onDismissPermissionsSheet = { showPermissionsSheet = false },
+            showCollaborationModeSelector = showCollaborationModeSelector,
+            onDismissCollaborationModeSelector = { showCollaborationModeSelector = false },
+            collaborationModePresets = collaborationModePresets,
+            collaborationModesLoading = collaborationModesLoading,
+            showExperimentalSheet = showExperimentalSheet,
+            onDismissExperimentalSheet = { showExperimentalSheet = false },
+            showSkillsSheet = showSkillsSheet,
+            onDismissSkillsSheet = { showSkillsSheet = false },
+            showSessionDiffSheet = showSessionDiffSheet,
+            onDismissSessionDiffSheet = { showSessionDiffSheet = false },
+            pinnedContext = pinnedContext,
+            onSlashError = { slashErrorMessage = it },
+        )
 
-        reloadErrorMessage?.let { message ->
-            AlertDialog(
-                onDismissRequest = { reloadErrorMessage = null },
-                title = { Text("重新加载失败") },
-                text = { Text(message) },
-                confirmButton = {
-                    TextButton(onClick = { reloadErrorMessage = null }) {
-                        Text("确定")
-                    }
-                },
-            )
-        }
+        ConversationDialogs(
+            appModel = appModel,
+            scope = scope,
+            threadKey = threadKey,
+            thread = thread,
+            showRenameDialog = showRenameDialog,
+            onDismissRenameDialog = { showRenameDialog = false },
+            renameDraft = renameDraft,
+            onRenameDraftChange = { renameDraft = it },
+            slashErrorMessage = slashErrorMessage,
+            onDismissSlashError = { slashErrorMessage = null },
+            reloadErrorMessage = reloadErrorMessage,
+            onDismissReloadError = { reloadErrorMessage = null },
+            onSlashError = { slashErrorMessage = it },
+        )
     }
 }
 
@@ -1117,584 +448,4 @@ private fun PendingUserInputRequest.isRelevantToThread(threadKey: ThreadKey): Bo
     return requestThreadId.isEmpty() || requestThreadId == threadKey.threadId
 }
 
-private fun fallbackCollaborationModePresets(): List<uniffi.codex_mobile_client.AppCollaborationModePreset> =
-    listOf(
-        uniffi.codex_mobile_client.AppCollaborationModePreset(
-            kind = uniffi.codex_mobile_client.AppModeKind.DEFAULT,
-            name = "默认",
-            model = null,
-            reasoningEffort = null,
-        ),
-        uniffi.codex_mobile_client.AppCollaborationModePreset(
-            kind = uniffi.codex_mobile_client.AppModeKind.PLAN,
-            name = "计划",
-            model = null,
-            reasoningEffort = uniffi.codex_mobile_client.ReasoningEffort.MEDIUM,
-        ),
-    )
-
-@Composable
-private fun CollaborationModeSheet(
-    presets: List<uniffi.codex_mobile_client.AppCollaborationModePreset>,
-    selectedMode: uniffi.codex_mobile_client.AppModeKind,
-    isLoading: Boolean,
-    onDismiss: () -> Unit,
-    onSelect: (uniffi.codex_mobile_client.AppModeKind) -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "协作模式",
-                color = AgentBuddyTheme.textPrimary,
-                fontSize = 18f.scaled,
-                fontWeight = FontWeight.SemiBold,
-            )
-            TextButton(onClick = onDismiss) {
-                Text("完成")
-            }
-        }
-
-        if (isLoading && presets.isEmpty()) {
-            CircularProgressIndicator(color = AgentBuddyTheme.accent)
-        }
-
-        presets.forEach { preset ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(AgentBuddyTheme.surface, RoundedCornerShape(16.dp))
-                    .clickable { onSelect(preset.kind) }
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        text = preset.name,
-                        color = AgentBuddyTheme.textPrimary,
-                        fontSize = AgentBuddyTextStyle.body.scaled,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    preset.reasoningEffort?.let { effort ->
-                        Text(
-                            text = collaborationModeEffortLabel(effort),
-                            color = AgentBuddyTheme.textSecondary,
-                            fontSize = AgentBuddyTextStyle.caption2.scaled,
-                        )
-                    }
-                }
-                if (preset.kind == selectedMode) {
-                    Text(
-                        text = "已选择",
-                        color = AgentBuddyTheme.accent,
-                        fontSize = AgentBuddyTextStyle.caption2.scaled,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-            }
-        }
-    }
-}
-
-private fun collaborationModeEffortLabel(
-    effort: uniffi.codex_mobile_client.ReasoningEffort,
-): String =
-    when (effort) {
-        uniffi.codex_mobile_client.ReasoningEffort.NONE -> "无"
-        uniffi.codex_mobile_client.ReasoningEffort.MINIMAL -> "极低"
-        uniffi.codex_mobile_client.ReasoningEffort.LOW -> "低"
-        uniffi.codex_mobile_client.ReasoningEffort.MEDIUM -> "中"
-        uniffi.codex_mobile_client.ReasoningEffort.HIGH -> "高"
-        uniffi.codex_mobile_client.ReasoningEffort.X_HIGH -> "极高"
-        uniffi.codex_mobile_client.ReasoningEffort.MAX -> "最高"
-    }
-
-private data class PinnedContextData(
-    val todoProgress: String?,
-    val diffSummary: DiffSummary?,
-    val diffSections: List<SessionDiffSection>,
-)
-
-private data class DiffSummary(
-    val additions: Int,
-    val deletions: Int,
-) {
-    val hasChanges: Boolean
-        get() = additions > 0 || deletions > 0
-}
-
-private data class SessionDiffSection(
-    val title: String,
-    val diff: String,
-) {
-    val id: String = "$title|${diff.hashCode()}"
-    val summary: DiffSummary = summarizeDiff(diff)
-}
-
-private const val MAX_STICKY_DIFF_SECTIONS = 8
-private const val MAX_STICKY_DIFF_CHARACTERS = 20_000
-
-private fun summarizeDiff(diff: String): DiffSummary {
-    var additions = 0
-    var deletions = 0
-    diff.lineSequence().forEach { line ->
-        when {
-            line.startsWith("+") && !line.startsWith("+++") -> additions += 1
-            line.startsWith("-") && !line.startsWith("---") -> deletions += 1
-        }
-    }
-    return DiffSummary(additions = additions, deletions = deletions)
-}
-
-private fun uniffi.codex_mobile_client.AppThreadSnapshot.composerContextPercent(): Int? {
-    if (contextTokensUsed == null && modelContextWindow == null) return null
-    val contextWindow = modelContextWindow?.toLong()
-    val baseline = 12_000L
-    if (contextWindow == null || contextWindow <= baseline) {
-        return contextPercent.coerceIn(0, 100)
-    }
-    val totalTokens = contextTokensUsed?.toLong() ?: baseline
-    val effectiveWindow = contextWindow - baseline
-    val usedTokens = (totalTokens - baseline).coerceAtLeast(0)
-    val remainingTokens = (effectiveWindow - usedTokens).coerceAtLeast(0)
-    return ((remainingTokens.toDouble() / effectiveWindow.toDouble()) * 100.0)
-        .toInt()
-        .coerceIn(0, 100)
-}
-
 private fun conversationBottomAnchorIndex(turnCount: Int): Int = turnCount + 1
-
-@Composable
-private fun UnsupportedHostPushHint(onDismiss: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp)
-            .background(AgentBuddyTheme.surface.copy(alpha = 0.72f), RoundedCornerShape(12.dp))
-            .padding(start = 12.dp, top = 6.dp, bottom = 6.dp, end = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            Icons.Default.NotificationsOff,
-            contentDescription = null,
-            tint = AgentBuddyTheme.warning,
-            modifier = Modifier.size(16.dp),
-        )
-        Text(
-            text = "该主机版本不支持完成通知，升级桌面 App 后可用",
-            color = AgentBuddyTheme.textSecondary,
-            fontSize = AgentBuddyTextStyle.caption.scaled,
-            modifier = Modifier.weight(1f),
-        )
-        IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
-            Icon(
-                Icons.Default.Close,
-                contentDescription = "关闭",
-                tint = AgentBuddyTheme.textSecondary,
-                modifier = Modifier.size(16.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun PlanContextBadge(progress: String) {
-    Text(
-        text = "计划 $progress",
-        color = AgentBuddyTheme.accent,
-        fontSize = AgentBuddyTextStyle.caption2.scaled,
-        fontWeight = FontWeight.Medium,
-        modifier = Modifier
-            .background(AgentBuddyTheme.surface.copy(alpha = 0.72f), RoundedCornerShape(999.dp))
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-    )
-}
-
-@Composable
-private fun DiffSummaryBadge(
-    summary: DiffSummary,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .background(AgentBuddyTheme.surface.copy(alpha = 0.72f), RoundedCornerShape(999.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = "\u2194",
-            color = AgentBuddyTheme.accent,
-            fontSize = AgentBuddyTextStyle.caption2.scaled,
-            fontWeight = FontWeight.SemiBold,
-        )
-        if (summary.hasChanges) {
-            Text(
-                text = "+${summary.additions}",
-                color = AgentBuddyTheme.success,
-                fontSize = AgentBuddyTextStyle.caption2.scaled,
-                fontWeight = FontWeight.SemiBold,
-                fontFamily = BerkeleyMono,
-            )
-            Text(
-                text = "-${summary.deletions}",
-                color = AgentBuddyTheme.danger,
-                fontSize = AgentBuddyTextStyle.caption2.scaled,
-                fontWeight = FontWeight.SemiBold,
-                fontFamily = BerkeleyMono,
-            )
-        } else {
-            Text(
-                text = "差异",
-                color = AgentBuddyTheme.textSecondary,
-                fontSize = AgentBuddyTextStyle.caption2.scaled,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
-    }
-}
-
-private fun parseSessionDiffSections(diff: String): List<SessionDiffSection> {
-    val normalized = diff.trim()
-    if (normalized.isBlank()) return emptyList()
-
-    val lines = normalized.lines()
-    val splitIndices = lines.mapIndexedNotNull { index, line ->
-        if (line.startsWith("diff --git ")) index else null
-    }
-
-    if (splitIndices.isEmpty()) {
-        return listOf(
-            SessionDiffSection(
-                title = diffSectionTitle(normalized),
-                diff = normalized,
-            ),
-        )
-    }
-
-    return splitIndices.mapIndexedNotNull { offset, start ->
-        val end = if (offset + 1 < splitIndices.size) splitIndices[offset + 1] else lines.size
-        val chunk = lines.subList(start, end).joinToString("\n").trim()
-        if (chunk.isBlank()) null else SessionDiffSection(title = diffSectionTitle(chunk), diff = chunk)
-    }
-}
-
-private fun mergeSessionDiffSections(sections: List<SessionDiffSection>): List<SessionDiffSection> {
-    val orderedTitles = mutableListOf<String>()
-    val mergedByTitle = linkedMapOf<String, String>()
-    val passthrough = mutableListOf<SessionDiffSection>()
-
-    sections.forEach { section ->
-        val title = section.title.trim()
-        if (title.isBlank()) {
-            passthrough += section
-            return@forEach
-        }
-
-        val existing = mergedByTitle[title]
-        if (existing == null) {
-            orderedTitles += title
-            mergedByTitle[title] = section.diff
-        } else {
-            mergedByTitle[title] = "$existing\n\n${section.diff}"
-        }
-    }
-
-    return orderedTitles.mapNotNull { title ->
-        mergedByTitle[title]?.let { SessionDiffSection(title = title, diff = it) }
-    } + passthrough
-}
-
-private fun diffSectionTitle(diff: String): String {
-    diff.lineSequence().forEach { line ->
-        when {
-            line.startsWith("diff --git ") -> {
-                return stripDiffPathPrefix(line.substringAfterLast(' '))
-            }
-            line.startsWith("+++ ") -> {
-                val path = line.removePrefix("+++ ")
-                if (path != "/dev/null") return stripDiffPathPrefix(path)
-            }
-            line.startsWith("--- ") -> {
-                val path = line.removePrefix("--- ")
-                if (path != "/dev/null") return stripDiffPathPrefix(path)
-            }
-        }
-    }
-    return ""
-}
-
-private fun stripDiffPathPrefix(path: String): String {
-    return when {
-        path.startsWith("a/") || path.startsWith("b/") -> path.drop(2)
-        else -> path
-    }
-}
-
-private fun workspaceTitleCompat(path: String): String {
-    return path.trimEnd('/').substringAfterLast('/').ifBlank { path }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun SessionDiffSheet(
-    sections: List<SessionDiffSection>,
-    onDismiss: () -> Unit,
-) {
-    var collapsedSectionIds by remember(sections) {
-        mutableStateOf(sections.mapTo(linkedSetOf()) { it.id })
-    }
-    val totalSummary = remember(sections) {
-        sections.fold(DiffSummary(additions = 0, deletions = 0)) { acc, section ->
-            DiffSummary(
-                additions = acc.additions + section.summary.additions,
-                deletions = acc.deletions + section.summary.deletions,
-            )
-        }
-    }
-    val useStickyHeaders = remember(sections) {
-        sections.size <= MAX_STICKY_DIFF_SECTIONS &&
-            sections.sumOf { it.diff.length } <= MAX_STICKY_DIFF_CHARACTERS
-    }
-
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        item {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "+${totalSummary.additions}",
-                    color = AgentBuddyTheme.success,
-                    fontSize = AgentBuddyTextStyle.caption.scaled,
-                    fontWeight = FontWeight.SemiBold,
-                    fontFamily = BerkeleyMono,
-                )
-                Text(
-                    text = "-${totalSummary.deletions}",
-                    color = AgentBuddyTheme.danger,
-                    fontSize = AgentBuddyTextStyle.caption.scaled,
-                    fontWeight = FontWeight.SemiBold,
-                    fontFamily = BerkeleyMono,
-                )
-            }
-        }
-
-        sections.forEach { section ->
-            if (section.title.isNotEmpty()) {
-                if (useStickyHeaders) {
-                    stickyHeader(key = "header-${section.id}") {
-                        SessionDiffSectionHeader(
-                            section = section,
-                            expanded = !collapsedSectionIds.contains(section.id),
-                        ) {
-                            collapsedSectionIds =
-                                linkedSetOf<String>().apply {
-                                    addAll(collapsedSectionIds)
-                                    if (contains(section.id)) {
-                                        remove(section.id)
-                                    } else {
-                                        add(section.id)
-                                    }
-                                }
-                        }
-                    }
-                } else {
-                    item(key = "header-${section.id}") {
-                        SessionDiffSectionHeader(
-                            section = section,
-                            expanded = !collapsedSectionIds.contains(section.id),
-                        ) {
-                            collapsedSectionIds =
-                                linkedSetOf<String>().apply {
-                                    addAll(collapsedSectionIds)
-                                    if (contains(section.id)) {
-                                        remove(section.id)
-                                    } else {
-                                        add(section.id)
-                                    }
-                                }
-                        }
-                    }
-                }
-            }
-
-            item(key = "body-${section.id}") {
-                if (section.title.isEmpty() || !collapsedSectionIds.contains(section.id)) {
-                    SyntaxHighlightedDiffBlock(
-                        diff = section.diff,
-                        titleHint = section.title.ifEmpty { null },
-                        fontSize = AgentBuddyTextStyle.caption.sp,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(AgentBuddyTheme.codeBackground, RoundedCornerShape(10.dp))
-                            .padding(horizontal = 10.dp, vertical = 8.dp),
-                    )
-                }
-            }
-        }
-
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-            ) {
-                TextButton(onClick = onDismiss) {
-                    Text("完成", color = AgentBuddyTheme.accent)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SessionDiffSectionHeader(
-    section: SessionDiffSection,
-    expanded: Boolean,
-    onToggle: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(AgentBuddyTheme.background)
-            .clickable(onClick = onToggle)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = section.title.uppercase(),
-            color = AgentBuddyTheme.textSecondary,
-            fontSize = AgentBuddyTextStyle.caption2.scaled,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.weight(1f),
-        )
-        Text(
-            text = "+${section.summary.additions}",
-            color = AgentBuddyTheme.success,
-            fontSize = AgentBuddyTextStyle.caption2.scaled,
-            fontWeight = FontWeight.SemiBold,
-            fontFamily = BerkeleyMono,
-        )
-        Text(
-            text = "-${section.summary.deletions}",
-            color = AgentBuddyTheme.danger,
-            fontSize = AgentBuddyTextStyle.caption2.scaled,
-            fontWeight = FontWeight.SemiBold,
-            fontFamily = BerkeleyMono,
-        )
-        Text(
-            text = if (expanded) "▲" else "▼",
-            color = AgentBuddyTheme.textMuted,
-            fontSize = AgentBuddyTextStyle.caption2.scaled,
-            fontWeight = FontWeight.Bold,
-        )
-    }
-}
-
-/**
- * Resolve the user-message position in the currently-loaded transcript.
- * `forkThreadFromMessage` / `editMessage` on the Rust side expect an index
- * into the thread's items filtered to user messages — see
- * `rollback_depth_for_turn` in `mobile_client/thread_projection.rs`.
- * Recomputing from the live `items` keeps the index correct under
- * pagination (older turns can shift positions; a cached `sourceTurnIndex`
- * from a prior hydrate would be stale).
- */
-private fun loadedUserItemIndex(
-    items: List<uniffi.codex_mobile_client.HydratedConversationItem>,
-    messageId: String,
-): UInt? {
-    var idx = 0u
-    for (candidate in items) {
-        if (candidate.content !is HydratedConversationItemContent.User) continue
-        if (candidate.id == messageId) return idx
-        idx++
-    }
-    return null
-}
-
-private fun lastUserAndAssistantText(
-    items: List<uniffi.codex_mobile_client.HydratedConversationItem>,
-): Pair<String?, String?> {
-    var lastUser: String? = null
-    var lastAssistant: String? = null
-    for (item in items.reversed()) {
-        when (val c = item.content) {
-            is HydratedConversationItemContent.User -> if (lastUser == null) lastUser = c.v1.text
-            is HydratedConversationItemContent.Assistant -> if (lastAssistant == null) lastAssistant = c.v1.text
-            else -> {}
-        }
-        if (lastUser != null && lastAssistant != null) break
-    }
-    return lastUser to lastAssistant
-}
-
-/**
- * Shimmering "Thinking..." text shown while the assistant is working.
- */
-@Composable
-private fun StreamingCursor() {
-    val transition = rememberInfiniteTransition(label = "shimmer")
-    val shimmerOffset by transition.animateFloat(
-        initialValue = -1f,
-        targetValue = 2f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1500, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "shimmerOffset",
-    )
-    val shimmerBrush = Brush.linearGradient(
-        colors = listOf(
-            AgentBuddyTheme.textSecondary.copy(alpha = 0.4f),
-            AgentBuddyTheme.accent,
-            AgentBuddyTheme.textSecondary.copy(alpha = 0.4f),
-        ),
-        start = Offset(shimmerOffset * 200f, 0f),
-        end = Offset((shimmerOffset + 0.6f) * 200f, 0f),
-    )
-    Text(
-        text = "思考中...",
-        fontSize = AgentBuddyTextStyle.body.scaled,
-        fontWeight = FontWeight.Medium,
-        style = TextStyle(brush = shimmerBrush),
-    )
-}
-
-@Composable
-private fun MinigameLaunchButton(onClick: () -> Unit) {
-    androidx.compose.material3.Surface(
-        onClick = onClick,
-        shape = androidx.compose.foundation.shape.CircleShape,
-        color = AgentBuddyTheme.surface.copy(alpha = 0.9f),
-        border = androidx.compose.foundation.BorderStroke(0.5.dp, AgentBuddyTheme.accent.copy(alpha = 0.3f)),
-        shadowElevation = 2.dp,
-        modifier = Modifier.size(36.dp),
-    ) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = Icons.Filled.SportsEsports,
-                contentDescription = "等待时玩个小游戏",
-                tint = AgentBuddyTheme.accent,
-                modifier = Modifier.size(18.dp),
-            )
-        }
-    }
-}

@@ -2,20 +2,16 @@ package com.akashark.agentbuddy.android.ui.voice
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.VolumeUp
-import androidx.compose.material3.Icon
+import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -26,8 +22,12 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyIconButton
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyChromeTypeLimit
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySpacing
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyTextStyle
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyTextStyle
 import uniffi.codex_mobile_client.AppVoiceSessionPhase
 import kotlin.math.abs
 import kotlin.math.max
@@ -46,87 +46,69 @@ fun InlineVoiceStatusStrip(
     val scaledInputLevel = if (isListening) max(0.08f, inputLevel) else max(0f, inputLevel)
     val scaledOutputLevel = if (isSpeaking) max(0.08f, outputLevel) else max(0f, outputLevel)
 
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(AgentBuddyTheme.surface.copy(alpha = 0.6f))
-            .padding(horizontal = 14.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        // YOU indicator
+    BuddyChromeTypeLimit {
         Row(
+            modifier = modifier
+                .fillMaxWidth()
+                .background(AgentBuddyTheme.surfaceSoft)
+                .padding(start = BuddySpacing.md, end = BuddySpacing.xxs),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            horizontalArrangement = Arrangement.spacedBy(BuddySpacing.xs),
         ) {
-            Box(
-                modifier = Modifier
-                    .size(5.dp)
-                    .background(
-                        if (isListening) AgentBuddyTheme.accent else AgentBuddyTheme.textMuted.copy(alpha = 0.4f),
-                        CircleShape,
-                    ),
-            )
-            Text(
-                text = "你",
-                color = if (isListening) AgentBuddyTheme.textPrimary else AgentBuddyTheme.textMuted,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = AgentBuddyTheme.monoFont,
-            )
-            AudioWaveform(
+            VoiceLevelIndicator(
+                label = "你",
+                active = isListening,
                 level = scaledInputLevel,
-                tint = AgentBuddyTheme.accent,
-                modifier = Modifier.size(width = 48.dp, height = 14.dp),
+                tint = AgentBuddyTheme.link,
             )
-        }
-
-        // CODEX indicator
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(5.dp)
-                    .background(
-                        if (isSpeaking) AgentBuddyTheme.warning else AgentBuddyTheme.textMuted.copy(alpha = 0.4f),
-                        CircleShape,
-                    ),
-            )
-            Text(
-                text = "CODEX",
-                color = if (isSpeaking) AgentBuddyTheme.textPrimary else AgentBuddyTheme.textMuted,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = AgentBuddyTheme.monoFont,
-            )
-            AudioWaveform(
+            VoiceLevelIndicator(
+                label = "搭子",
+                active = isSpeaking,
                 level = scaledOutputLevel,
                 tint = AgentBuddyTheme.warning,
-                modifier = Modifier.size(width = 48.dp, height = 14.dp),
+            )
+            Spacer(Modifier.weight(1f))
+            // Phase in words, so the state never depends on colour alone.
+            Text(
+                text = phaseLabel(phase),
+                color = phaseColor(phase),
+                style = buddyTextStyle(BuddyTextStyle.CAPTION, FontWeight.Medium),
+            )
+            BuddyIconButton(
+                icon = Icons.AutoMirrored.Outlined.VolumeUp,
+                contentDescription = "切换扬声器",
+                onClick = onToggleSpeaker,
+                diameter = 32.dp,
             )
         }
+    }
+}
 
-        Spacer(Modifier.weight(1f))
-
-        // Speaker toggle
-        Icon(
-            Icons.Default.VolumeUp,
-            contentDescription = "切换扬声器",
-            tint = AgentBuddyTheme.textPrimary,
+@Composable
+private fun VoiceLevelIndicator(
+    label: String,
+    active: Boolean,
+    level: Float,
+    tint: Color,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Box(
             modifier = Modifier
-                .size(16.dp)
-                .clickable(onClick = onToggleSpeaker),
+                .size(6.dp)
+                .background(if (active) tint else AgentBuddyTheme.onDisabled, CircleShape),
         )
-
-        // Phase label
         Text(
-            text = phaseLabel(phase),
-            color = phaseColor(phase),
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Medium,
-            fontFamily = AgentBuddyTheme.monoFont,
+            text = label,
+            color = if (active) AgentBuddyTheme.textPrimary else AgentBuddyTheme.textSecondary,
+            style = buddyTextStyle(BuddyTextStyle.CAPTION, FontWeight.Medium),
+        )
+        AudioWaveform(
+            level = level,
+            tint = tint,
+            modifier = Modifier.size(width = 40.dp, height = 14.dp),
         )
     }
 }

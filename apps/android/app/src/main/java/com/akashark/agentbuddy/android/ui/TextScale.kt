@@ -56,13 +56,18 @@ val LocalTextScale = compositionLocalOf { ConversationTextSize.DEFAULT.scale }
  */
 val Int.scaled: TextUnit
     @Composable get() = with(LocalDensity.current) {
-        (this@scaled * LocalTextScale.current).dp.toSp()
+        scaledTextDp(this@scaled.toFloat(), LocalTextScale.current).dp.toSp()
     }
 
 val Float.scaled: TextUnit
     @Composable get() = with(LocalDensity.current) {
-        (this@scaled * LocalTextScale.current).dp.toSp()
+        scaledTextDp(this@scaled, LocalTextScale.current).dp.toSp()
     }
+
+/** Smallest text size the app draws (Mint spec): the 极小 / 小 steps never go below it. */
+private const val MIN_SCALED_TEXT = 12f
+
+internal fun scaledTextDp(size: Float, scale: Float): Float = (size * scale).coerceAtLeast(MIN_SCALED_TEXT)
 
 /**
  * Semantic text sizes matching iOS UIFont text-style point sizes at default

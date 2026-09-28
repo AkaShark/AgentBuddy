@@ -40,6 +40,9 @@ import com.akashark.agentbuddy.android.ui.AnimatedSplashScreen
 import com.akashark.agentbuddy.android.ui.ExperimentalFeatures
 import com.akashark.agentbuddy.android.ui.AgentBuddyApp
 import com.akashark.agentbuddy.android.ui.AgentBuddyAppTheme
+import com.akashark.agentbuddy.android.ui.AgentBuddyThemeManager
+import com.akashark.agentbuddy.android.ui.gallery.MintGallery
+import com.akashark.agentbuddy.android.ui.gallery.MintGalleryScreen
 import com.akashark.agentbuddy.android.ui.WallpaperManager
 import com.akashark.agentbuddy.android.util.LLog
 import kotlinx.coroutines.delay
@@ -86,6 +89,11 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        // DEBUG state gallery: fixture screens only, no runtime or network.
+        MintGallery.requestedPage(intent)?.let { page ->
+            showMintGallery(page, dark = MintGallery.requestsDark(intent))
+            return
+        }
         OpenAIApiKeyStore(applicationContext).applyToEnvironment()
         ExperimentalFeatures.initialize(applicationContext)
         PetOverlayController.initialize(applicationContext)
@@ -160,6 +168,16 @@ class MainActivity : ComponentActivity() {
         handleNotificationIntent(intent)
         consumeOverlayNavigationIntent(intent)
         requestNotificationPermissionOnce()
+    }
+
+    private fun showMintGallery(page: String, dark: Boolean) {
+        AgentBuddyThemeManager.initialize(applicationContext)
+        AgentBuddyThemeManager.applyPreviewOverride(dark)
+        setContent {
+            AgentBuddyAppTheme {
+                MintGalleryScreen(pageId = page)
+            }
+        }
     }
 
     override fun onStart() {

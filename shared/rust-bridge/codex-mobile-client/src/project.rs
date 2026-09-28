@@ -85,7 +85,8 @@ pub fn derive_projects(sessions: Vec<AppSessionSummary>) -> Vec<AppProject> {
             cwd,
             last_used_at_ms: None,
         });
-        if let Some(ts) = summary.updated_at {
+        // `updated_at` is in seconds; the project record carries milliseconds.
+        if let Some(ts) = summary.updated_at.map(|secs| secs.saturating_mul(1000)) {
             if entry.last_used_at_ms.map_or(true, |prev| ts > prev) {
                 entry.last_used_at_ms = Some(ts);
             }
@@ -163,7 +164,16 @@ mod tests {
         // Most-recently-used first.
         assert_eq!(projects[0].server_id, "srv1");
         assert_eq!(projects[0].cwd, "/a/b");
-        assert_eq!(projects[0].last_used_at_ms, Some(20));
+        assert_eq!(projects[0].last_used_at_ms, Some(20_000));
+    }
+
+    #[test]
+    fn last_used_is_converted_from_seconds_to_millis() {
+        // A real `updated_at` (seconds since epoch) must not be read as ms,
+        // or platforms render it as "56 years ago".
+        let secs = 1_790_000_000;
+        let projects = derive_projects(vec![session("srv1", "t1", "/a", Some(secs))]);
+        assert_eq!(projects[0].last_used_at_ms, Some(secs * 1000));
     }
 
     #[test]
@@ -184,7 +194,7 @@ mod tests {
         let projects = derive_projects(sessions);
         assert_eq!(projects.len(), 1);
         assert_eq!(projects[0].cwd, r"C:\Users\npace");
-        assert_eq!(projects[0].last_used_at_ms, Some(20));
+        assert_eq!(projects[0].last_used_at_ms, Some(20_000));
     }
 
     #[test]

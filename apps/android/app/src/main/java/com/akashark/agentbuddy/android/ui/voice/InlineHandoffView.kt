@@ -1,15 +1,12 @@
 package com.akashark.agentbuddy.android.ui.voice
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -17,12 +14,17 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.akashark.agentbuddy.android.ui.LocalAppModel
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
+import com.akashark.agentbuddy.android.ui.LocalAppModel
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyShapes
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySpacing
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyTextStyle
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyTextStyle
 import com.akashark.agentbuddy.android.ui.rememberStickyFollowTail
 import uniffi.codex_mobile_client.HydratedConversationItemContent
 import uniffi.codex_mobile_client.ThreadKey
@@ -69,80 +71,64 @@ fun InlineHandoffView(
     LazyColumn(
         state = listState,
         modifier = modifier
-            .background(AgentBuddyTheme.surface, RoundedCornerShape(12.dp))
-            .padding(8.dp),
+            .clip(BuddyShapes.detailCard)
+            .background(AgentBuddyTheme.surface)
+            .border(1.dp, AgentBuddyTheme.border, BuddyShapes.detailCard),
+        contentPadding = PaddingValues(horizontal = BuddySpacing.md, vertical = BuddySpacing.sm),
+        verticalArrangement = Arrangement.spacedBy(BuddySpacing.xxs),
     ) {
         items(items, key = { it.id }) { item ->
             when (val content = item.content) {
-                is HydratedConversationItemContent.User -> {
-                    Text(
-                        text = content.v1.text,
-                        color = AgentBuddyTheme.textPrimary,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(vertical = 2.dp),
-                    )
-                }
+                is HydratedConversationItemContent.User ->
+                    HandoffLine(content.v1.text, BuddyTextStyle.LABEL, AgentBuddyTheme.textSecondary)
 
-                is HydratedConversationItemContent.Assistant -> {
-                    Text(
-                        text = content.v1.text,
-                        color = AgentBuddyTheme.textPrimary,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(vertical = 2.dp),
-                    )
-                }
+                is HydratedConversationItemContent.Assistant ->
+                    HandoffLine(content.v1.text, BuddyTextStyle.LABEL, AgentBuddyTheme.textPrimary, FontWeight.Medium)
 
                 is HydratedConversationItemContent.CodeReview -> {
                     val text = content.v1.findings.firstOrNull()?.title ?: "代码评审"
-                    Text(
-                        text = "评审：$text",
-                        color = AgentBuddyTheme.textPrimary,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(vertical = 2.dp),
-                    )
+                    HandoffLine("评审：$text", BuddyTextStyle.LABEL, AgentBuddyTheme.textPrimary, FontWeight.Medium)
                 }
 
-                is HydratedConversationItemContent.Reasoning -> {
-                    Text(
+                is HydratedConversationItemContent.Reasoning ->
+                    HandoffLine(
                         text = content.v1.summary.joinToString(" "),
-                        color = AgentBuddyTheme.textMuted,
-                        fontSize = 11.sp,
-                        fontStyle = FontStyle.Italic,
-                        modifier = Modifier.padding(vertical = 1.dp),
+                        style = BuddyTextStyle.CAPTION,
+                        color = AgentBuddyTheme.textSecondary,
+                        italic = true,
                     )
-                }
 
-                is HydratedConversationItemContent.CommandExecution -> {
-                    Text(
-                        text = "$ ${content.v1.command}",
-                        color = AgentBuddyTheme.toolCallCommand,
-                        fontSize = 11.sp,
-                        modifier = Modifier.padding(vertical = 1.dp),
-                    )
-                }
+                is HydratedConversationItemContent.CommandExecution ->
+                    HandoffLine("$ ${content.v1.command}", BuddyTextStyle.CODE, AgentBuddyTheme.textSecondary)
 
-                is HydratedConversationItemContent.ImageView -> {
-                    Text(
-                        text = "已查看图片：${content.v1.path.substringAfterLast('/')}",
-                        color = AgentBuddyTheme.textMuted,
-                        fontSize = 11.sp,
-                        modifier = Modifier.padding(vertical = 1.dp),
+                is HydratedConversationItemContent.ImageView ->
+                    HandoffLine(
+                        "已查看图片：${content.v1.path.substringAfterLast('/')}",
+                        BuddyTextStyle.CAPTION,
+                        AgentBuddyTheme.textSecondary,
                     )
-                }
 
-                is HydratedConversationItemContent.Note -> {
-                    Text(
-                        text = content.v1.body,
-                        color = AgentBuddyTheme.danger,
-                        fontSize = 11.sp,
-                        modifier = Modifier.padding(vertical = 1.dp),
-                    )
-                }
+                is HydratedConversationItemContent.Note ->
+                    HandoffLine(content.v1.body, BuddyTextStyle.CAPTION, AgentBuddyTheme.danger)
 
                 else -> {} // Skip other types in compact view
             }
         }
     }
+}
+
+@Composable
+private fun HandoffLine(
+    text: String,
+    style: BuddyTextStyle,
+    color: Color,
+    weight: FontWeight? = null,
+    italic: Boolean = false,
+) {
+    Text(
+        text = text,
+        style = buddyTextStyle(style, weight),
+        color = color,
+        fontStyle = if (italic) FontStyle.Italic else null,
+    )
 }

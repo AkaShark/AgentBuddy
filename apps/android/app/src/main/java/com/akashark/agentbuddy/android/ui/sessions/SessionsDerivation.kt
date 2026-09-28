@@ -38,9 +38,9 @@ data class SessionsDerivedData(
 )
 
 enum class WorkspaceSortMode(val title: String) {
-    RECENT("Most Recent"),
+    RECENT("最近更新"),
     NAME("名称"),
-    DATE("Date"),
+    DATE("按日期"),
 }
 
 /**

@@ -1,17 +1,6 @@
 package com.akashark.agentbuddy.android.ui.home
 
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.text.PlatformTextStyle
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
-import com.akashark.agentbuddy.android.ui.AgentBuddyTextStyle
-import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
-import com.akashark.agentbuddy.android.ui.AgentBuddyThemeManager
-import com.akashark.agentbuddy.android.ui.common.runtimeLabel
-import com.akashark.agentbuddy.android.ui.scaled
 import uniffi.codex_mobile_client.Account
-import com.akashark.agentbuddy.android.ui.common.AgentRuntimeKind
 import uniffi.codex_mobile_client.AppServerHealth
 import uniffi.codex_mobile_client.AppServerSnapshot
 import uniffi.codex_mobile_client.AppSessionSummary
@@ -42,35 +31,10 @@ data class ThreadLineage(
 }
 
 /**
- * TextStyle matching the conversation body size at the current text scale,
- * using the user's selected markdown font (mono when mono is enabled,
- * platform default otherwise) at [FontWeight.Medium].
- *
- * Mirrors iOS `MarkdownMatchedTitleFont` so home dashboard titles render at
- * the same size as conversation message bodies — making row headings visually
- * match what appears inside a conversation.
- *
- * Swift reference: HomeDashboardView.swift MarkdownMatchedTitleFont (L1203-1213).
- */
-@Composable
-@Suppress("DEPRECATION")
-fun markdownMatchedTitleStyle(): TextStyle {
-    val family = if (AgentBuddyThemeManager.monoFontEnabled) AgentBuddyTheme.monoFont else FontFamily.Default
-    return TextStyle(
-        fontFamily = family,
-        fontWeight = FontWeight.Medium,
-        fontSize = AgentBuddyTextStyle.body.scaled,
-        platformStyle = PlatformTextStyle(includeFontPadding = false),
-    )
-}
-
-/**
  * Pure functions for deriving home dashboard data from Rust snapshots.
  * No business logic duplication — just UI-specific sorting/filtering.
  */
 object HomeDashboardSupport {
-    fun runtimeLabel(kind: AgentRuntimeKind): String = kind.runtimeLabel
-
     /**
      * Connected servers sorted by: active server first, then alphabetical.
      * Deduplicates by normalized host.
@@ -275,18 +239,3 @@ object HomeDashboardSupport {
         return prefix + mask + suffix
     }
 }
-
-// ─────────────────────────────────────────────────────────
-// Hydrated conversation walks moved to Rust
-// ─────────────────────────────────────────────────────────
-//
-// Everything that used to live here — `isToolCallRunning`,
-// `lastTurnBounds`, `hydratedToolRows`, `explorationSummary`,
-// `displayedAssistantMessage`, `HomeToolRow` — duplicated reducer logic
-// from `shared/rust-bridge/codex-mobile-client/src/store/boundary.rs`
-// (`extract_conversation_activity`). The Rust side now produces a
-// complete `AppSessionSummary` with `recent_tool_log` (flat
-// `List<AppToolLogEntry>` including "Explore" / "WebSearch" entries),
-// `last_response_preview`, and `last_turn_start_ms` / `last_turn_end_ms`.
-// Home card composables read those session props directly; see
-// `SessionCanvasRow.kt`, `InlineStats.kt`, `HomeToolRowView.kt`.

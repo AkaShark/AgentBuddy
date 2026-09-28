@@ -1,6 +1,5 @@
 package com.akashark.agentbuddy.android.ui.conversation
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,15 +8,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.CloseFullscreen
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
+import androidx.compose.material.icons.outlined.ArrowUpward
+import androidx.compose.material.icons.outlined.CloseFullscreen
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,24 +21,28 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.akashark.agentbuddy.android.ui.AgentBuddyTextStyle
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
-import com.akashark.agentbuddy.android.ui.scaled
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyBanner
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyBannerTone
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyIconButton
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyIconButtonTone
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySpacing
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyTextStyle
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyTextStyle
+import androidx.compose.ui.unit.dp
 
 /**
- * Full-screen composer for writing long prompts. Opened from the inline
- * composer's expand icon; shares the same `text` state so edits round-trip
- * back when the dialog is dismissed. Matches `ConversationComposerExpandedView`
- * on iOS.
+ * Full-screen composer for long prompts. Opened from the inline composer's
+ * expand icon; shares the same `text` state so edits round-trip back when
+ * the dialog is dismissed. Matches `ConversationComposerExpandedView` on iOS.
+ * Send goes through the caller's single send path and is disabled while
+ * [canSend] is false (the draft is never cleared by a blocked send). With
+ * [queues] (a turn is running) it reads 「排队」, as in the inline composer.
  */
 @Composable
 fun ComposerExpandedDialog(
@@ -51,10 +51,12 @@ fun ComposerExpandedDialog(
     onSend: () -> Unit,
     onDismiss: () -> Unit,
     canSend: Boolean,
-    placeholder: String = "\u6d88\u606f\u2026",
+    queues: Boolean = false,
+    placeholder: String = "消息…",
+    /** Shown under the toolbar when sending is blocked (e.g. the host is disconnected). */
+    notice: String? = null,
 ) {
     val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -64,6 +66,10 @@ fun ComposerExpandedDialog(
             dismissOnClickOutside = false,
         ),
     ) {
+        // Inside the dialog's own composition, so the editor's focus target is
+        // attached before focus is requested (from outside it could run first
+        // and throw "FocusRequester is not initialized").
+        LaunchedEffect(Unit) { focusRequester.requestFocus() }
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = AgentBuddyTheme.background,
@@ -71,68 +77,72 @@ fun ComposerExpandedDialog(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .safeDrawingPadding()
                     .imePadding(),
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .padding(horizontal = BuddySpacing.xs, vertical = BuddySpacing.xxs),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    IconButton(
+                    BuddyIconButton(
+                        icon = Icons.Outlined.CloseFullscreen,
+                        contentDescription = "收起编辑框",
                         onClick = onDismiss,
-                        modifier = Modifier.size(40.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CloseFullscreen,
-                            contentDescription = "收起编辑框",
-                            tint = AgentBuddyTheme.textPrimary,
-                        )
-                    }
+                        iconSize = 20.dp,
+                    )
                     Spacer(Modifier.weight(1f))
-                    if (canSend) {
-                        IconButton(
-                            onClick = {
-                                onSend()
-                                onDismiss()
-                            },
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(AgentBuddyTheme.accent, CircleShape),
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.Send,
-                                contentDescription = "发送",
-                                tint = Color.Black,
-                                modifier = Modifier.size(20.dp),
-                            )
+                    val send = {
+                        if (canSend) {
+                            onSend()
+                            onDismiss()
                         }
                     }
+                    if (queues) {
+                        ComposerPill(
+                            text = "排队",
+                            icon = Icons.AutoMirrored.Outlined.PlaylistAdd,
+                            enabled = canSend,
+                            contentDescription = "加入队列，当前步骤完成后发送",
+                            onClick = send,
+                        )
+                    } else {
+                        BuddyIconButton(
+                            icon = Icons.Outlined.ArrowUpward,
+                            contentDescription = "发送",
+                            onClick = send,
+                            tone = BuddyIconButtonTone.ACTION,
+                            diameter = 40.dp,
+                            enabled = canSend,
+                        )
+                    }
                 }
-
+                if (notice != null) {
+                    BuddyBanner(
+                        tone = BuddyBannerTone.WARNING,
+                        message = notice,
+                        modifier = Modifier.padding(horizontal = BuddySpacing.md),
+                    )
+                }
                 Box(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                        .padding(horizontal = BuddySpacing.lg, vertical = BuddySpacing.xs),
                 ) {
                     if (text.isEmpty()) {
                         Text(
                             text = placeholder,
-                            color = AgentBuddyTheme.textMuted,
-                            fontSize = AgentBuddyTextStyle.body.scaled,
+                            style = buddyTextStyle(BuddyTextStyle.BODY),
+                            color = AgentBuddyTheme.textSecondary,
                         )
                     }
                     BasicTextField(
                         value = text,
                         onValueChange = onTextChange,
-                        textStyle = TextStyle(
-                            color = AgentBuddyTheme.textPrimary,
-                            fontSize = AgentBuddyTextStyle.body.scaled,
-                            fontFamily = AgentBuddyTheme.monoFont,
-                        ),
-                        cursorBrush = SolidColor(AgentBuddyTheme.accent),
+                        textStyle = buddyTextStyle(BuddyTextStyle.BODY).copy(color = AgentBuddyTheme.textPrimary),
+                        cursorBrush = SolidColor(AgentBuddyTheme.focus),
                         modifier = Modifier
                             .fillMaxSize()
                             .focusRequester(focusRequester),

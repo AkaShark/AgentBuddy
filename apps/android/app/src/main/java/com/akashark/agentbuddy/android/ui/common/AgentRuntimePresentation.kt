@@ -20,6 +20,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyTextStyle
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyTextStyle
 import uniffi.codex_mobile_client.AppAgentMetadata
 
 /**
@@ -164,10 +166,9 @@ fun BetaBadge(modifier: Modifier = Modifier) {
             .padding(horizontal = 5.dp, vertical = 1.dp),
     ) {
         Text(
-            text = "BETA",
-            color = AgentBuddyTheme.accent,
-            fontSize = 9.sp,
-            fontWeight = FontWeight.SemiBold,
+            text = "测试版",
+            color = AgentBuddyTheme.link,
+            style = buddyTextStyle(BuddyTextStyle.CAPTION, FontWeight.SemiBold),
         )
     }
 }

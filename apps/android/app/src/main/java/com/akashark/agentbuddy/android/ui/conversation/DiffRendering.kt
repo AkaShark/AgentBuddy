@@ -3,7 +3,9 @@ package com.akashark.agentbuddy.android.ui.conversation
 import android.graphics.Typeface
 import android.text.SpannableStringBuilder
 import android.text.Spanned
-import android.text.style.BackgroundColorSpan
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.text.style.LineBackgroundSpan
 import android.text.style.ForegroundColorSpan
 import android.view.View
 import android.view.ViewGroup
@@ -13,13 +15,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.res.ResourcesCompat
+import androidx.core.widget.TextViewCompat
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.isUnspecified
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.akashark.agentbuddy.android.ui.AgentBuddyTextStyle
 import com.akashark.agentbuddy.android.ui.LocalTextScale
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
+import kotlin.math.roundToInt
 
 internal fun isDiffLanguage(language: String?): Boolean {
     return language
@@ -45,27 +50,26 @@ internal fun SyntaxHighlightedDiffBlock(
     } else {
         fontSize.value * textScale
     }
-    val palette = remember(
-        AgentBuddyTheme.textBody.toArgb(),
-        AgentBuddyTheme.textSecondary.toArgb(),
-        AgentBuddyTheme.success.toArgb(),
-        AgentBuddyTheme.danger.toArgb(),
-        AgentBuddyTheme.accentStrong.toArgb(),
-        AgentBuddyTheme.codeBackground.toArgb(),
-        AgentBuddyTheme.surface.copy(alpha = 0.72f).toArgb(),
-    ) {
-        DiffSyntaxPalette(
-            context = AgentBuddyTheme.textBody.toArgb(),
-            metadata = AgentBuddyTheme.textSecondary.toArgb(),
-            addition = AgentBuddyTheme.success.toArgb(),
-            deletion = AgentBuddyTheme.danger.toArgb(),
-            hunk = AgentBuddyTheme.accentStrong.toArgb(),
-            contextBackground = AgentBuddyTheme.codeBackground.toArgb(),
-            metadataBackground = AgentBuddyTheme.surface.copy(alpha = 0.72f).toArgb(),
-            additionBackground = AgentBuddyTheme.success.copy(alpha = 0.12f).toArgb(),
-            deletionBackground = AgentBuddyTheme.danger.copy(alpha = 0.12f).toArgb(),
-            hunkBackground = AgentBuddyTheme.accentStrong.copy(alpha = 0.12f).toArgb(),
-        )
+    // Diff colours follow the theme: additions and deletions sit on the
+    // success / danger surfaces; context and metadata lines take the fill of
+    // the surrounding code surface.
+    val palette = DiffSyntaxPalette(
+        context = AgentBuddyTheme.textBody.toArgb(),
+        metadata = AgentBuddyTheme.textSecondary.toArgb(),
+        addition = AgentBuddyTheme.success.toArgb(),
+        deletion = AgentBuddyTheme.danger.toArgb(),
+        hunk = AgentBuddyTheme.accentStrong.toArgb(),
+        contextBackground = android.graphics.Color.TRANSPARENT,
+        metadataBackground = android.graphics.Color.TRANSPARENT,
+        additionBackground = AgentBuddyTheme.successSurface.toArgb(),
+        deletionBackground = AgentBuddyTheme.dangerSurface.toArgb(),
+        hunkBackground = AgentBuddyTheme.accentStrong.copy(alpha = 0.12f).toArgb(),
+    )
+    val context = LocalContext.current
+    val codeTypeface = remember(context) {
+        runCatching {
+            ResourcesCompat.getFont(context, com.akashark.agentbuddy.android.R.font.berkeley_mono_regular)
+        }.getOrNull() ?: Typeface.MONOSPACE
     }
     val highlighted = remember(diff, titleHint, palette) {
         buildHighlightedDiff(diff = diff, titleHint = titleHint, palette = palette)
@@ -76,14 +80,15 @@ internal fun SyntaxHighlightedDiffBlock(
             HorizontalScrollView(context).apply {
                 overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
                 isHorizontalScrollBarEnabled = true
-                isFillViewport = false
+                // Fill the viewport so line bands span the whole code area.
+                isFillViewport = true
                 addView(
                     TextView(context).apply {
                         layoutParams = ViewGroup.LayoutParams(
                             ViewGroup.LayoutParams.WRAP_CONTENT,
                             ViewGroup.LayoutParams.WRAP_CONTENT,
                         )
-                        typeface = Typeface.MONOSPACE
+                        typeface = codeTypeface
                         includeFontPadding = false
                         setHorizontallyScrolling(true)
                         setTextIsSelectable(true)
@@ -93,15 +98,22 @@ internal fun SyntaxHighlightedDiffBlock(
         },
         update = { scrollView ->
             val textView = scrollView.getChildAt(0) as TextView
-            textView.typeface = Typeface.MONOSPACE
+            textView.typeface = codeTypeface
             textView.includeFontPadding = false
             textView.textSize = resolvedFontPx
+            // CODE line height (22 / 14) relative to the rendered size.
+            TextViewCompat.setLineHeight(
+                textView,
+                (textView.textSize * CodeLineHeightRatio).roundToInt(),
+            )
             textView.setTextColor(AgentBuddyTheme.textBody.toArgb())
             textView.text = highlighted
         },
         modifier = modifier,
     )
 }
+
+private const val CodeLineHeightRatio = 22f / 14f
 
 private fun buildHighlightedDiff(
     diff: String,
@@ -124,12 +136,15 @@ private fun buildHighlightedDiff(
         )
 
         val lineEnd = builder.length
-        builder.setSpan(
-            BackgroundColorSpan(kind.background(palette)),
-            lineStart,
-            lineEnd,
-            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
-        )
+        val background = kind.background(palette)
+        if (background != android.graphics.Color.TRANSPARENT) {
+            builder.setSpan(
+                DiffLineBackgroundSpan(background),
+                lineStart,
+                lineEnd,
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+            )
+        }
 
         if (index < lines.lastIndex) {
             builder.append('\n')
@@ -137,6 +152,28 @@ private fun buildHighlightedDiff(
     }
 
     return builder
+}
+
+/** Paints a full-width band behind one diff line (not just behind its glyphs). */
+private class DiffLineBackgroundSpan(private val color: Int) : LineBackgroundSpan {
+    override fun drawBackground(
+        canvas: Canvas,
+        paint: Paint,
+        left: Int,
+        right: Int,
+        top: Int,
+        baseline: Int,
+        bottom: Int,
+        text: CharSequence,
+        start: Int,
+        end: Int,
+        lineNumber: Int,
+    ) {
+        val previous = paint.color
+        paint.color = color
+        canvas.drawRect(left.toFloat(), top.toFloat(), right.toFloat(), bottom.toFloat(), paint)
+        paint.color = previous
+    }
 }
 
 private data class DiffSyntaxPalette(

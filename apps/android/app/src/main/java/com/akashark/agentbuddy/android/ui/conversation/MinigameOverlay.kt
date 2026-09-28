@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyReduceMotion
 import com.akashark.agentbuddy.android.state.MinigameOverlayState
 import com.akashark.agentbuddy.android.ui.AgentBuddyTextStyle
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
@@ -132,8 +133,9 @@ private val LOADING_STAGES = listOf(
 
 @Composable
 private fun LoadingSkeleton() {
+    val reduceMotion = buddyReduceMotion
     val transition = rememberInfiniteTransition(label = "minigame-skeleton-shimmer")
-    val shimmerOffset by transition.animateFloat(
+    val animatedOffset by transition.animateFloat(
         initialValue = -1f,
         targetValue = 2f,
         animationSpec = infiniteRepeatable(
@@ -142,6 +144,8 @@ private fun LoadingSkeleton() {
         ),
         label = "minigame-skeleton-offset",
     )
+    // No shimmer sweep when animations are removed.
+    val shimmerOffset = if (reduceMotion) 0f else animatedOffset
     val brush = Brush.linearGradient(
         colors = listOf(
             AgentBuddyTheme.textSecondary.copy(alpha = 0.18f),

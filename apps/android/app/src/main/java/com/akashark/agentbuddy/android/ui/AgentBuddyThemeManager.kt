@@ -7,7 +7,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.graphics.Color
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -18,6 +17,8 @@ private const val SELECTED_DARK_THEME_KEY = "selected_dark_theme"
 private const val APPEARANCE_MODE_KEY = "appearance_mode"
 private const val DARK_MODE_KEY = "dark_mode_enabled"
 private const val FONT_MONO_KEY = "font_family_mono"
+const val DEFAULT_LIGHT_THEME = "agentbuddy-mint-light"
+const val DEFAULT_DARK_THEME = "agentbuddy-mint-dark"
 
 enum class AgentBuddyAppearanceMode(
     val storageValue: String,
@@ -40,194 +41,6 @@ enum class AgentBuddyAppearanceMode(
         }
 }
 
-enum class AgentBuddyColorThemeType {
-    LIGHT,
-    DARK,
-}
-
-data class AgentBuddyThemeIndexEntry(
-    val slug: String,
-    val name: String,
-    val type: AgentBuddyColorThemeType,
-    val accentHex: String,
-    val backgroundHex: String,
-    val foregroundHex: String,
-)
-
-data class AgentBuddyThemeDefinition(
-    val name: String,
-    val type: AgentBuddyColorThemeType,
-    val colors: Map<String, String>,
-)
-
-data class AgentBuddyResolvedTheme(
-    val slug: String,
-    val name: String,
-    val type: AgentBuddyColorThemeType,
-    val background: Color,
-    val surface: Color,
-    val surfaceLight: Color,
-    val textPrimary: Color,
-    val textSecondary: Color,
-    val textMuted: Color,
-    val textBody: Color,
-    val textSystem: Color,
-    val accent: Color,
-    val accentStrong: Color,
-    val border: Color,
-    val separator: Color,
-    val danger: Color,
-    val success: Color,
-    val warning: Color,
-    val textOnAccent: Color,
-    val codeBackground: Color,
-) {
-    companion object {
-        val defaultLight =
-            resolve(
-                slug = "codex-light",
-                definition =
-                    AgentBuddyThemeDefinition(
-                        name = "Codex Light",
-                        type = AgentBuddyColorThemeType.LIGHT,
-                        colors =
-                            mapOf(
-                                "editor.background" to "#FFFFFF",
-                                "editor.foreground" to "#0D0D0D",
-                                "sideBar.background" to "#FCFCFC",
-                                "sideBar.foreground" to "#212121",
-                                "activityBar.background" to "#FCFCFC",
-                                "textLink.foreground" to "#0169CC",
-                                "button.background" to "#0169CC",
-                            ),
-                    ),
-            )
-
-        val defaultDark =
-            resolve(
-                slug = "codex-dark",
-                definition =
-                    AgentBuddyThemeDefinition(
-                        name = "Codex Dark",
-                        type = AgentBuddyColorThemeType.DARK,
-                        colors =
-                            mapOf(
-                                "editor.background" to "#111111",
-                                "editor.foreground" to "#FCFCFC",
-                                "sideBar.background" to "#131313",
-                                "sideBar.foreground" to "#8F8F8F",
-                                "activityBar.background" to "#131313",
-                                "textLink.foreground" to "#0169CC",
-                                "button.background" to "#0169CC",
-                            ),
-                    ),
-            )
-
-        fun resolve(
-            slug: String,
-            definition: AgentBuddyThemeDefinition,
-        ): AgentBuddyResolvedTheme {
-            val colors = definition.colors
-            val background =
-                colorFromHex(
-                    colors["editor.background"],
-                    fallback = if (definition.type == AgentBuddyColorThemeType.DARK) Color(0xFF111111) else Color.White,
-                )
-            val foreground =
-                colorFromHex(
-                    colors["editor.foreground"],
-                    fallback = if (definition.type == AgentBuddyColorThemeType.DARK) Color(0xFFFCFCFC) else Color(0xFF0D0D0D),
-                )
-            val surface =
-                colors["sideBar.background"]?.let(::colorFromHex)
-                    ?: adjustBrightness(background, if (definition.type == AgentBuddyColorThemeType.DARK) 0.03f else -0.02f)
-            val surfaceLight =
-                colors["activityBar.background"]?.let(::colorFromHex)
-                    ?: adjustBrightness(surface, if (definition.type == AgentBuddyColorThemeType.DARK) 0.04f else -0.03f)
-            val accent =
-                colors["textLink.foreground"]?.let(::colorFromHex)
-                    ?: colors["button.background"]?.let(::colorFromHex)
-                    ?: if (definition.type == AgentBuddyColorThemeType.DARK) Color(0xFFB0B0B0) else Color(0xFF4A4A4A)
-            val accentStrong =
-                colors["button.background"]?.let(::colorFromHex)
-                    ?: colors["textLink.foreground"]?.let(::colorFromHex)
-                    ?: accent
-            val border =
-                colors["editorGroup.border"]?.let(::colorFromHex)
-                    ?: colors["sideBar.border"]?.let(::colorFromHex)
-                    ?: adjustBrightness(surface, if (definition.type == AgentBuddyColorThemeType.DARK) 0.05f else -0.05f)
-            val separator =
-                colors["panel.border"]?.let(::colorFromHex)
-                    ?: adjustBrightness(background, if (definition.type == AgentBuddyColorThemeType.DARK) 0.04f else -0.04f)
-
-            return AgentBuddyResolvedTheme(
-                slug = slug,
-                name = definition.name,
-                type = definition.type,
-                background = background,
-                surface = surface,
-                surfaceLight = surfaceLight,
-                textPrimary = foreground,
-                textSecondary = colors["sideBar.foreground"]?.let(::colorFromHex) ?: dimColor(foreground, 0.55f),
-                textMuted = colors["editorLineNumber.foreground"]?.let(::colorFromHex) ?: dimColor(foreground, 0.35f),
-                textBody = dimColor(foreground, 0.88f),
-                textSystem = dimColor(foreground, 0.7f),
-                accent = accent,
-                accentStrong = accentStrong,
-                border = border,
-                separator = separator,
-                danger = if (definition.type == AgentBuddyColorThemeType.DARK) Color(0xFFFF5555) else Color(0xFFD32F2F),
-                success = if (definition.type == AgentBuddyColorThemeType.DARK) Color(0xFF6EA676) else Color(0xFF2E7D32),
-                warning = if (definition.type == AgentBuddyColorThemeType.DARK) Color(0xFFE2A644) else Color(0xFFE65100),
-                textOnAccent = if (brightness(accentStrong) > 0.5f) Color(0xFF0D0D0D) else Color.White,
-                codeBackground = background,
-            )
-        }
-
-        fun brightness(color: Color): Float = (0.299f * color.red) + (0.587f * color.green) + (0.114f * color.blue)
-
-        fun adjustBrightness(
-            color: Color,
-            amount: Float,
-        ): Color =
-            Color(
-                red = (color.red + amount).coerceIn(0f, 1f),
-                green = (color.green + amount).coerceIn(0f, 1f),
-                blue = (color.blue + amount).coerceIn(0f, 1f),
-                alpha = color.alpha,
-            )
-
-        fun dimColor(
-            color: Color,
-            factor: Float,
-        ): Color =
-            if (brightness(color) > 0.5f) {
-                Color(
-                    red = (color.red * factor).coerceIn(0f, 1f),
-                    green = (color.green * factor).coerceIn(0f, 1f),
-                    blue = (color.blue * factor).coerceIn(0f, 1f),
-                    alpha = color.alpha,
-                )
-            } else {
-                val inverse = 1f - factor
-                Color(
-                    red = (color.red + ((1f - color.red) * inverse)).coerceIn(0f, 1f),
-                    green = (color.green + ((1f - color.green) * inverse)).coerceIn(0f, 1f),
-                    blue = (color.blue + ((1f - color.blue) * inverse)).coerceIn(0f, 1f),
-                    alpha = color.alpha,
-                )
-            }
-    }
-}
-
-internal fun colorFromHex(
-    hex: String?,
-    fallback: Color = Color.Transparent,
-): Color {
-    val normalized = hex?.trim()?.takeIf { it.isNotEmpty() } ?: return fallback
-    return runCatching { Color(android.graphics.Color.parseColor(normalized)) }.getOrElse { fallback }
-}
-
 object AgentBuddyThemeManager {
     private val lock = Any()
     private var appContext: Context? = null
@@ -238,7 +51,8 @@ object AgentBuddyThemeManager {
     var appearanceMode by mutableStateOf(AgentBuddyAppearanceMode.SYSTEM)
         private set
 
-    var monoFontEnabled by mutableStateOf(true)
+    /** Interface font: Berkeley Mono when true, the system font otherwise (default). */
+    var monoFontEnabled by mutableStateOf(false)
         private set
 
     var lightTheme by mutableStateOf(AgentBuddyResolvedTheme.defaultLight)
@@ -262,11 +76,13 @@ object AgentBuddyThemeManager {
     val darkThemes: List<AgentBuddyThemeIndexEntry>
         get() = themeIndex.filter { it.type == AgentBuddyColorThemeType.DARK }
 
+    // Mint is the default only for users who never picked a theme: the keys are
+    // written by an explicit selection, so an existing choice is kept as is.
     val selectedLightSlug: String
-        get() = preferences?.getString(SELECTED_LIGHT_THEME_KEY, null) ?: "agentbuddy-light"
+        get() = preferences?.getString(SELECTED_LIGHT_THEME_KEY, null) ?: DEFAULT_LIGHT_THEME
 
     val selectedDarkSlug: String
-        get() = preferences?.getString(SELECTED_DARK_THEME_KEY, null) ?: "agentbuddy-dark"
+        get() = preferences?.getString(SELECTED_DARK_THEME_KEY, null) ?: DEFAULT_DARK_THEME
 
     private val preferences
         get() = appContext?.getSharedPreferences(UI_PREFERENCES_NAME, Context.MODE_PRIVATE)
@@ -285,7 +101,8 @@ object AgentBuddyThemeManager {
             systemIsDark = systemIsDarkMode
             appearanceMode = loadAppearanceMode()
             activeTheme = themeForMode(appearanceMode)
-            monoFontEnabled = preferences?.getBoolean(FONT_MONO_KEY, true) ?: true
+            // The system font is the default only when the user never chose one.
+            monoFontEnabled = preferences?.getBoolean(FONT_MONO_KEY, false) ?: false
             initialized = true
         }
     }
@@ -347,8 +164,25 @@ object AgentBuddyThemeManager {
         }
     }
 
+    /** DEBUG gallery: forced appearance that is never written to preferences. */
+    private var previewDark: Boolean? = null
+
+    /**
+     * Renders the Mint themes in a fixed appearance for the DEBUG state
+     * gallery without touching the user's stored theme, font or mode.
+     * Call after [initialize].
+     */
+    fun applyPreviewOverride(dark: Boolean) {
+        previewDark = dark
+        lightTheme = loadAndResolve(DEFAULT_LIGHT_THEME) ?: AgentBuddyResolvedTheme.defaultLight
+        darkTheme = loadAndResolve(DEFAULT_DARK_THEME) ?: AgentBuddyResolvedTheme.defaultDark
+        monoFontEnabled = false
+        activeTheme = if (dark) darkTheme else lightTheme
+        themeVersion += 1
+    }
+
     private fun usesDarkTheme(mode: AgentBuddyAppearanceMode = appearanceMode): Boolean =
-        mode.resolvesDarkTheme(systemIsDark)
+        previewDark ?: mode.resolvesDarkTheme(systemIsDark)
 
     private fun themeForMode(mode: AgentBuddyAppearanceMode): AgentBuddyResolvedTheme =
         if (usesDarkTheme(mode)) {

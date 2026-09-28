@@ -8,15 +8,17 @@ import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
-import com.akashark.agentbuddy.android.ui.scaled
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyTextStyle
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyTextStyle
 import kotlinx.coroutines.delay
 import kotlin.math.max
 import kotlin.math.roundToLong
@@ -39,6 +41,7 @@ fun TurnStopwatchChip(
     startSeconds: Double,
     endSeconds: Double?,
     modifier: Modifier = Modifier,
+    tint: Color = AgentBuddyTheme.textSecondary,
 ) {
     val elapsed = if (endSeconds != null) {
         max(0.0, endSeconds - startSeconds)
@@ -56,10 +59,9 @@ fun TurnStopwatchChip(
     }
 
     val label = formatStopwatch(elapsed)
-    val tint = AgentBuddyTheme.textMuted.copy(alpha = 0.7f)
 
     Row(
-        modifier = modifier,
+        modifier = modifier.semantics(mergeDescendants = true) { contentDescription = "用时 $label" },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
@@ -67,13 +69,12 @@ fun TurnStopwatchChip(
             imageVector = Icons.Outlined.Timer,
             contentDescription = null,
             tint = tint,
-            modifier = Modifier.size(10.dp),
+            modifier = Modifier.size(14.dp),
         )
         Text(
             text = label,
+            style = buddyTextStyle(BuddyTextStyle.CAPTION),
             color = tint,
-            fontFamily = AgentBuddyTheme.monoFont,
-            fontSize = 10f.scaled,
         )
     }
 }

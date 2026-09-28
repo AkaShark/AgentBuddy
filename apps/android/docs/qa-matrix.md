@@ -25,6 +25,12 @@ Current tests (`app/src/test/java/com/akashark/agentbuddy/android/`):
 - `state/SnapshotExtensionsTest` — snapshot display helpers (model labels)
 - `state/SshHostKeyMismatchTest` — typed SSH host-key prompts (changed key, unreadable saved key) read from Rust errors
 - `ui/AgentBuddyAppearanceModeTest`, `ui/ConversationTextSizingTest` — appearance mode and text sizing
+- `ui/AgentBuddyResolvedThemeTest` — Mint semantic roles from `agentbuddy.*` keys, iOS-equivalent fallbacks for other themes, `#RRGGBBAA` alpha stripping
+- `ui/homeshell/HomeTaskPresentationTest`, `ui/homeshell/HomeShellSummariesTest` — home task state projection, section partitioning, summaries
+- `ui/settings/ThemePickerSectionsTest` — theme picker 推荐 / 全部主题 grouping
+- `ui/approvals/ApprovalCoordinatorTest`, `ui/approvals/ApprovalPresentationTest` — approval submit bookkeeping (one decision per request, retryable failures, per-thread outcomes, RESOLVED_ELSEWHERE via reconcile), stack paging, approval wording
+- `ui/conversation/ComposerStateTest` — composer states (idle / running stop + 排队 / stopping / disconnected / creating), send gate, failed-draft restore
+- `ui/conversation/ConversationHeaderModelTest` — header title, connection state and 「搭档 · 主机」 subtitle
 - `ui/conversation/BundledMorphdomAssetTest` — bundled morphdom asset for the widget WebView shell
 - `ui/conversation/ComposerBarSlashCommandTest` — composer slash commands
 - `ui/conversation/MathMarkdownTest` — math Markdown rendering
@@ -188,30 +194,39 @@ disconnects and re-establishes the chosen transport.
 - Code blocks support selection/copy and still scroll horizontally.
 - Markdown links remain tappable after selection support changes.
 
-## Home Dashboard Zoom + Swipe Reply Parity (mirrors iOS b96961b3 + 52ff299d)
+## Home shell — 任务 / 项目 / 主机 (Mint, iOS parity)
 
-Ported in parallel with the iOS "new ui" and "new ui stuff" commits. Each
-item must render identically to the iOS `HomeDashboardView` on zoom-1/2/3/4
-for the matching state.
+Replaces the old zoomable home dashboard (removed in the Mint rebuild; see
+`docs/design/android-mint-ui-migration.md`).
 
-| Feature | Check |
+| Area | Expected |
 |---|---|
-| Zoom toolbar button | Top-right of header cycles 1→2→3→4→3→2→1 with icon matching level (ViewQuilt→ViewList→ViewAgenda→ViewStream). Persists across app restart via `DashboardZoomPrefs` SharedPreferences. |
-| Pinch-to-zoom | Pinch on home LazyColumn crosses level thresholds (`pinchAccumulator ± 0.4 → 1 level`), emits haptic on transition, does not steal single-finger vertical scroll. |
-| Zoom 1 (scan) | Title + StatusDot only; no meta/body/chips. |
-| Zoom 2 (glance) | + time · server · workspace meta line. Tool-activity label + pulsing dots appear only when `isActive && isToolCallRunning(hydratedItems)` — pure thinking falls through to server metadata. |
-| Zoom 3 (read) | + modelBadgeLine (server icon + server + model + fork/subagent) with trailing inline stats, + user-message quote `>` prefix, + compact tool log (1 row), + response preview capped at 25% screen. |
-| Zoom 4 (deep) | Tool log expands to 3 rows; response preview cap rises to 50% screen; preview scroll-anchors to bottom when overflowing. |
-| Response preview crossfade | New assistant-block id flip triggers Crossfade on the preview; preserved on empty new-turn assistant items via `displayedAssistantMessage` walking back to last non-empty. |
-| TurnStopwatchChip | Live 1Hz tick while turn active (end=null) via `produceState` + `delay(1000)`; static elapsed when ended. Format `<60s → "Xs"`, `<3600s → "Xm" or "XmYs"`. |
-| Tool log grouping | Consecutive exploration commands (read/search/listFiles `HydratedCommandActionKind`) collapse into `⌕ Explored N files, M searches, K listings` summary row; other tool kinds render as single-line rows with `toolIconForName` glyph. |
-| inlineStats chips | Turn count, tool count, diff `+N/-N`, TurnStopwatchChip, token % (warning tint ≥80%). Left text truncates first; chips stay pinned. |
-| recentUserMessage | `>` chip prefix + FormattedText at `LitterFont.conversationBodyPointSize × textScale`. Only shown when message exists and differs from title. |
-| StatusDot shimmer | Active state gets both the 800ms alpha pulse AND a 2s linear-gradient sweep overlay. |
-| Home hydration | Home list calls `appModel.externalResumeThread(session.key)` — not `client.readThread` — so the server attaches a live listener and cards update without opening the thread. |
-| Swipe reply | Right-swipe on home row reveals reply affordance (`SessionReplySwipe` via `SwipeableRow.leadingAction`); past commit threshold opens `QuickReplySheet` modal; send path resumes the thread before `startTurn` to avoid "thread cannot be found" on cold launches. Left-swipe reveals hide (trailingAction). |
-| SavedProjectStore | Last-selected server + project persist across app restart via Rust `preferencesSetHomeSelection` / `HomeSelection`. Wired through `LitterApp.kt`. |
-| StreamingMarkdownView bodySize | Optional `bodySize` parameter thread through to TextView font size; opt-in by response preview and by direct consumers that need parametric sizing. |
+| Bottom navigation | Material 3 `NavigationBar` with 任务 / 项目 / 主机; selected tab survives rotation, process death and a round trip into a conversation. Back from 项目 / 主机 returns to 任务 first. Labels stay within the chrome cap at large text |
+| Composer pill | 「有个想法？交给搭子…」 above the bar on 任务 and 项目 (not 主机); tap opens the new-task sheet; voice button only with `realtime_voice` |
+| 任务 sections | 「需要你处理」 (approval / input), 「正在进行」 (running + stopping, brand cards), 「接着上次」 (rest, rows); state projection stopping > approval > input > running > completed/idle, MCP elicitations excluded, connection problems never shown as failures |
+| Task actions | Visible 「…」 menu and the same long-press menu: 回复, 停止 (running only), 分叉 (disabled while running), 固定/取消固定, 隐藏, 删除 (confirm). Swipe right = quick reply, left = hide, solid light-palette fills with white labels; TalkBack custom actions for both |
+| 「正在停止…」 on home | Set on 停止; clears on turn end, turn switch or host disconnect |
+| Header | Host filter 「N 台主机在线」 (全部主机 / each host / 管理主机), settings gear, search, 「…」 (全部任务, Saved Apps when present, 终端 with `terminal`) |
+| Search | 250 ms debounce, server-side `listThreads`, runtime pills, pull-to-refresh with force repair, fork clusters; tapping a result toggles pin (unchanged) |
+| Task details | Settings 「首页显示任务详情」 (`dashboardZoomStep` ≥ 3) adds model chip, latest step, activity summary, fork 「分叉 i/n」 |
+| Empty states | No host → 扫码连接 (QR sheet directly) + 其他连接方式; no tasks → 开始任务; search without results → clear search |
+| 项目 | Projects from Rust `deriveProjects` (last used time in ms → correct 「N 天前」), task counts keyed by `projectIdFor`; hero card with 新建任务, other projects rows with host; 「+」 opens the directory picker in project mode |
+| 主机 | Card per host with connection pill (text + dot), mode subtitle, runtime chips, 「在这台主机开始任务」, 「…」 (重新连接, 重启服务, 重命名 (remote), 编辑连接, 移除 (confirm), 终端 with flag); 「扫码连接」 and 「+」 add-host entry; "This Device" rendered as 「本机」 |
+| New-task sheet | Mint sheet with project / host / model chips, attachments, dictation, expanded editor; progress + double-submit guard; draft kept on failure; stays on home after creating |
+| 全部任务 | Reachable from the 「…」 menu and `/resume`; back returns to the list; rows show the same status as home |
+| Home hydration | Pinned threads still auto-resume through `externalResumeThread` so cards update without opening the thread |
+| SavedProjectStore | Last-selected host + project persist across restart via Rust `HomeSelection` |
+
+## Mint visual QA (gallery, dark, large text, reduced motion)
+
+| Check | How |
+|---|---|
+| DEBUG state gallery | `adb shell am force-stop com.akashark.agentbuddy.android && adb shell am start -n com.akashark.agentbuddy.android/.MainActivity --es mint_gallery <page> [--ez mint_dark true]`; 50 fixture pages (`ui/gallery/MintGalleryPages.kt`); never starts the runtime or writes theme prefs |
+| Dark mode | Every gallery page in light and dark; semantic roles only |
+| Large text | `adb shell settings put system font_scale 2.0`: home, conversation, approvals, composer — bottom bar / button rows / headers capped at 1.3×, body keeps growing, approval buttons stack, approval card ≤ 45% of the screen with inner scroll |
+| Minimum sizes | No text below 12sp (also at the smallest app text size); touch targets ≥ 48dp |
+| Reduced motion | Developer options → animator duration scale off: status pulses, shimmers, streaming cursor, splash, minigame skeleton and follow-scroll animations stop |
+| Theme defaults | Fresh install → Mint + system font; an existing theme / font / text size / wallpaper choice is kept |
 
 ## Tool Call Card Parity Matrix (iOS + Android)
 
@@ -301,3 +316,18 @@ Replaces the prior WebSocket + base64-PCM audio pump with a platform-native WebR
 | Known non-blockers | Per-frame input/output meter animation no longer drives — requires `RTCRtpReceiver.stats` polling to restore (follow-up) | Same flat meter behavior; speaker toggle currently stubbed to a boolean — follow-up to honor runtime routing |
 | Regression: custom AEC path | Retired — `codex-ios-audio` crate + `AecBridge.swift` / `VoiceSessionAudioCodec.swift` were deleted; libwebrtc AEC3 handles echo cancellation natively | Retired — `AecBridge.kt` deleted; `JavaAudioDeviceModule` enables the hardware AEC + NS |
 | Regression: SSH-tunneled codex server | RPC still flows through SSH; WebRTC peer goes direct to OpenAI edge from device. If client runs in fully air-gapped network, realtime voice will not establish | Same |
+
+## Conversation composer and approvals (Mint, iOS parity)
+
+| Area | Expected (iOS + Android) |
+|---|---|
+| Idle composer | Send disabled until there is text or an attachment |
+| Running turn | Explicit 「停止」; with input the send control reads 「排队」 and the message goes into the Rust follow-up queue |
+| Stopping | 「正在停止…」, second stop blocked; resets when the turn ends, a new turn starts or the host disconnects; a refused stop shows an error |
+| Disconnected | Persistent banner; send button, full-screen editor and every other send path are blocked without clearing the draft, attachments or a pending question; slash commands still run |
+| Creating | Progress on the send control, no double submit; a failed send keeps the draft (restored only into an empty composer) and shows 「重试」 |
+| Queue | Count + previews; 「干预」 (messages only) and remove |
+| Approval in the open conversation | Card above the composer, one at a time with 「第 N 个，共 M 个」; 「拒绝」/「允许一次」, session grant behind 「本会话都允许…」 + confirmation; submitting / failed (retry) / outcome card; answered elsewhere → 「已在别处处理」 |
+| Approval for another conversation | Non-blocking top banner; tap opens that conversation, close only hides the banner (never a denial) |
+| User-input request | Only inline above the composer (no duplicate overlay); answers are keyed by request id |
+
