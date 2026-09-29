@@ -43,58 +43,65 @@ struct NewThreadHeroView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: BuddySpacing.lg) {
-            if !isSending {
-                BuddyPageHeader(
-                    title: "Start a new idea",
-                    subtitle: Text("Describe what you want done. AgentBuddy starts on the host you pick and keeps you posted."),
-                    titleStyle: .title
+        // Scrolls so that, once the keyboard is up, content that no longer
+        // fits stays below the navigation bar and can be scrolled out from
+        // behind the keyboard. A fixed VStack would overflow and be centred,
+        // pushing the heading under the toolbar.
+        ScrollView {
+            VStack(alignment: .leading, spacing: BuddySpacing.lg) {
+                if !isSending {
+                    BuddyPageHeader(
+                        title: "Start a new idea",
+                        subtitle: Text("Describe what you want done. AgentBuddy starts on the host you pick and keeps you posted."),
+                        titleStyle: .title
+                    )
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+
+                    contextChips
+                        .transition(.opacity)
+                }
+
+                HomeComposerView(
+                    project: project,
+                    transcriptionServerId: activeServerId,
+                    onThreadCreated: { key in
+                        withAnimation(reduceMotion ? nil : .spring(response: 0.5, dampingFraction: 0.85)) {
+                            isSending = true
+                        }
+                        Task { @MainActor in
+                            try? await Task.sleep(nanoseconds: Self.morphSettleSeconds)
+                            onThreadCreated(key)
+                        }
+                    },
+                    autoFocus: autoFocus
                 )
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .padding(.horizontal, -BuddySpacing.md)
 
-                contextChips
-                    .transition(.opacity)
+                if project == nil, !launchableServers.isEmpty, !isSending {
+                    BuddyBanner(
+                        tone: .info,
+                        message: Text("Pick a project so AgentBuddy knows which folder to work in."),
+                        systemImage: "folder",
+                        actionTitle: "Choose project",
+                        action: onOpenProjectPicker
+                    )
+                }
             }
-
-            HomeComposerView(
-                project: project,
-                transcriptionServerId: activeServerId,
-                onThreadCreated: { key in
-                    withAnimation(reduceMotion ? nil : .spring(response: 0.5, dampingFraction: 0.85)) {
-                        isSending = true
-                    }
-                    Task { @MainActor in
-                        try? await Task.sleep(nanoseconds: Self.morphSettleSeconds)
-                        onThreadCreated(key)
-                    }
-                },
-                autoFocus: autoFocus
-            )
-            .padding(.horizontal, -BuddySpacing.md)
-
-            if project == nil, !launchableServers.isEmpty, !isSending {
-                BuddyBanner(
-                    tone: .info,
-                    message: Text("Pick a project so AgentBuddy knows which folder to work in."),
-                    systemImage: "folder",
-                    actionTitle: "Choose project",
-                    action: onOpenProjectPicker
-                )
-            }
-
-            Spacer(minLength: 0)
+            .frame(maxWidth: 760, alignment: .leading)
+            .padding(.horizontal, BuddySpacing.xl)
+            .padding(.top, BuddySpacing.md)
+            .padding(.bottom, BuddySpacing.xl)
+            .frame(maxWidth: .infinity)
         }
-        .frame(maxWidth: 760, alignment: .leading)
-        .padding(.horizontal, BuddySpacing.xl)
-        .padding(.top, BuddySpacing.md)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .scrollDismissesKeyboard(.interactively)
+        .scrollBounceBehavior(.basedOnSize)
         .buddyPageBackground()
         .animation(reduceMotion ? nil : .spring(response: 0.5, dampingFraction: 0.85), value: isSending)
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if let onCancel {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { onCancel() }
                         .foregroundStyle(AgentBuddyTheme.link)
                 }
@@ -104,21 +111,39 @@ struct NewThreadHeroView: View {
 
     // MARK: - Context chips
 
+    /// One row when all three fit; otherwise host + project share a row and
+    /// the model chip wraps, keeping the composer above the keyboard.
     private var contextChips: some View {
         ViewThatFits(in: .horizontal) {
-            HStack(spacing: BuddySpacing.xs) { chips }
-            VStack(alignment: .leading, spacing: 0) { chips }
+            HStack(spacing: BuddySpacing.xs) {
+                serverChip
+                projectChip
+                modelChip
+            }
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: BuddySpacing.xs) {
+                    serverChip
+                    projectChip
+                }
+                modelChip
+            }
+            VStack(alignment: .leading, spacing: 0) {
+                serverChip
+                projectChip
+                modelChip
+            }
         }
     }
 
-    @ViewBuilder
-    private var chips: some View {
-        serverChip
+    private var projectChip: some View {
         ProjectChip(
             project: project,
             disabled: launchableServers.isEmpty,
             onTap: onOpenProjectPicker
         )
+    }
+
+    private var modelChip: some View {
         HomeModelChip(
             serverId: activeServerId,
             disabled: selectedLaunchableServer == nil
