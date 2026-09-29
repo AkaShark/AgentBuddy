@@ -62,12 +62,6 @@ pub fn autostart_action(s: &HostState) -> TrayAction {
     }
 }
 
-/// Open the console on launch until the service is installed, so a first
-/// run is not just an icon lost in a crowded menu bar.
-pub fn should_show_on_launch(install: &InstallState) -> bool {
-    !matches!(install, InstallState::Installed)
-}
-
 /// After the app bundle was replaced the LaunchAgent still runs the old
 /// binary; hand it over with `agentbuddy upgrade` when the version changed.
 pub fn needs_upgrade(last_seen: Option<&str>, current: &str, install: &InstallState) -> bool {
@@ -76,7 +70,11 @@ pub fn needs_upgrade(last_seen: Option<&str>, current: &str, install: &InstallSt
 
 pub fn show_window(app: &AppHandle, page: Option<&str>) {
     if let Some(w) = app.get_webview_window("main") {
-        let _ = w.move_window(Position::TrayCenter);
+        // The tray position is unknown until the icon has been clicked, and
+        // a crowded menu bar can hide the icon for good; centre instead.
+        if w.move_window(Position::TrayCenter).is_err() {
+            let _ = w.center();
+        }
         let _ = w.show();
         let _ = w.set_focus();
         if let Some(p) = page {
@@ -228,9 +226,6 @@ pub fn spawn_upgrade_check(app: AppHandle) {
         let current = app.package_info().version.to_string();
         let mut settings = Settings::load(&app);
         if let Ok(s) = compute_host_state(&app).await {
-            if should_show_on_launch(&s.install) {
-                show_window(&app, Some("overview"));
-            }
             let state = app.state::<AppState>();
             if record_version_after_upgrade(&mut settings, &current, &s.install, || {
                 run_mutating(&app, &state, Subcommand::Upgrade)
@@ -372,13 +367,6 @@ mod tests {
         let s = state(InstallState::PathMismatch { plist_exe: "/old".into() }, true);
         assert_eq!(status_label(&s), "状态：需要修复");
         assert!(autostart_checked(&s));
-    }
-
-    #[test]
-    fn console_opens_on_launch_until_the_service_is_installed() {
-        assert!(should_show_on_launch(&InstallState::NotInstalled));
-        assert!(should_show_on_launch(&InstallState::PathMismatch { plist_exe: "/old".into() }));
-        assert!(!should_show_on_launch(&InstallState::Installed));
     }
 
     #[test]

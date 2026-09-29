@@ -10,7 +10,7 @@
 .badge.ok { color: var(--accent); border-color: var(--accent); }
 .badge.warn { color: var(--danger); border-color: var(--danger); }
 .banner { background: #1a0d0d; border: 1px solid var(--danger); border-radius: 8px; padding: 10px 12px; display: flex; gap: 12px; align-items: flex-start; }
-.banner pre { margin: 0; white-space: pre-wrap; flex: 1; }
+.banner pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; flex: 1; min-width: 0; }
 table { border-collapse: collapse; width: 100%; }
 td, th { border-bottom: 1px solid var(--border); padding: 8px 6px; text-align: left; vertical-align: middle; }
 .log { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px; flex: 1; min-height: 240px; overflow: auto; white-space: pre; font-size: 12px; margin: 0; }
