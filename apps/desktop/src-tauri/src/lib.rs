@@ -23,6 +23,10 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             tray::install(app.handle())?;
+            // The app is only ever started by hand (the daemon is the login
+            // item), and a crowded menu bar can hide the tray icon, so every
+            // launch opens the console.
+            tray::show_window(app.handle(), Some("overview"));
             tray::spawn_refresher(app.handle().clone());
             tray::spawn_upgrade_check(app.handle().clone());
             Ok(())
@@ -53,6 +57,16 @@ pub fn run() {
             commands::logs_follow_stop,
             commands::reveal_path,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running AgentBuddy");
+        .build(tauri::generate_context!())
+        .expect("error while building AgentBuddy")
+        .run(|app, event| {
+            // Opening the app again from Finder or Spotlight while it runs
+            // brings the console back.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { .. } = event {
+                tray::show_window(app, Some("overview"));
+            }
+            #[cfg(not(target_os = "macos"))]
+            let _ = (app, event);
+        });
 }
