@@ -73,14 +73,18 @@ Android App ──iroh──▶ alleycat daemon (Mac)
 1. **握手**
    - `codex_to_acp_initialize` 发 `protocolVersion: 1`（整数）。
    - 缓存 ACP `initialize` 回包里的 `agentCapabilities`（`loadSession`、`sessionCapabilities.resume/list`、`promptCapabilities.image`），供后续决策。
+   - 客户端能力改为构建参数，默认值不变（`fs` 读写、`terminal` 都是 true）。mfcli 声明为 false：它在同一台机器上自己执行文件和命令工具，这正是探测验证过的路径；也避开了 bridge 的 `terminal/create` 在读循环里同步跑完命令、期间不转发流式通知的问题。
+   - ACP 错误回包的 `data.details` 拼进错误文本。mfcli 的 `message` 永远是 `Internal error`，真正的原因（`Agent not initialized`、`Session … not found`）只在 `data.details` 里。
 2. **进程生命周期**
    - 池里新拉起的进程先用缓存的初始化参数发 ACP `initialize`，再处理任何请求。
    - 每个 `AcpClient` 记录本进程已加载的会话集合（`session/new`、`session/load`、`session/resume` 成功后加入）。
    - `turn/start` 发现会话不在当前进程里时先恢复：agent 支持 `sessionCapabilities.resume` 就发 `session/resume`（不回放），否则 `loadSession` 为真时发 `session/load` 并丢弃回放，都不支持就报错。恢复需要的 cwd 取自 bridge 在内存里记下的会话 cwd（`thread/start`、`thread/resume` 时记录），通用层不依赖第 5 节的索引；daemon 重启后手机重连会先走 `thread/resume`，那时由 `mfcli-bridge` 补 cwd。
-   - `session/resume` 的方法名和参数在实现第一步用真实 mfcli 确认（它声明了 `sessionCapabilities.resume`，但本次探测没有调用它）。
+   - 已用真实 mfcli 验证：`session/resume {sessionId, cwd, mcpServers: []}` 不回放、返回 `models` 与 `configOptions`，之后的 prompt 保留上下文；进程没加载过的会话直接 prompt 会报 `Session … not found`，未 `initialize` 时任何请求都报 `Agent not initialized`。
+   - 进程死亡检测：读循环退出时把 client 标记为已关闭；池取到已关闭的 client 时丢弃并重建（走上面的重新初始化和恢复路径），不再把死进程一直留到闲置淘汰。另加一个标注为测试钩子的 `recycle_process(ctx)`，用于在测试里模拟淘汰。
 3. **模型与思考强度**
    - bridge 按会话记录 `configOptions` 的 `currentValue`（来自 `session/new`、`session/load`、`session/set_config_option` 的回包）。
    - `thread/start` 回包的 `model` 返回真实的 `currentValue`（没有时才回退到 agent 名）。
+   - `thread/resume` 同样记下 `session/load` 回包里的 `configOptions`，回包的 `model` 返回真实当前模型。
    - `thread/start` 和 `turn/start` 带了与当前值不同的 `model` 时，在发 prompt 前调 `session/set_config_option {configId: "model", value}`。
    - `effort` 同理，映射到 `thought_level`：
 
@@ -101,7 +105,7 @@ Android App ──iroh──▶ alleycat daemon (Mac)
 6. **辅助进程**
    - 池里按 `agent:node_id:aux` 为每台手机额外分配一个进程，专门处理只读的 `session/list` 和模型发现。
    - 这样首页刷新列表不用排在正在流式输出的 `session/prompt` 后面。
-   - 池容量 4 不变（每手机最多 2 个进程）。
+   - 池容量是整个 agent 共用的（不是每手机），默认 4 不变；mfcli 构建时设为 8，每手机最多占 2 个。
 
 ## 5. alleycat：新 crate `mfcli-bridge`
 
@@ -140,8 +144,8 @@ Android App ──iroh──▶ alleycat daemon (Mac)
 
 - **alleycat pin**：`services/kittylitter/Cargo.toml` 和 `shared/rust-bridge/Cargo.toml` 同步切到新 commit，更新 `Cargo.lock`。开发期 `services/kittylitter` 临时用本地 path 依赖，推送后改回 git rev。
 - **Android（仅显示层）**
-  - `ui/AnimatedSplashScreen.kt` 的 `SplashProviders` 和 `ui/discovery/DiscoveryChooser.kt` 的 `AgentBuddyAgents` 加 MyFlicker。
-  - 图标用字母徽标回退；拿到官方图标后再加 `res/drawable/agent_mfcli.xml`。
+  - `ui/discovery/DiscoveryChooser.kt` 的 `AgentBuddyAgents` 加 `mfcli`（这里按名字查图标，缺失时用字母徽标）。
+  - `ui/AnimatedSplashScreen.kt` 的 `SplashProviders` 每项都必须有 drawable，没有官方图标前不加；拿到官方图标后再加 `res/drawable/agent_mfcli.xml` 并补上 splash。
   - `apps/android/docs/qa-matrix.md` 加 mfcli 行。
 - **iOS**：功能自动继承。splash / chooser 装饰项和真机验证放到 iOS 轮次，并在总结里记为后续。
 - **桌面端**：无代码改动（Agents 页通用）。
