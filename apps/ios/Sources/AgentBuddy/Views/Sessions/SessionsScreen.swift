@@ -7,7 +7,7 @@ struct SessionsScreen: View {
     @Environment(AppState.self) var appState
     @Environment(ConversationWarmupCoordinator.self) var conversationWarmup
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
-    @State var sessionsModel = SessionsModel()
+    @State var sessionsModel: SessionsModel
     @State var isLoading: Bool
     @State var resumingKey: ThreadKey?
     @State var isStartingNewSession = false
@@ -28,6 +28,8 @@ struct SessionsScreen: View {
     @State var hasLoadedInitialSessions = false
     @State var isSessionLoadInFlight = false
     let autoLoadSessions: Bool
+    /// Set when this screen lists one project's tasks (Projects tab).
+    let projectScope: SessionsProjectScope?
     let onOpenConversation: (ThreadKey) -> Void
     private let onInfo: (() -> Void)?
     static let relativeFormatter: RelativeDateTimeFormatter = {
@@ -38,13 +40,16 @@ struct SessionsScreen: View {
 
     init(
         autoLoadSessions: Bool = true,
+        projectScope: SessionsProjectScope? = nil,
         onOpenConversation: @escaping (ThreadKey) -> Void,
         onInfo: (() -> Void)? = nil
     ) {
         self.autoLoadSessions = autoLoadSessions
+        self.projectScope = projectScope
         self.onOpenConversation = onOpenConversation
         self.onInfo = onInfo
         _isLoading = State(initialValue: autoLoadSessions)
+        _sessionsModel = State(initialValue: SessionsModel(projectScope: projectScope))
     }
 
     var body: some View {

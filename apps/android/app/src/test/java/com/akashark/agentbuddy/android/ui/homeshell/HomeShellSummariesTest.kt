@@ -45,6 +45,34 @@ class HomeShellSummariesTest {
     }
 
     @Test
+    fun `recent tasks are the project's newest three`() {
+        val project = project("mbp", "/p/A", 0)
+        val sessions = listOf(
+            session("mbp", "/p/A", active = false, threadId = "a1", updatedAt = 1),
+            session("mbp", "/p/A/", active = false, threadId = "a5", updatedAt = 5),
+            session("mbp", "/p/B", active = false, threadId = "b9", updatedAt = 9),
+            session("mini", "/p/A", active = false, threadId = "m8", updatedAt = 8),
+            session("mbp", "/p/A", active = true, threadId = "a3", updatedAt = 3),
+            session("mbp", "/p/A", active = false, threadId = "a4", updatedAt = 4),
+        )
+        val recent = ProjectSummaries.recentTasks(project, sessions, idFor)
+        assertEquals(listOf("a5", "a4", "a3"), recent.map { it.key.threadId })
+    }
+
+    @Test
+    fun `project tasks use the project id rule and stay on the project's host`() {
+        val sessions = listOf(
+            session("mbp", "/p/A/", active = false, threadId = "a1"),
+            session("mbp", "/p/a", active = false, threadId = "lower"),
+            session("mbp", "/p/B", active = false, threadId = "b1"),
+            session("mini", "/p/A", active = false, threadId = "m1"),
+            session("mbp", "", active = false, threadId = "blank"),
+        )
+        val tasks = ProjectSummaries.tasksOf(idFor("mbp", "/p/A"), "mbp", sessions, idFor)
+        assertEquals(listOf("a1"), tasks.map { it.key.threadId })
+    }
+
+    @Test
     fun `hero is the selected project, else the most recently used`() {
         val summaries = ProjectSummaries.build(
             projects = listOf(project("mbp", "/p/A", 1_000), project("mbp", "/p/B", 5_000)),
@@ -112,8 +140,14 @@ class HomeShellSummariesTest {
     private fun project(serverId: String, cwd: String, lastUsedAtMs: Long) =
         AppProject(id = idFor(serverId, cwd), serverId = serverId, cwd = cwd, lastUsedAtMs = lastUsedAtMs)
 
-    private fun session(serverId: String, cwd: String, active: Boolean) = AppSessionSummary(
-        key = ThreadKey(serverId = serverId, threadId = "$serverId$cwd$active"),
+    private fun session(
+        serverId: String,
+        cwd: String,
+        active: Boolean,
+        threadId: String = "$serverId$cwd$active",
+        updatedAt: Long? = null,
+    ) = AppSessionSummary(
+        key = ThreadKey(serverId = serverId, threadId = threadId),
         agentRuntimeKind = "codex",
         serverDisplayName = serverId,
         serverHost = serverId,
@@ -128,7 +162,7 @@ class HomeShellSummariesTest {
         agentRole = null,
         agentDisplayLabel = null,
         agentStatus = AppSubagentStatus.UNKNOWN,
-        updatedAt = null,
+        updatedAt = updatedAt,
         hasActiveTurn = active,
         isResumed = true,
         isSubagent = false,

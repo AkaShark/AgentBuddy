@@ -492,6 +492,7 @@ where
     let legacy_permission_profile = normalize_legacy_permission_profile_fields(&mut normalized);
     normalize_empty_cwd_fields(&mut normalized, None);
     normalize_default_service_tier(&mut normalized);
+    normalize_unknown_reasoning_efforts(&mut normalized);
     normalize_legacy_v0_128_compat(&mut normalized);
     normalize_legacy_thread_status(&mut normalized);
     normalize_dynamic_tool_content_item_aliases(&mut normalized);
@@ -641,6 +642,67 @@ fn normalize_default_service_tier(value: &mut serde_json::Value) {
         serde_json::Value::Array(items) => {
             for child in items {
                 normalize_default_service_tier(child);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// True for a string the pinned protocol's `ReasoningEffort` enum rejects.
+/// Parsing with the enum itself keeps this in step when the fork adds values.
+fn is_unknown_reasoning_effort(value: &serde_json::Value) -> bool {
+    value.as_str().is_some_and(|effort| {
+        effort
+            .parse::<codex_protocol::openai_models::ReasoningEffort>()
+            .is_err()
+    })
+}
+
+/// Newer codex releases add reasoning efforts (e.g. `max`) that the pinned
+/// protocol enum does not know, and a single unknown value fails the whole
+/// typed response: `model/list` then leaves the picker with no models at all.
+/// Drop unknown options from `supportedReasoningEfforts`, fall back to the
+/// highest remaining option for the required `defaultReasoningEffort`, and
+/// clear the optional effort fields (thread responses, collaboration mode
+/// presets and config use `reasoningEffort`, `reasoning_effort` and
+/// `model_reasoning_effort`).
+fn normalize_unknown_reasoning_efforts(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::Object(map) => {
+            if let Some(serde_json::Value::Array(options)) = map.get_mut("supportedReasoningEfforts") {
+                options.retain(|option| {
+                    !option
+                        .get("reasoningEffort")
+                        .is_some_and(is_unknown_reasoning_effort)
+                });
+            }
+            if map
+                .get("defaultReasoningEffort")
+                .is_some_and(is_unknown_reasoning_effort)
+            {
+                let fallback = map
+                    .get("supportedReasoningEfforts")
+                    .and_then(serde_json::Value::as_array)
+                    .and_then(|options| options.last())
+                    .and_then(|option| option.get("reasoningEffort"))
+                    .cloned()
+                    .unwrap_or_else(|| serde_json::Value::String("medium".to_string()));
+                map.insert("defaultReasoningEffort".to_string(), fallback);
+            }
+            for key in ["reasoningEffort", "reasoning_effort", "model_reasoning_effort"] {
+                if let Some(effort) = map.get_mut(key)
+                    && is_unknown_reasoning_effort(effort)
+                {
+                    *effort = serde_json::Value::Null;
+                }
+            }
+            for child in map.values_mut() {
+                normalize_unknown_reasoning_efforts(child);
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for child in items {
+                normalize_unknown_reasoning_efforts(child);
             }
         }
         _ => {}
@@ -1264,6 +1326,7 @@ mod tests {
     use codex_app_server_protocol::{
         CommandAction, CommandExecutionSource, CommandExecutionStatus, ThreadItem,
     };
+    use codex_protocol::openai_models::ReasoningEffort;
     use serde::Deserialize;
     use serde::de::Error as _;
     use serde_json::json;
@@ -1444,6 +1507,99 @@ mod tests {
             deserialize_typed_response(&payload).expect("thread/resume should deserialize");
 
         assert_eq!(parsed.service_tier, None);
+    }
+
+    #[test]
+    fn deserialize_typed_response_drops_unknown_reasoning_efforts_from_model_list() {
+        let payload = json!({
+            "data": [{
+                "id": "gpt-6-astra",
+                "model": "gpt-6-astra",
+                "upgrade": null,
+                "upgradeInfo": null,
+                "availabilityNux": null,
+                "displayName": "GPT-6-Astra",
+                "description": "Frontier intelligence",
+                "hidden": false,
+                "supportedReasoningEfforts": [
+                    { "reasoningEffort": "low", "description": "Fast" },
+                    { "reasoningEffort": "xhigh", "description": "Deeper" },
+                    { "reasoningEffort": "max", "description": "Deepest" }
+                ],
+                "defaultReasoningEffort": "max",
+                "isDefault": true
+            }],
+            "nextCursor": null
+        });
+
+        let parsed: upstream::ModelListResponse =
+            deserialize_typed_response(&payload).expect("model/list should deserialize");
+
+        let model = &parsed.data[0];
+        assert_eq!(
+            model
+                .supported_reasoning_efforts
+                .iter()
+                .map(|option| option.reasoning_effort)
+                .collect::<Vec<_>>(),
+            vec![ReasoningEffort::Low, ReasoningEffort::XHigh]
+        );
+        assert_eq!(model.default_reasoning_effort, ReasoningEffort::XHigh);
+    }
+
+    #[test]
+    fn deserialize_typed_response_clears_unknown_thread_reasoning_effort() {
+        let payload = json!({
+            "model": "gpt-6-astra",
+            "modelProvider": "openai",
+            "approvalPolicy": "on-request",
+            "approvalsReviewer": "user",
+            "sandbox": { "type": "workspaceWrite" },
+            "permissionProfile": { "type": "disabled" },
+            "cwd": "/tmp",
+            "instructionSources": [],
+            "reasoningEffort": "max",
+            "thread": {
+                "id": "thread-1",
+                "preview": "hello",
+                "ephemeral": false,
+                "modelProvider": "openai",
+                "createdAt": 1,
+                "updatedAt": 2,
+                "status": { "type": "notLoaded" },
+                "path": "/tmp/thread.jsonl",
+                "cwd": "/tmp",
+                "cliVersion": "0.200.0",
+                "source": "appServer",
+                "agentNickname": null,
+                "agentRole": null,
+                "gitInfo": null,
+                "name": null,
+                "turns": []
+            }
+        });
+
+        let parsed: upstream::ThreadResumeResponse =
+            deserialize_typed_response(&payload).expect("thread/resume should deserialize");
+
+        assert_eq!(parsed.reasoning_effort, None);
+    }
+
+    #[test]
+    fn deserialize_typed_response_clears_unknown_collaboration_mode_effort() {
+        let payload = json!({
+            "data": [
+                { "name": "Deep", "mode": "plan", "model": "gpt-6-astra", "reasoning_effort": "max" },
+                { "name": "Quick", "mode": "default", "model": null, "reasoning_effort": "low" }
+            ]
+        });
+
+        let parsed: upstream::CollaborationModeListResponse = deserialize_typed_response(&payload)
+            .expect("collaborationMode/list should deserialize");
+
+        assert_eq!(parsed.data.len(), 2);
+        assert_eq!(parsed.data[1].reasoning_effort, Some(Some(ReasoningEffort::Low)));
+        assert_ne!(parsed.data[0].reasoning_effort, Some(Some(ReasoningEffort::Low)));
     }
 
     #[test]

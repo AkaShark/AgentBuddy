@@ -3,7 +3,10 @@ import SwiftUI
 extension SessionsScreen {
     var newSessionButton: some View {
         Button {
-            if let defaultServerId = defaultNewSessionServerId(preferredServerId: appState.sessionsSelectedServerFilterId) {
+            if let projectScope {
+                // A project's page starts the task in that project's folder.
+                Task { await startNewSession(serverId: projectScope.serverId, cwd: projectScope.cwd) }
+            } else if let defaultServerId = defaultNewSessionServerId(preferredServerId: appState.sessionsSelectedServerFilterId) {
                 if connectedServers.first(where: { $0.id == defaultServerId })?.isLocal == true {
                     let cwd = AgentBuddyPlatform.defaultLocalWorkingDirectory()
                     Task { await startNewSession(serverId: defaultServerId, cwd: cwd) }

@@ -1033,6 +1033,7 @@ impl AppClient {
             let mut models = Vec::new();
             let mut seen_model_ids = HashSet::new();
             let mut failed_runtime_kinds = HashSet::new();
+            let mut last_failure = None;
             for runtime_kind in runtime_kinds {
                 if !runtime_exposes_model_choices(&runtime_kind) {
                     continue;
@@ -1065,6 +1066,7 @@ impl AppClient {
                                 server_id,
                                 error
                             );
+                            last_failure = Some(error);
                             break;
                         }
                     };
@@ -1103,6 +1105,14 @@ impl AppClient {
                         &failed_runtime_kinds,
                     );
                 }
+            }
+            // Caching an empty list here would read as "loaded, no models" and
+            // the picker would never ask again; keep the list unset so the next
+            // open retries, and report why.
+            if models.is_empty()
+                && let Some(error) = last_failure
+            {
+                return Err(error);
             }
             c.app_store.update_server_models(&server_id, Some(models));
             Ok(())

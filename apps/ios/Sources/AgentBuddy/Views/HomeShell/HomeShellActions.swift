@@ -26,6 +26,8 @@ struct HomeShellActions {
     // MARK: Projects
     var selectProject: (AppProject) -> Void
     var createProject: () -> Void
+    /// Opens the All tasks screen limited to one project.
+    var showProjectTasks: (AppProject) -> Void
 
     // MARK: Hosts
     /// Scopes the task list to a host, or reconnects it when disconnected.

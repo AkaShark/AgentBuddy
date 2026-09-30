@@ -1,7 +1,5 @@
 package com.akashark.agentbuddy.android.ui.conversation
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,7 +8,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
@@ -27,9 +24,10 @@ import com.akashark.agentbuddy.android.ui.scaled
 import uniffi.codex_mobile_client.AppMessageRenderBlock
 
 /**
- * Composable that renders streaming assistant messages with a fade-in reveal
- * effect on newly appended tokens. Uses [StreamingTextCoordinator] to split
- * text into a stable cached prefix and an animated frontier.
+ * Composable that renders streaming assistant messages. Uses
+ * [StreamingTextCoordinator] to split text into a stable cached prefix and a
+ * re-parsed frontier. The frontier is drawn fully opaque: fading it in again on
+ * every delta made the paragraph being written blink.
  *
  * [mintTypography] renders with the Mint BODY / CODE metrics that follow the
  * system font size (the conversation timeline); false keeps the fixed-dp
@@ -45,7 +43,7 @@ fun StreamingMarkdownView(
 ) {
     val appModel = LocalAppModel.current
 
-    // Compute streaming state — stable prefix blocks are cached, frontier blocks animate
+    // Compute streaming state — stable prefix blocks are cached, the frontier is re-parsed
     val streamState = remember(itemId, text) {
         StreamingTextCoordinator.update(
             itemId = itemId,
@@ -54,12 +52,7 @@ fun StreamingMarkdownView(
         )
     }
 
-    // Animate frontier alpha: snap to 0 on new text, then animate to 1
-    val frontierAlpha = remember(itemId) { Animatable(1f) }
-
     LaunchedEffect(text) {
-        frontierAlpha.snapTo(0f)
-        frontierAlpha.animateTo(1f, animationSpec = tween(durationMillis = 150))
         onRendered?.invoke()
     }
 
@@ -67,21 +60,19 @@ fun StreamingMarkdownView(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(if (mintTypography) BuddySpacing.sm else 8.dp),
     ) {
-        // Render stable prefix blocks (fully opaque, cached)
+        // Stable prefix blocks (cached)
         if (streamState.stableBlocks.isNotEmpty()) {
             StreamingRenderBlocks(
                 blocks = streamState.stableBlocks,
-                alpha = 1f,
                 bodySize = bodySize,
                 mintTypography = mintTypography,
             )
         }
 
-        // Render frontier blocks with fade-in
+        // Frontier blocks (re-parsed as text arrives)
         if (streamState.frontierBlocks.isNotEmpty()) {
             StreamingRenderBlocks(
                 blocks = streamState.frontierBlocks,
-                alpha = frontierAlpha.value,
                 bodySize = bodySize,
                 mintTypography = mintTypography,
             )
@@ -92,7 +83,6 @@ fun StreamingMarkdownView(
 @Composable
 private fun StreamingRenderBlocks(
     blocks: List<AppMessageRenderBlock>,
-    alpha: Float,
     bodySize: Float,
     mintTypography: Boolean,
 ) {
@@ -102,7 +92,6 @@ private fun StreamingRenderBlocks(
                 if (block.markdown.isNotEmpty()) {
                     StreamingMarkdownText(
                         text = block.markdown,
-                        modifier = Modifier.alpha(alpha),
                         bodySize = bodySize,
                         mintTypography = mintTypography,
                     )
@@ -112,7 +101,6 @@ private fun StreamingRenderBlocks(
                 if (isMathLanguage(block.language)) {
                     StreamingMarkdownText(
                         text = mathMarkdownBlock(block.code),
-                        modifier = Modifier.alpha(alpha),
                         bodySize = bodySize,
                         mintTypography = mintTypography,
                     )
@@ -120,7 +108,6 @@ private fun StreamingRenderBlocks(
                     CodeBlockSegment(
                         language = block.language,
                         code = block.code,
-                        modifier = Modifier.alpha(alpha),
                         codeStyle = if (mintTypography) {
                             buddyTextStyle(BuddyTextStyle.CODE)
                         } else {
@@ -138,7 +125,6 @@ private fun StreamingRenderBlocks(
                         .build(),
                     contentDescription = "助手图片",
                     modifier = Modifier
-                        .alpha(alpha)
                         .fillMaxWidth()
                         .heightIn(max = 300.dp)
                         .clip(TimelineImageShape),

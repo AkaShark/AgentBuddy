@@ -1,5 +1,27 @@
 import Foundation
 
+/// Limits the All tasks screen to one project, matched the same way the
+/// Projects tab counts a project's tasks (Rust's canonical project id).
+struct SessionsProjectScope: Hashable {
+    let serverId: String
+    let projectId: String
+    /// Where a new task from this page starts.
+    let cwd: String
+
+    init(_ project: AppProject) {
+        serverId = project.serverId
+        projectId = project.id
+        cwd = project.cwd
+    }
+
+    func filter(_ sessions: [AppSessionSummary]) -> [AppSessionSummary] {
+        var resolver = ProjectIdResolver()
+        return sessions.filter { session in
+            session.serverId == serverId && resolver.id(serverId: session.serverId, cwd: session.cwd) == projectId
+        }
+    }
+}
+
 @MainActor
 enum SessionsDerivation {
     private static let absoluteDateFormatter: DateFormatter = {
@@ -11,6 +33,7 @@ enum SessionsDerivation {
 
     static func build(
         sessions: [AppSessionSummary],
+        projectScope: SessionsProjectScope? = nil,
         selectedServerFilterId: String?,
         showOnlyForks: Bool,
         selectedRuntimeKind: AgentRuntimeKind?,
@@ -59,7 +82,12 @@ enum SessionsDerivation {
             childrenByKey[thread.key] = sortedChildrenByServerAndParentId[thread.serverId]?[thread.threadId] ?? []
         }
 
-        let filteredThreads = allThreads.filter { thread in
+        // A project scope narrows what is listed (and what empty states and
+        // runtime pills describe); lineage above still spans every task, so
+        // sub-agents render exactly as they do on the full list.
+        let listedThreads = projectScope.map { $0.filter(allThreads) } ?? allThreads
+
+        let filteredThreads = listedThreads.filter { thread in
             if let selectedServerFilterId, thread.serverId != selectedServerFilterId {
                 return false
             }
@@ -111,8 +139,8 @@ enum SessionsDerivation {
         })
 
         return SessionsDerivedData(
-            allThreads: allThreads,
-            allThreadKeys: allThreads.map(\.key),
+            allThreads: listedThreads,
+            allThreadKeys: listedThreads.map(\.key),
             filteredThreads: filteredThreads,
             filteredThreadKeys: filteredThreads.map(\.key),
             workspaceSections: workspaceSections,

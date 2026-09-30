@@ -94,6 +94,9 @@ class AppNavigationActions(
         HomeShellActions(
             openConversation = shell::navigateToConversation,
             showAllTasks = { shell.navigate(Route.Sessions(serverId = null, title = "全部任务")) },
+            showProjectTasks = { project, title ->
+                shell.navigate(Route.Sessions(serverId = project.serverId, title = title, projectCwd = project.cwd))
+            },
             openProjectPicker = { shell.showProjectPicker = true },
             openAccount = { serverId -> shell.showAccountForServer = serverId },
             startVoice = if (voiceEnabled) ::startHomeVoice else null,

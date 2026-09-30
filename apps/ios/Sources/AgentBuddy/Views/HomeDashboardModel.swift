@@ -29,7 +29,7 @@ final class HomeDashboardModel {
                 if selectedServerId != nil {
                     userClearedSelection = false
                 }
-                reconcileSelectedProject()
+                alignSelectedProjectWithServer()
             }
         }
     }
@@ -43,6 +43,13 @@ final class HomeDashboardModel {
                 SavedProjectStore.selectedProjectId = selectedProject?.id
             }
         }
+    }
+
+    /// The selected project when its host can start a task right now. The
+    /// composer uses this, so an offline project falls back to the project and
+    /// host prompts instead of a send that fails.
+    var launchableSelectedProject: AppProject? {
+        selectedProject.flatMap { canLaunchSessions(on: $0.serverId) ? $0 : nil }
     }
 
     @ObservationIgnored private weak var appModel: AppModel?
@@ -144,6 +151,18 @@ final class HomeDashboardModel {
         selectedProject = nil
     }
 
+    /// Makes `project` the current project. A live host also becomes the task
+    /// scope; an offline host can't scope the task list, so the scope goes back
+    /// to every host while the project itself stays selected.
+    func selectProject(_ project: AppProject) {
+        selectedProject = project
+        selectedServerId = canLaunchSessions(on: project.serverId) ? project.serverId : nil
+    }
+
+    func canLaunchSessions(on serverId: String) -> Bool {
+        connectedServers.contains { $0.id == serverId && $0.canLaunchSessions }
+    }
+
     func bind(appModel: AppModel) {
         self.appModel = appModel
         guard isActive else { return }
@@ -242,29 +261,52 @@ final class HomeDashboardModel {
     }
 
     private func reconcileSelectedProject() {
-        guard let serverId = selectedServerId else {
-            selectedProject = nil
-            return
-        }
+        let next = Self.reconciledProject(
+            selectedProject,
+            // Only read from disk when there is nothing selected to keep.
+            savedId: selectedProject == nil ? SavedProjectStore.selectedProjectId : nil,
+            scopedServerId: selectedServerId,
+            projects: projects,
+            knownServerIds: Set(connectedServers.map(\.id))
+        )
+        if next != selectedProject { selectedProject = next }
+    }
 
-        let serverProjects = projects.filter { $0.serverId == serverId }
+    private func alignSelectedProjectWithServer() {
+        let next = Self.alignedProject(selectedProject, toServer: selectedServerId, projects: projects)
+        if next != selectedProject { selectedProject = next }
+    }
 
-        // Preserve user's current pick if it matches this server (even if it
-        // isn't in the derived list yet, e.g. a freshly-picked directory).
-        if let current = selectedProject, current.serverId == serverId {
-            if let refreshed = serverProjects.first(where: { $0.id == current.id }) {
-                selectedProject = refreshed
+    /// Snapshot refresh rule. It never swaps the user's project for another
+    /// one, and a host dropping offline (which clears the host scope) keeps its
+    /// project selected: the pick is refreshed from the derived list, restored
+    /// from the saved id after launch when that agrees with the host scope, and
+    /// dropped only once its host is gone and no task refers to it any more.
+    static func reconciledProject(
+        _ current: AppProject?,
+        savedId: String?,
+        scopedServerId: String?,
+        projects: [AppProject],
+        knownServerIds: Set<String>
+    ) -> AppProject? {
+        guard let current else {
+            return projects.first { project in
+                project.id == savedId && (scopedServerId == nil || project.serverId == scopedServerId)
             }
-            return
         }
-
-        if let persistedId = SavedProjectStore.selectedProjectId,
-           let match = serverProjects.first(where: { $0.id == persistedId }) {
-            selectedProject = match
-            return
+        if let refreshed = projects.first(where: { $0.id == current.id }) {
+            return refreshed
         }
+        // A freshly picked folder has no task yet; keep it while its host is known.
+        return knownServerIds.contains(current.serverId) ? current : nil
+    }
 
-        selectedProject = serverProjects.first
+    /// Explicit host change rule: the project moves to one on that host (the
+    /// new-task sheet's host chip relies on this). Clearing the scope keeps the
+    /// project; only `clearScope()` clears it.
+    static func alignedProject(_ current: AppProject?, toServer serverId: String?, projects: [AppProject]) -> AppProject? {
+        guard let serverId, current?.serverId != serverId else { return current }
+        return projects.first { $0.serverId == serverId }
     }
 
     /// Merge rule:

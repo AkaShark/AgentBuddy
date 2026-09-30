@@ -25,8 +25,9 @@ extension HomeNavigationView {
             }
             .navigationDestination(for: HomeNavigationRoute.self) { route in
                 switch route {
-                case let .sessions(serverId, title):
+                case let .sessions(serverId, title, project):
                     SessionsScreen(
+                        projectScope: project.map(SessionsProjectScope.init),
                         onOpenConversation: { key in
                             openConversation(key)
                         },
@@ -52,7 +53,7 @@ extension HomeNavigationView {
                     )
                 case .newThread:
                     NewThreadHeroView(
-                        project: homeDashboardModel.selectedProject,
+                        project: homeDashboardModel.launchableSelectedProject,
                         connectedServers: homeDashboardModel.connectedServers,
                         selectedServerId: homeDashboardModel.selectedServerId,
                         onSelectServer: { serverId in

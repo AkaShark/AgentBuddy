@@ -58,6 +58,33 @@ object ProjectSummaries {
         }
     }
 
+    /**
+     * Sessions that belong to the project [projectId] on [serverId], matched
+     * with the same Rust `projectIdFor` the counts use. Other hosts are skipped
+     * before the per-session id call.
+     */
+    fun tasksOf(
+        projectId: String,
+        serverId: String,
+        sessions: List<AppSessionSummary>,
+        idFor: (serverId: String, cwd: String) -> String,
+    ): List<AppSessionSummary> =
+        sessions.filter { it.key.serverId == serverId && it.cwd.isNotBlank() && idFor(it.key.serverId, it.cwd) == projectId }
+
+    /**
+     * The project's newest tasks for the current-project card, from the same
+     * session list the counts use (connected hosts, no sub-agents).
+     */
+    fun recentTasks(
+        project: AppProject,
+        sessions: List<AppSessionSummary>,
+        idFor: (serverId: String, cwd: String) -> String,
+        limit: Int = 3,
+    ): List<AppSessionSummary> =
+        tasksOf(project.id, project.serverId, sessions, idFor)
+            .sortedByDescending { it.updatedAt ?: 0L }
+            .take(limit)
+
     /** The current project, else the most recently used one. */
     fun hero(summaries: List<ProjectSummary>, selectedId: String?): ProjectSummary? =
         summaries.firstOrNull { it.id == selectedId } ?: summaries.maxByOrNull { it.lastUsedMs ?: 0L }

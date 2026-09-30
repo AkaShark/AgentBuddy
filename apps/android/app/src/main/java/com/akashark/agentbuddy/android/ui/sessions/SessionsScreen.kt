@@ -17,11 +17,13 @@ import com.akashark.agentbuddy.android.ui.LocalAppModel
 import com.akashark.agentbuddy.android.ui.RecentDirectoryEntry
 import com.akashark.agentbuddy.android.ui.RecentDirectoryStore
 import com.akashark.agentbuddy.android.ui.homeshell.forkSessionThread
+import com.akashark.agentbuddy.android.ui.homeshell.projects.ProjectSummaries
 import com.akashark.agentbuddy.android.ui.homeshell.tasks.HomeTaskPresentation
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import uniffi.codex_mobile_client.AppSessionSummary
 import uniffi.codex_mobile_client.ThreadKey
+import uniffi.codex_mobile_client.projectIdFor
 
 /**
  * 全部任务: every task on the connected hosts, grouped by project, with
@@ -33,6 +35,8 @@ fun SessionsScreen(
     serverId: String?,
     title: String,
     sessionsUiState: SessionsUiState,
+    /** Limits the list to this project on [serverId] (no host filter shown). */
+    projectCwd: String? = null,
     onOpenConversation: (ThreadKey) -> Unit,
     onNewSession: (() -> Unit)? = null,
     onBack: () -> Unit,
@@ -53,7 +57,11 @@ fun SessionsScreen(
     }
 
     var searchQuery by remember { mutableStateOf("") }
-    var serverFilterId by remember(serverId) { mutableStateOf(serverId) }
+    // A project page is scoped to its host up front, so it starts without a host filter.
+    var serverFilterId by remember(serverId, projectCwd) { mutableStateOf(if (projectCwd == null) serverId else null) }
+    val projectId = remember(serverId, projectCwd) {
+        if (serverId != null && projectCwd != null) projectIdFor(serverId, projectCwd) else null
+    }
     var renameTarget by remember { mutableStateOf<AppSessionSummary?>(null) }
     var archiveTarget by remember { mutableStateOf<AppSessionSummary?>(null) }
     val voiceController = remember { VoiceRuntimeController.shared }
@@ -66,10 +74,17 @@ fun SessionsScreen(
         snapshot,
         searchQuery,
         serverFilterId,
+        projectId,
         sessionsUiState.sortMode,
         sessionsUiState.showOnlyForks,
     ) {
-        val summaries = snapshot?.sessionSummaries ?: emptyList()
+        val all = snapshot?.sessionSummaries ?: emptyList()
+        // Sub-agent runs stay in, nested under their parent as on 全部任务.
+        val summaries = if (projectId != null && serverId != null) {
+            ProjectSummaries.tasksOf(projectId, serverId, all, ::projectIdFor)
+        } else {
+            all
+        }
         SessionsDerivation.derive(
             summaries = summaries,
             serverFilter = serverFilterId,
@@ -249,6 +264,7 @@ fun SessionsScreen(
         hasLoadedInitialSessions = hasLoadedInitialSessions,
         searchQuery = searchQuery,
         serverOptions = snapshot?.servers
+            ?.takeIf { projectCwd == null }
             ?.filter { it.isConnected }
             ?.sortedBy { it.serverId }
             ?.map { SessionsServerOption(it.serverId, sessionsHostLabel(it.displayName)) }

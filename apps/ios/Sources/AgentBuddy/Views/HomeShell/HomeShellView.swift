@@ -86,6 +86,7 @@ struct HomeShellView: View {
             ProjectsHomeView(
                 model: model,
                 actions: actions,
+                openingKey: openingKey,
                 onManageHosts: { selectedTab.wrappedValue = .hosts }
             )
         case .hosts:

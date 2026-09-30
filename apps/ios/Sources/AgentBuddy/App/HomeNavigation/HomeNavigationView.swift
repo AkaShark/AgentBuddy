@@ -178,8 +178,7 @@ struct HomeNavigationView: View {
                 projects: homeDashboardModel.projects,
                 serverNamesById: Dictionary(uniqueKeysWithValues: homeDashboardModel.connectedServers.map { ($0.id, $0.displayName) }),
                 onSelect: { project in
-                    homeDashboardModel.selectedServerId = project.serverId
-                    homeDashboardModel.selectedProject = project
+                    homeDashboardModel.selectProject(project)
                 },
                 onCreateNew: {
                     showProjectPicker = false

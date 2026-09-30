@@ -89,22 +89,25 @@ extension SessionsScreen {
     var sessionFilterRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: BuddySpacing.xs) {
-                Menu {
-                    Button("All hosts") { selectedServerFilterId = nil }
-                    ForEach(connectedServerOptions, id: \.id) { option in
-                        Button(option.name) { selectedServerFilterId = option.id }
+                // A project already fixes the host.
+                if projectScope == nil {
+                    Menu {
+                        Button("All hosts") { selectedServerFilterId = nil }
+                        ForEach(connectedServerOptions, id: \.id) { option in
+                            Button(option.name) { selectedServerFilterId = option.id }
+                        }
+                    } label: {
+                        SessionsFilterChip(
+                            title: selectedServerFilterTitle,
+                            systemImage: "laptopcomputer",
+                            isSelected: selectedServerFilterId != nil,
+                            opensMenu: true
+                        )
                     }
-                } label: {
-                    SessionsFilterChip(
-                        title: selectedServerFilterTitle,
-                        systemImage: "laptopcomputer",
-                        isSelected: selectedServerFilterId != nil,
-                        opensMenu: true
-                    )
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text("Show tasks from"))
+                    .accessibilityValue(selectedServerFilterTitle)
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Text("Show tasks from"))
-                .accessibilityValue(selectedServerFilterTitle)
 
                 Button {
                     showOnlyForks.toggle()
@@ -137,7 +140,7 @@ extension SessionsScreen {
                 .accessibilityLabel(Text("Sort"))
                 .accessibilityValue(Text(LocalizedStringKey(workspaceSortMode.title)))
 
-                if selectedServerFilterId != nil || showOnlyForks {
+                if (projectScope == nil && selectedServerFilterId != nil) || showOnlyForks {
                     Button {
                         selectedServerFilterId = nil
                         showOnlyForks = false

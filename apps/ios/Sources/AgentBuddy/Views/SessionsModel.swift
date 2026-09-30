@@ -26,12 +26,17 @@ final class SessionsModel {
 
     @ObservationIgnored private weak var appModel: AppModel?
     @ObservationIgnored private weak var appState: AppState?
+    private let projectScope: SessionsProjectScope?
     @ObservationIgnored private var searchQuery = ""
     @ObservationIgnored private var selectedRuntimeKind: AgentRuntimeKind?
     @ObservationIgnored private var hasInitializedState = false
     @ObservationIgnored private var observationGeneration = 0
     @ObservationIgnored private var frozenMostRecentThreadOrder: [ThreadKey]?
     @ObservationIgnored private var lastPublishedSnapshot: Snapshot?
+
+    init(projectScope: SessionsProjectScope? = nil) {
+        self.projectScope = projectScope
+    }
 
     func bind(appModel: AppModel, appState: AppState) {
         let needsRebind = self.appModel !== appModel || self.appState !== appState
@@ -72,6 +77,7 @@ final class SessionsModel {
         let previousDisplayedOrder = derivedData.allThreadKeys
         let currentSearchQuery = searchQuery
         let currentRuntimeKindFilter = selectedRuntimeKind
+        let projectScope = projectScope
 
         observationGeneration &+= 1
         let generation = observationGeneration
@@ -109,6 +115,7 @@ final class SessionsModel {
 
             let nextDerivedData = SessionsDerivation.build(
                 sessions: appSnapshot?.sessionSummaries ?? [],
+                projectScope: projectScope,
                 selectedServerFilterId: selectedServerFilterId,
                 showOnlyForks: showOnlyForks,
                 selectedRuntimeKind: currentRuntimeKindFilter,
