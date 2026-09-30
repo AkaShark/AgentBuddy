@@ -122,6 +122,7 @@ private val AgentBuddyAgents: List<AgentRuntimeKind> = listOf(
     "hermes",
     "devin",
     "grok",
+    "mfcli",
 )
 
 private val CodexOnlyAgents: List<AgentRuntimeKind> = listOf("codex")
