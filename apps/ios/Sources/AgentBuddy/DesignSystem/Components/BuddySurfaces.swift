@@ -92,7 +92,7 @@ struct BuddyChip: View {
     enum Tone {
         /// surfaceSoft (on page or white cards).
         case soft
-        /// Translucent white on the brand card.
+        /// Subtle contrasting fill on the brand card.
         case onBrand
         /// surface with border.
         case outline

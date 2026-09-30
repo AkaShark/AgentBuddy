@@ -219,6 +219,10 @@ Replaces the old zoomable home dashboard (removed in the Mint rebuild; see
 
 ## Mint visual QA (gallery, dark, large text, reduced motion)
 
+Default dark palette (2026-09-29): neutral graphite surfaces and gray-white text,
+muted current-task cards, mint actions, and surface-aware brand chips on both
+platforms. Palette and measured contrast pairs: [Mint dark palette](../../../docs/design/mint-dark-palette.md).
+
 | Check | How |
 |---|---|
 | DEBUG state gallery | `adb shell am force-stop com.akashark.agentbuddy.android && adb shell am start -n com.akashark.agentbuddy.android/.MainActivity --es mint_gallery <page> [--ez mint_dark true]`; 50 fixture pages (`ui/gallery/MintGalleryPages.kt`); never starts the runtime or writes theme prefs |
@@ -333,4 +337,3 @@ Replaces the prior WebSocket + base64-PCM audio pump with a platform-native WebR
 | Approval in the open conversation | Card above the composer, one at a time with 「第 N 个，共 M 个」; 「拒绝」/「允许一次」, session grant behind 「本会话都允许…」 + confirmation; submitting / failed (retry) / outcome card; answered elsewhere → 「已在别处处理」 |
 | Approval for another conversation | Non-blocking top banner; tap opens that conversation, close only hides the banner (never a denial) |
 | User-input request | Only inline above the composer (no duplicate overlay); answers are keyed by request id |
-

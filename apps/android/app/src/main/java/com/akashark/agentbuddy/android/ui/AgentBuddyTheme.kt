@@ -153,9 +153,14 @@ object AgentBuddyTheme {
     val onDisabled: Color
         get() = activeTheme.onDisabled
 
-    /** Chip fill on a [brand] surface: brand is light mint in both palettes. */
+    /** Subtle lift on dark brand surfaces; preserve white chips on light brands. */
     val brandChipFill: Color
-        get() = Color.White.copy(alpha = 0.45f)
+        get() =
+            if (AgentBuddyResolvedTheme.brightness(brand) > 0.5f) {
+                Color.White.copy(alpha = 0.45f)
+            } else {
+                onBrand.copy(alpha = 0.08f)
+            }
 
     /** Shadow for floating layers in light mode; dark mode relies on outlines. */
     val floatingShadow: Color

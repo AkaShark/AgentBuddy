@@ -251,9 +251,9 @@
     "slug": "agentbuddy-mint-dark",
     "name": "AgentBuddy Mint Dark",
     "type": "dark",
-    "accentHex": "#C3E7B5",
-    "backgroundHex": "#111914",
-    "foregroundHex": "#EEF4EB"
+    "accentHex": "#AEDFC0",
+    "backgroundHex": "#151619",
+    "foregroundHex": "#ECECEE"
   },
   {
     "slug": "agentbuddy-mint-light",

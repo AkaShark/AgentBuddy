@@ -42,9 +42,15 @@ extension AgentBuddyTheme {
     static var warningSurface: Color { role(\.warningSurface) }
     static var dangerSurface: Color { role(\.dangerSurface) }
 
-    /// Chip fill placed on a `brand` surface. Brand is the same light mint in
-    /// both palettes, so a translucent white lift reads in either appearance.
-    static var brandChipFill: Color { Color.white.opacity(0.45) }
+    /// Keep chips subtle on dark brand surfaces without washing out their text.
+    /// Resolve from the surface itself so custom light-brand themes still work.
+    static var brandChipFill: Color {
+        let store = ThemeStore.shared
+        let theme = store.colorScheme == .dark ? store.dark : store.light
+        return ResolvedTheme.brightness(of: theme.brand) > 0.5
+            ? Color.white.opacity(0.45)
+            : Color(hex: theme.onBrand).opacity(0.08)
+    }
 
     /// Fill of controls that cannot be used right now.
     static var disabled: Color { role(\.disabled) }
