@@ -111,7 +111,7 @@ fun AgentBuddyApp(
 
         HomeSelectionEffects(shell, snapshot)
         val projects = remember(snapshot) { snapshot?.let { deriveProjects(it.sessionSummaries) } ?: emptyList() }
-        HomeProjectReconcileEffect(shell, projects)
+        HomeProjectReconcileEffect(shell, projects, snapshot?.servers?.map { it.serverId }?.toSet())
 
         LaunchedEffect(openPetSettingsRequest) {
             if (openPetSettingsRequest > 0) shell.openSettings(SettingsStartDestination.Pets)
@@ -221,13 +221,30 @@ private fun HomeSelectionEffects(shell: AppShellState, snapshot: uniffi.codex_mo
     }
 }
 
-/** Keeps the selected project valid for the selected host (persisted id first, else the first). */
+/**
+ * Keeps the selected project valid for the selected host (persisted id first,
+ * else the first). Without a host filter a picked project stays: the filter is
+ * also dropped automatically while its host is offline or reconnecting, and
+ * clearing the project then undid the user's pick. It is dropped once its host
+ * is removed ([serverIds] is null until the first snapshot). Choosing "all
+ * hosts" clears the project explicitly in [AppNavigationActions].
+ */
 @Composable
-private fun HomeProjectReconcileEffect(shell: AppShellState, projects: List<uniffi.codex_mobile_client.AppProject>) {
+private fun HomeProjectReconcileEffect(
+    shell: AppShellState,
+    projects: List<uniffi.codex_mobile_client.AppProject>,
+    serverIds: Set<String>?,
+) {
     val context = LocalContext.current
-    LaunchedEffect(shell.selectedServerId, projects) {
+    LaunchedEffect(shell.selectedServerId, projects, serverIds) {
         val currentServerId = shell.selectedServerId ?: run {
-            shell.selectedProject = null
+            shell.selectedProject?.let { picked ->
+                if (serverIds != null && picked.serverId !in serverIds) {
+                    shell.selectedProject = null
+                } else {
+                    projects.firstOrNull { it.id == picked.id }?.let { shell.selectedProject = it }
+                }
+            }
             return@LaunchedEffect
         }
         val serverProjects = projects.filter { it.serverId == currentServerId }

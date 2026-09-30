@@ -185,7 +185,7 @@ private fun SessionsFilterRow(state: SessionsViewState, actions: SessionsCallbac
             horizontalArrangement = Arrangement.spacedBy(BuddySpacing.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box {
+            if (state.serverOptions.isNotEmpty()) Box {
                 SessionsFilterChip(
                     title = serverTitle,
                     icon = Icons.Outlined.Laptop,

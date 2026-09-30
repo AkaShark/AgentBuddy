@@ -202,6 +202,8 @@ fun HomeShellScreen(
                         onSelect = actions.selectProject,
                         onCreateProject = actions.createProject,
                         onManageHosts = { tab = HomeShellTab.HOSTS },
+                        onOpenTask = { session -> taskActions.open(session, actions.openConversation) },
+                        onShowProjectTasks = { summary -> actions.showProjectTasks(summary.project, summary.name) },
                     ),
                 )
                 HomeShellTab.HOSTS -> HostsHomeContent(
@@ -220,7 +222,8 @@ fun HomeShellScreen(
             NewTaskHostOption(serverId = it.serverId, name = hostDisplayName(it.displayName))
         }
         NewTaskSheet(
-            project = selectedProject,
+            // A project on an offline host would only fail to start.
+            project = selectedProject?.takeIf { project -> launchable.any { it.serverId == project.serverId } },
             hosts = launchable,
             // With a single connected host there is nothing to choose; show it
             // as the sheet's host without changing the home filter.

@@ -187,6 +187,7 @@ object GalleryHomeShellFixtures {
             summary("Website", "mini", "Mac mini", 8, 0, 50),
         ),
         hasHosts = true,
+        heroRecent = sessions.filter { it.cwd.endsWith("/AgentBuddy") }.take(3),
     )
 
     val hostsState = HostsHomeUiState(

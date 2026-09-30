@@ -12,6 +12,8 @@ class HomeShellActions(
     val openConversation: (ThreadKey) -> Unit,
     /** 全部任务 (the sessions screen across every host). */
     val showAllTasks: () -> Unit,
+    /** The sessions screen limited to one project, titled with its name. */
+    val showProjectTasks: (project: AppProject, title: String) -> Unit,
     /** The root project picker (also used by the new-task sheet's project chip). */
     val openProjectPicker: () -> Unit,
     /** Local account sign-in, when creating a task needs it. */

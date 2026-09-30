@@ -49,9 +49,11 @@ fun AppRouteContent(
             SessionsScreen(
                 serverId = route.serverId,
                 title = route.title,
+                projectCwd = route.projectCwd,
                 sessionsUiState = sessionsUiState,
                 onOpenConversation = shell::pushConversation,
-                onNewSession = { navActions.openDirectoryPicker(route.serverId) },
+                // A project page starts new tasks from the project card instead.
+                onNewSession = if (route.projectCwd == null) ({ navActions.openDirectoryPicker(route.serverId) }) else null,
                 onBack = shell::navigateBack,
                 onInfo = route.serverId?.let { serverId -> { shell.navigate(Route.ServerInfo(serverId)) } },
                 stopMarkers = shell.homeMemory.cancelling,

@@ -78,7 +78,9 @@ fun buildHomeShellData(input: HomeShellInputs): HomeShellData {
     // Every session on connected hosts (no sub-agents): search and project counts.
     val allSessions = snapshot?.let { HomeDashboardSupport.recentSessions(it, limit = Int.MAX_VALUE) }.orEmpty()
     val merged = HomeTaskList.merge(input.pinned, input.hidden, servers, allSessions)
-    val scopedServerId = input.selectedProject?.serverId ?: input.selectedServerId
+    // The current project scopes the list only while its host is connected.
+    val projectServerId = input.selectedProject?.serverId?.takeIf { id -> servers.any { it.serverId == id } }
+    val scopedServerId = projectServerId ?: input.selectedServerId
     val visible = HomeTaskList.scoped(merged, scopedServerId)
     val activeTurnIds = HomeTaskPresentation.activeTurnIds(snapshot?.threads.orEmpty())
     val connectedServerIds = snapshot?.servers.orEmpty().filter { it.isConnected }.mapTo(HashSet()) { it.serverId }
@@ -116,7 +118,7 @@ fun buildHomeShellData(input: HomeShellInputs): HomeShellData {
         visibleSessions = visible,
         runtimeKinds = runtimeKinds,
         tasks = tasks,
-        projects = projectsState(input, allServers, allSessions),
+        projects = projectsState(input, allServers, servers, allSessions),
         hosts = hostsState(input, allServers, allSessions),
         activeTurnIds = activeTurnIds,
         connectedServerIds = connectedServerIds,
@@ -137,6 +139,7 @@ private fun availability(servers: List<AppServerSnapshot>, hasSavedHosts: Boolea
 private fun projectsState(
     input: HomeShellInputs,
     allServers: List<AppServerSnapshot>,
+    connectedServers: List<AppServerSnapshot>,
     sessions: List<AppSessionSummary>,
 ): ProjectsHomeUiState {
     val selected = input.selectedProject
@@ -157,6 +160,13 @@ private fun projectsState(
         hero = hero,
         others = summaries.filter { it.id != hero?.id },
         hasHosts = allServers.any { it.health == AppServerHealth.CONNECTED },
+        // Tasks hidden from home stay out of the card too (they still count).
+        heroRecent = hero?.let { summary ->
+            val hidden = input.hidden.toSet()
+            ProjectSummaries.recentTasks(summary.project, sessions.filter { HomeTaskList.pinKey(it.key) !in hidden }, input.projectId)
+        }.orEmpty(),
+        // Same test as the Tasks scoping above, so the two tabs agree while a host reconnects.
+        heroHostOnline = hero == null || connectedServers.any { it.serverId == hero.project.serverId },
     )
 }
 

@@ -210,7 +210,7 @@ Replaces the old zoomable home dashboard (removed in the Mint rebuild; see
 | Search | 250 ms debounce, server-side `listThreads`, runtime pills, pull-to-refresh with force repair, fork clusters; tapping a result toggles pin (unchanged) |
 | Task details | Settings 「首页显示任务详情」 (`dashboardZoomStep` ≥ 3) adds model chip, latest step, activity summary, fork 「分叉 i/n」 |
 | Empty states | No host → 扫码连接 (QR sheet directly) + 其他连接方式; no tasks → 开始任务; search without results → clear search |
-| 项目 | Projects from Rust `deriveProjects` (last used time in ms → correct 「N 天前」), task counts keyed by `projectIdFor`; hero card with 新建任务, other projects rows with host; 「+」 opens the directory picker in project mode |
+| 项目 | Projects from Rust `deriveProjects` (last used time in ms → correct 「N 天前」), task counts keyed by `projectIdFor`; hero card with 「最近任务」 (newest three, tap opens the task; 「查看全部 N 个任务」 opens the task list scoped to that project (titled with its name, no host filter); 「主机离线…」 when its host is down) and 新建任务; other projects rows with host; tapping one makes it the hero and scrolls back up, and the pick survives its host being offline or reconnecting; 「+」 opens the directory picker in project mode |
 | 主机 | Card per host with connection pill (text + dot), mode subtitle, runtime chips, 「在这台主机开始任务」, 「…」 (重新连接, 重启服务, 重命名 (remote), 编辑连接, 移除 (confirm), 终端 with flag); 「扫码连接」 and 「+」 add-host entry; "This Device" rendered as 「本机」 |
 | New-task sheet | Mint sheet with project / host / model chips, attachments, dictation, expanded editor; progress + double-submit guard; draft kept on failure; stays on home after creating |
 | 全部任务 | Reachable from the 「…」 menu and `/resume`; back returns to the list; rows show the same status as home |

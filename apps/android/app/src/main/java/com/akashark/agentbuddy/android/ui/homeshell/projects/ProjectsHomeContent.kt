@@ -33,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,13 +60,20 @@ import com.akashark.agentbuddy.android.ui.designsystem.components.buddyCard
 import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySize
 import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySpacing
 import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyTextStyle
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyReduceMotion
 import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyTextStyle
+import kotlinx.coroutines.launch
 import uniffi.codex_mobile_client.AppProject
+import uniffi.codex_mobile_client.AppSessionSummary
 
 data class ProjectsHomeUiState(
     val hero: ProjectSummary?,
     val others: List<ProjectSummary>,
     val hasHosts: Boolean,
+    /** The hero project's newest tasks (at most three). */
+    val heroRecent: List<AppSessionSummary> = emptyList(),
+    /** False when the hero project's host is not connected. */
+    val heroHostOnline: Boolean = true,
 )
 
 class ProjectsHomeCallbacks(
@@ -73,11 +81,14 @@ class ProjectsHomeCallbacks(
     val onSelect: (AppProject) -> Unit,
     val onCreateProject: () -> Unit,
     val onManageHosts: () -> Unit,
+    val onOpenTask: (AppSessionSummary) -> Unit = {},
+    val onShowProjectTasks: (ProjectSummary) -> Unit = {},
 )
 
 /**
- * 项目 tab: the current (or most recent) project with a direct 「新建任务」,
- * then the other known projects. Tapping a row makes it the current project.
+ * 项目 tab: the current (or most recent) project with its newest tasks and a
+ * direct 「新建任务」, then the other known projects. Tapping a row makes it
+ * the current project and scrolls back up so the card change is visible.
  */
 @Composable
 fun ProjectsHomeContent(
@@ -86,6 +97,12 @@ fun ProjectsHomeContent(
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
 ) {
+    val scope = rememberCoroutineScope()
+    val reduceMotion = buddyReduceMotion
+    val selectAndReveal: (AppProject) -> Unit = { project ->
+        callbacks.onSelect(project)
+        scope.launch { if (reduceMotion) listState.scrollToItem(0) else listState.animateScrollToItem(0) }
+    }
     BoxWithConstraints(modifier.fillMaxSize()) {
         val gutter = BuddySpacing.pageGutter(maxWidth)
         LazyColumn(
@@ -115,7 +132,7 @@ fun ProjectsHomeContent(
                 Box(Modifier.padding(top = BuddySpacing.xl)) {
                     val hero = state.hero
                     if (hero != null) {
-                        ProjectHeroCard(hero) { callbacks.onNewTask(hero.project) }
+                        ProjectHeroCard(hero, state.heroRecent, state.heroHostOnline, callbacks)
                     } else {
                         ProjectsEmptyState(state.hasHosts, callbacks)
                     }
@@ -131,7 +148,7 @@ fun ProjectsHomeContent(
                 itemsIndexed(state.others, key = { _, summary -> summary.id }) { index, summary ->
                     Column {
                         if (index > 0) BuddyDivider()
-                        ProjectRow(summary, callbacks)
+                        ProjectRow(summary, callbacks, onSelect = selectAndReveal)
                     }
                 }
             }
@@ -164,7 +181,12 @@ private fun ProjectsEmptyState(hasHosts: Boolean, callbacks: ProjectsHomeCallbac
 }
 
 @Composable
-private fun ProjectHeroCard(summary: ProjectSummary, onNewTask: () -> Unit) {
+private fun ProjectHeroCard(
+    summary: ProjectSummary,
+    recent: List<AppSessionSummary>,
+    hostOnline: Boolean,
+    callbacks: ProjectsHomeCallbacks,
+) {
     Column(
         modifier = Modifier.fillMaxWidth().buddyCard(BuddySurfaceTone.SOFT),
         verticalArrangement = Arrangement.spacedBy(BuddySpacing.md),
@@ -206,13 +228,26 @@ private fun ProjectHeroCard(summary: ProjectSummary, onNewTask: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        BuddyButton(text = "新建任务", onClick = onNewTask, icon = Icons.Outlined.Add)
+        ProjectRecentTasks(
+            summary = summary,
+            recent = recent,
+            hostOnline = hostOnline,
+            onOpenTask = callbacks.onOpenTask,
+            onShowAll = { callbacks.onShowProjectTasks(summary) },
+        )
+        // An offline host cannot start the task; the note above says why.
+        BuddyButton(
+            text = "新建任务",
+            onClick = { callbacks.onNewTask(summary.project) },
+            icon = Icons.Outlined.Add,
+            enabled = hostOnline,
+        )
     }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ProjectRow(summary: ProjectSummary, callbacks: ProjectsHomeCallbacks) {
+private fun ProjectRow(summary: ProjectSummary, callbacks: ProjectsHomeCallbacks, onSelect: (AppProject) -> Unit) {
     var menuOpen by remember { mutableStateOf(false) }
     Box {
         BuddyListRow(
@@ -225,7 +260,7 @@ private fun ProjectRow(summary: ProjectSummary, callbacks: ProjectsHomeCallbacks
                     .combinedClickable(
                         onClickLabel = "设为当前项目",
                         onLongClickLabel = "更多操作",
-                        onClick = { callbacks.onSelect(summary.project) },
+                        onClick = { onSelect(summary.project) },
                         onLongClick = { menuOpen = true },
                     ).semantics { stateDescription = "${summary.taskCount} 个任务" },
         )
@@ -243,7 +278,7 @@ private fun ProjectRow(summary: ProjectSummary, callbacks: ProjectsHomeCallbacks
                 leadingIcon = { Icon(Icons.Outlined.CheckCircle, contentDescription = null, tint = AgentBuddyTheme.textPrimary) },
                 onClick = {
                     menuOpen = false
-                    callbacks.onSelect(summary.project)
+                    onSelect(summary.project)
                 },
             )
         }
