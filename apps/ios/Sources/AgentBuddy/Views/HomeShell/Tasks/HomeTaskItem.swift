@@ -15,8 +15,7 @@ struct HomeTaskItem: Identifiable, Equatable {
     var key: ThreadKey { session.key }
 
     var title: String {
-        let trimmed = session.sessionTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? String(localized: "Untitled task") : trimmed
+        HomeTaskPresentation.title(for: session)
     }
 
     /// Last path component of the working directory ("AgentBuddy").
@@ -96,6 +95,12 @@ enum HomeTaskPresentation {
                 isPinned: pinned.contains(SavedThreadsStore.PinnedKey(threadKey: session.key))
             )
         }
+    }
+
+    /// Task title as the task rows show it.
+    static func title(for session: HomeDashboardRecentSession) -> String {
+        let trimmed = session.sessionTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? String(localized: "Untitled task") : trimmed
     }
 
     static func hydrationId(_ key: ThreadKey) -> String {

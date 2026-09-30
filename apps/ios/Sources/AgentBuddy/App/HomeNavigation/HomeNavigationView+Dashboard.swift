@@ -8,7 +8,7 @@ extension HomeNavigationView {
     /// same path as the pushed hero, so the handoff is identical.
     var splitDetailRoot: some View {
         NewThreadHeroView(
-            project: homeDashboardModel.selectedProject,
+            project: homeDashboardModel.launchableSelectedProject,
             connectedServers: homeDashboardModel.connectedServers,
             selectedServerId: homeDashboardModel.selectedServerId,
             onSelectServer: { serverId in
@@ -31,8 +31,7 @@ extension HomeNavigationView {
         var actions = homeShellActions
         actions.newTask = { project in
             if let project {
-                homeDashboardModel.selectedServerId = project.serverId
-                homeDashboardModel.selectedProject = project
+                homeDashboardModel.selectProject(project)
             }
             openNewThread()
         }

@@ -32,7 +32,9 @@ struct MintGalleryView: View {
         ProcessInfo.processInfo.arguments.contains("--mint-dark")
     }
 
-    @State private var appModel = MintGalleryFixtures.makeAppModel()
+    @State private var appModel = MintGalleryView.requestedPage == .projects
+        ? MintGalleryFixtures.makeProjectsAppModel()
+        : MintGalleryFixtures.makeAppModel()
     @State private var homeModel = HomeDashboardModel()
 
     init() {
@@ -181,6 +183,30 @@ enum MintGalleryFixtures {
         return appModel
     }
 
+    /// Projects page: enough tasks in the current project for its card to list
+    /// three and link to the rest.
+    static func makeProjectsAppModel() -> AppModel {
+        let appModel = makeAppModel()
+        guard var snapshot = appModel.snapshot,
+              let template = snapshot.sessionSummaries.first(where: { $0.key == mainThreadKey }) else {
+            return appModel
+        }
+        let extras: [(title: String, age: TimeInterval)] = [
+            ("Tidy up the onboarding copy", 5_400),
+            ("Profile the sync queue on cold start", 86_400),
+        ]
+        for (index, extra) in extras.enumerated() {
+            var session = template
+            session.key = ThreadKey(serverId: template.key.serverId, threadId: "thread-preview-project-\(index)")
+            session.title = extra.title
+            session.preview = extra.title
+            session.updatedAt = Int64(Date().addingTimeInterval(-extra.age).timeIntervalSince1970)
+            snapshot.sessionSummaries.append(session)
+        }
+        appModel.applySnapshot(snapshot)
+        return appModel
+    }
+
     static func approval(id: String, kind: ApprovalKind, thread: String) -> PendingApproval {
         PendingApproval(
             id: id,
@@ -214,6 +240,7 @@ enum MintGalleryFixtures {
             startVoice: {},
             selectProject: { _ in },
             createProject: {},
+            showProjectTasks: { _ in },
             selectServer: { _ in },
             clearServerScope: {},
             addServer: {},

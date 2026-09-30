@@ -2,7 +2,9 @@ import Foundation
 
 extension HomeNavigationView {
     enum HomeNavigationRoute: Hashable {
-        case sessions(serverId: String, title: String)
+        /// All tasks screen. A non-nil `project` limits it to that project's
+        /// tasks (the Projects tab's "See all tasks").
+        case sessions(serverId: String, title: String, project: AppProject? = nil)
         case conversation(ThreadKey)
         case realtimeVoice(ThreadKey)
         case conversationInfo(ThreadKey)

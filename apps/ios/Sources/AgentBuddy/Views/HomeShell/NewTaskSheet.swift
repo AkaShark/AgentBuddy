@@ -14,7 +14,7 @@ struct NewTaskSheet: View {
     var body: some View {
         NavigationStack {
             NewThreadHeroView(
-                project: model.selectedProject,
+                project: model.launchableSelectedProject,
                 connectedServers: model.connectedServers,
                 selectedServerId: model.selectedServerId,
                 onSelectServer: { serverId in
@@ -36,8 +36,7 @@ struct NewTaskSheet: View {
                     uniquingKeysWith: { first, _ in first }
                 ),
                 onSelect: { project in
-                    model.selectedServerId = project.serverId
-                    model.selectedProject = project
+                    model.selectProject(project)
                 },
                 onCreateNew: {
                     showsProjectPicker = false

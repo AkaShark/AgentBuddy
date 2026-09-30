@@ -33,11 +33,9 @@ extension HomeNavigationView {
             searchThreads: loadSearchThreads,
             newTask: { project in presentNewTask(project: project) },
             startVoice: experimentalFeatures.isEnabled(.realtimeVoice) ? { startHomeVoiceSession() } : nil,
-            selectProject: { project in
-                homeDashboardModel.selectedServerId = project.serverId
-                homeDashboardModel.selectedProject = project
-            },
+            selectProject: { project in homeDashboardModel.selectProject(project) },
             createProject: presentProjectCreation,
+            showProjectTasks: { project in showProjectTasks(project) },
             selectServer: handleSelectServer,
             clearServerScope: { homeDashboardModel.clearScope() },
             addServer: { appState.showServerPicker = true },
@@ -64,8 +62,7 @@ extension HomeNavigationView {
 
     func presentNewTask(project: AppProject?) {
         if let project {
-            homeDashboardModel.selectedServerId = project.serverId
-            homeDashboardModel.selectedProject = project
+            homeDashboardModel.selectProject(project)
         }
         guard !homeDashboardModel.connectedServers.isEmpty else {
             appState.showServerPicker = true

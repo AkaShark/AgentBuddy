@@ -109,15 +109,26 @@ extension HomeNavigationView {
         navigationPath.removeLast()
     }
 
+    /// All tasks for a host.
     func showSessions(for serverId: String) {
+        showSessions(for: serverId, title: serverTitle(for: serverId), project: nil)
+    }
+
+    /// Only one project's tasks, titled with the project name.
+    func showProjectTasks(_ project: AppProject) {
+        let title = HomeTaskPresentation.projectName(forCwd: project.cwd) ?? project.cwd
+        showSessions(for: project.serverId, title: title, project: project)
+    }
+
+    private func showSessions(for serverId: String, title: String, project: AppProject?) {
         appState.sessionsSelectedServerFilterId = serverId
         appState.sessionsShowOnlyForks = false
         appState.showModelSelector = false
         hasSeededInitialConversationRoute = true
 
         if let existingIndex = navigationPath.lastIndex(where: { route in
-            guard case let .sessions(id, _) = route else { return false }
-            return id == serverId
+            guard case let .sessions(id, _, existingProject) = route else { return false }
+            return id == serverId && existingProject?.id == project?.id
         }) {
             navigationPath = Array(navigationPath.prefix(through: existingIndex))
             return
@@ -128,7 +139,7 @@ extension HomeNavigationView {
         } else if case .realtimeVoice = navigationPath.last {
             navigationPath.removeLast()
         }
-        navigationPath.append(.sessions(serverId: serverId, title: serverTitle(for: serverId)))
+        navigationPath.append(.sessions(serverId: serverId, title: title, project: project))
     }
 
     private func serverTitle(for serverId: String) -> String {

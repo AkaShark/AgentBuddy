@@ -428,7 +428,6 @@
 "All tasks" = "全部任务";
 "Apps" = "应用";
 "Changed %lld files" = "已修改 %lld 个文件";
-"Choose a project" = "选择一个项目";
 "Choose which host's tasks to show" = "选择要显示哪台主机的任务";
 "Connect a host first" = "先连接一台主机";
 "Connect your first computer" = "连接你的第一台电脑";
@@ -469,13 +468,15 @@
 "Pair with QR code" = "扫码配对";
 "Partner, model & permissions" = "搭档、模型与权限";
 "Pick a folder on one of your hosts. Tasks you start there are grouped here." = "在主机上选择一个文件夹，在那里开始的任务会归到这里。";
-"Pick one of your projects below, or open a new folder on a host." = "从下面选择一个项目，或在主机上打开新文件夹。";
 "Pick up where you left off" = "接着上次";
 "Picture in Picture" = "画中画";
 "Pin" = "固定";
 "Projects" = "项目";
-"Your projects" = "你的项目";
 "Other projects" = "其他项目";
+"Recent tasks" = "最近任务";
+"See all %lld tasks" = "查看全部 %lld 个任务";
+"No tasks yet. Start one with New task." = "还没有任务，从「新建任务」开始。";
+"Host offline. Reconnect it to continue this project." = "主机离线，连上后可以继续这个项目。";
 "Projects are folders on a connected computer. Pair a computer, then pick a folder to work in." = "项目是已连接电脑上的文件夹。先配对电脑，再选择工作文件夹。";
 "Ran %lld commands" = "运行了 %lld 条命令";
 "Reconnect" = "重新连接";
