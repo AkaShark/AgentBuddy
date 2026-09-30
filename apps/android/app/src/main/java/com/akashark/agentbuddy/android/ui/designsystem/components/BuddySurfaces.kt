@@ -1,8 +1,11 @@
 package com.akashark.agentbuddy.android.ui.designsystem.components
 
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.indication
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -15,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -91,7 +95,7 @@ enum class BuddyChipTone {
     /** surfaceSoft (on page or white cards). */
     SOFT,
 
-    /** Translucent white on the brand card. */
+    /** Subtle contrasting fill on the brand card. */
     ON_BRAND,
 
     /** surface with border. */
@@ -183,7 +187,8 @@ fun BuddyIconTile(
 
 /**
  * Tappable context chip (host / project / partner): surfaceSoft capsule at
- * compact-pill height inside a 48dp hit area.
+ * compact-pill height inside a 48dp hit area. The press ripple is drawn on the
+ * capsule itself; drawn on the taller hit area it did not match the pill.
  */
 @Composable
 fun BuddyContextChip(
@@ -196,19 +201,28 @@ fun BuddyContextChip(
     onClickLabel: String? = null,
 ) {
     val content = if (enabled) AgentBuddyTheme.textPrimary else AgentBuddyTheme.onDisabled
+    val interaction = remember { MutableInteractionSource() }
     Box(
         modifier =
             modifier
                 .heightIn(min = BuddySize.minHitTarget)
-                .clip(CircleShape)
-                .clickable(enabled = enabled, onClickLabel = onClickLabel, role = Role.Button, onClick = onClick),
+                .clickable(
+                    interactionSource = interaction,
+                    indication = null,
+                    enabled = enabled,
+                    onClickLabel = onClickLabel,
+                    role = Role.Button,
+                    onClick = onClick,
+                ),
         contentAlignment = Alignment.Center,
     ) {
         Row(
             modifier =
                 Modifier
                     .defaultMinSize(minHeight = BuddySize.compactPill)
-                    .background(if (enabled) AgentBuddyTheme.surfaceSoft else AgentBuddyTheme.disabled, CircleShape)
+                    .clip(CircleShape)
+                    .background(if (enabled) AgentBuddyTheme.surfaceSoft else AgentBuddyTheme.disabled)
+                    .indication(interaction, LocalIndication.current)
                     .padding(horizontal = BuddySpacing.sm),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,

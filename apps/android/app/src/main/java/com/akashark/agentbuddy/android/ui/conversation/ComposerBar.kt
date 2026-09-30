@@ -339,12 +339,8 @@ fun ComposerBar(
             focusRequester = inlineFocusRequester,
             voiceControl = {
                 ComposerVoiceControl(
-                    appModel = appModel,
-                    threadKey = threadKey,
-                    scope = scope,
                     isRecording = isRecording,
                     isTranscribing = isTranscribing,
-                    hasContent = hasContent,
                     onStartDictation = {
                         if (transcriptionManager.hasMicPermission(context)) {
                             transcriptionManager.startRecording(context)

@@ -7,44 +7,28 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.akashark.agentbuddy.android.state.AppModel
-import com.akashark.agentbuddy.android.state.VoiceRuntimeController
-import com.akashark.agentbuddy.android.ui.AgentBuddyFeature
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
-import com.akashark.agentbuddy.android.ui.ExperimentalFeatures
 import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyIconButton
 import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyIconButtonTone
 import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySize
-import com.akashark.agentbuddy.android.ui.voice.InlineVoiceButton
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
-import uniffi.codex_mobile_client.ThreadKey
 
 /**
- * Dictation / realtime voice slot of the composer: stop while recording, a
- * spinner while transcribing, the realtime voice button (feature flag) when
- * the composer is empty, otherwise the dictation mic.
+ * Dictation slot of the composer: stop while recording, a spinner while
+ * transcribing, otherwise the dictation mic (iOS parity; realtime voice starts
+ * from the home composer instead).
  */
 @Composable
 internal fun ComposerVoiceControl(
-    appModel: AppModel,
-    threadKey: ThreadKey,
-    scope: CoroutineScope,
     isRecording: Boolean,
     isTranscribing: Boolean,
-    hasContent: Boolean,
     onStartDictation: () -> Unit,
     onStopDictation: () -> Unit,
 ) {
-    val realtimeAvailable = remember { ExperimentalFeatures.isEnabled(AgentBuddyFeature.REALTIME_VOICE) }
     when {
         isRecording -> BuddyIconButton(
             icon = Icons.Filled.Stop,
@@ -64,18 +48,6 @@ internal fun ComposerVoiceControl(
                 modifier = Modifier.size(20.dp),
                 color = AgentBuddyTheme.textSecondary,
                 strokeWidth = 2.dp,
-            )
-        }
-        realtimeAvailable && !hasContent -> {
-            val voiceController = remember { VoiceRuntimeController.shared }
-            val voiceSession by voiceController.activeVoiceSession.collectAsState()
-            val snapshot by appModel.snapshot.collectAsState()
-            InlineVoiceButton(
-                phase = snapshot?.voiceSession?.phase,
-                inputLevel = voiceSession?.inputLevel ?: 0f,
-                isAvailable = true,
-                onStart = { scope.launch { voiceController.startVoiceOnThread(appModel, threadKey) } },
-                onStop = { scope.launch { voiceController.stopActiveVoiceSession(appModel) } },
             )
         }
         else -> ComposerDictationButton(onClick = onStartDictation)

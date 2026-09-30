@@ -322,6 +322,9 @@ Replaces the prior WebSocket + base64-PCM audio pump with a platform-native WebR
 | Area | Expected (iOS + Android) |
 |---|---|
 | Idle composer | Send disabled until there is text or an attachment |
+| Dictation | Mic left of send (asks for the microphone permission when missing); realtime voice starts only from the home composer pill |
+| Partner / model panel | Chip press ripple matches the capsule; models load even when the host's codex reports reasoning efforts the app does not know (e.g. `max`, dropped in Rust); a failed `model/list` is not cached as an empty list, so reopening the panel (after 10 s) retries it |
+| Streaming reply | Text grows in place; the paragraph being written does not blink |
 | Running turn | Explicit 「停止」; with input the send control reads 「排队」 and the message goes into the Rust follow-up queue |
 | Stopping | 「正在停止…」, second stop blocked; resets when the turn ends, a new turn starts or the host disconnects; a refused stop shows an error |
 | Disconnected | Persistent banner; send button, full-screen editor and every other send path are blocked without clearing the draft, attachments or a pending question; slash commands still run |
