@@ -3007,6 +3007,8 @@ AgentBuddy 分支推送同样先征得用户同意。
 
 `~/Desktop` 项目卡住：同样的环境变量和目录，手动运行 mfcli 不到 5 秒就好；daemon 在 `/tmp`、`$HOME`、`/` 下启动都正常。判断是 macOS 隐私保护拦了「桌面」文件夹：ad-hoc 签名的 AgentBuddy.app 没有授权，每次重签都会让授权失效。需要在「系统设置 → 隐私与安全性 → 完全磁盘访问权限（或文件与文件夹 → 桌面）」给 AgentBuddy 授权，换上正式 sidecar 之后再验一次。
 
+2026-10-01 收尾：alleycat `feat/mfcli-agent` 推到 AkaShark/alleycat（`d16ee21`，draft PR AkaShark/alleycat#2，叠在 #1 上），两处 pin 改为 `d16ee21`，`cargo check`（kittylitter）和 `make rust-check` 通过；`make desktop-sidecar` 用 pin 的源码构建正式 sidecar，替换进 `/Applications/AgentBuddy.app` 并重签；`make android` + `make android-install` 用新 pin 重建 JNI 库并装到 Pixel 9。用户给 AgentBuddy 开了完全磁盘访问权限后，`~/Desktop/Project/Person/Project/AgentBuddy` 项目里的 MyFlicker 任务（会话 `4fe043fb…`）在该目录起进程、约 2.5 秒恢复会话，`pwd` 输出该目录，回复 `grape`，不再卡住。注意：每次 ad-hoc 重签都会让这个授权失效，需要重新授权。
+
 ## 修订任务（2026-09-30，见 spec 第 12 节）
 
 ### Task 6b: acp-bridge 按项目目录分进程（`process_per_cwd`）
