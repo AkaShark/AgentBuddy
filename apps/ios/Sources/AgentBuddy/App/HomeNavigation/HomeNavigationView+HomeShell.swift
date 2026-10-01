@@ -80,15 +80,15 @@ extension HomeNavigationView {
         }
     }
 
-    /// Phone new-task sheet. Keeps the previous phone behaviour: the new task
-    /// is pinned and the user stays on home, where it appears under
-    /// "In progress" and streams in place.
+    /// Phone new-task sheet. The new task is pinned, the sheet closes and the
+    /// new task's conversation opens, as on iPad.
     var newTaskSheet: some View {
         NewTaskSheet(
             model: homeDashboardModel,
             onThreadCreated: { key in
                 homeDashboardModel.pinThread(key)
                 isNewTaskSheetPresented = false
+                openConversation(key)
             },
             onCreateProject: {
                 isNewTaskSheetPresented = false

@@ -231,7 +231,11 @@ fun HomeShellScreen(
             draft = memory.newTaskDraft,
             onSelectServer = { actions.selectServer(it) },
             onOpenProjectPicker = actions.openProjectPicker,
-            onThreadCreated = { key -> taskActions.pin(key, data.visibleSessions) },
+            onThreadCreated = { key ->
+                taskActions.pin(key, data.visibleSessions)
+                selectedProject?.let { appModel.launchState.updateCurrentCwd(it.cwd) }
+                actions.openConversation(key)
+            },
             onLoginRequired = actions.openAccount,
             onDismiss = { showNewTask = false },
         )
