@@ -23,9 +23,9 @@ import uniffi.codex_mobile_client.AppProject
 import uniffi.codex_mobile_client.ThreadKey
 
 /**
- * New-task sheet on the home shell. Creating the task keeps today's flow
- * (requires a project; `startThread`, record the directory, `startTurn`,
- * pin) and stays on home. The sheet cannot be dismissed while the task is
+ * New-task sheet on the home shell. Creating the task (requires a project;
+ * `startThread`, record the directory, `startTurn`, pin) closes the sheet
+ * and opens the new task. The sheet cannot be dismissed while the task is
  * being created, and a failed creation keeps the draft.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
