@@ -20,7 +20,7 @@ permissions:
 jobs:
   prepare-release-assets:
     runs-on: macos-26
-    timeout-minutes: 90
+    timeout-minutes: 120
     env:
       HOMEBREW_NO_AUTO_UPDATE: "1"
       SCCACHE_BUCKET: rust-cache
@@ -55,7 +55,7 @@ jobs:
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-ios-macabi,x86_64-apple-ios-macabi,i686-unknown-linux-musl
+          targets: aarch64-apple-ios-macabi,i686-unknown-linux-musl
 
       - name: Configure sccache
         run: |
@@ -88,7 +88,7 @@ jobs:
           export SCCACHE_ERROR_LOG="$RUNNER_TEMP/sccache-mac.log"
           trap 'status=$?; echo "==> sccache stats"; sccache --show-stats || true; if [ -f "$SCCACHE_ERROR_LOG" ]; then echo "==> sccache error log"; tail -200 "$SCCACHE_ERROR_LOG" || true; fi; exit $status' EXIT
           sccache --zero-stats || true
-          ./apps/ios/scripts/build-rust.sh --preserve-current --macabi-only
+          ./apps/ios/scripts/build-rust.sh --preserve-current --macabi-arm64-only
           make alpine-fs xcgen
           echo "==> sccache stats after Mac release prep"
           sccache --show-stats || true
@@ -98,7 +98,9 @@ jobs:
           mkdir -p .ci-prep/mac
           tar -czf .ci-prep/mac/mac-release-prep.tgz -C . \
             apps/ios/Resources/fs \
-            apps/ios/GeneratedRust \
+            apps/ios/GeneratedRust/Headers \
+            apps/ios/GeneratedRust/ios-macabi \
+            apps/ios/GeneratedRust/.swift-bindings.hash \
             apps/ios/Sources/AgentBuddy/Bridge/UniFFICodexClient.generated.swift
 
       - name: Upload Mac release prep artifact

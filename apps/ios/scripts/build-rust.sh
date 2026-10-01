@@ -27,6 +27,7 @@ SIM_ONLY=0
 FAST_SIM=0
 MACABI_ONLY=0
 FAST_MACABI=0
+MACABI_SINGLE_TARGET=""
 FORCE_BINDINGS=0
 SKIP_BINDINGS=0
 CARGO_FEATURES=""
@@ -72,6 +73,12 @@ for arg in "$@"; do
       # directly via LIBRARY_SEARCH_PATHS[sdk=macosx*].
       MACABI_ONLY=1
       ;;
+    --macabi-arm64-only)
+      # Release archives use ARCHS=arm64. Keep the selected release profile
+      # while avoiding an unused x86_64 build and universal-library packaging.
+      MACABI_ONLY=1
+      MACABI_SINGLE_TARGET="aarch64-apple-ios-macabi"
+      ;;
     --fast-macabi)
       # Fast Catalyst dev lane: build only the host arch (arm64 on
       # Apple Silicon, x86_64 on Intel) using the ios-dev profile (no
@@ -79,6 +86,7 @@ for arg in "$@"; do
       # Catalyst builds default to ONLY_ACTIVE_ARCH=YES, so a host-only
       # staticlib is sufficient. Skips xcframework + lipo.
       FAST_MACABI=1
+      MACABI_SINGLE_TARGET="$MACABI_HOST_TARGET"
       MACABI_ONLY=1
       PROFILE="ios-dev"
       CARGO_PROFILE_FLAG="--profile ios-dev"
@@ -97,7 +105,7 @@ for arg in "$@"; do
       CARGO_FEATURES="--features rpc-trace"
       ;;
     *)
-      echo "usage: $(basename "$0") [--preserve-current|--recorded-gitlink] [--device-only] [--fast-device] [--fast-sim] [--macabi-only] [--fast-macabi] [--force-bindings] [--skip-bindings] [--rpc-trace]" >&2
+      echo "usage: $(basename "$0") [--preserve-current|--recorded-gitlink] [--device-only] [--fast-device] [--fast-sim] [--macabi-only] [--macabi-arm64-only] [--fast-macabi] [--force-bindings] [--skip-bindings] [--rpc-trace]" >&2
       exit 1
       ;;
   esac
@@ -283,8 +291,8 @@ if [ "$DEVICE_ONLY" -eq 1 ]; then
 elif [ "$SIM_ONLY" -eq 1 ]; then
   rustup target add aarch64-apple-ios-sim
 elif [ "$MACABI_ONLY" -eq 1 ]; then
-  if [ "$FAST_MACABI" -eq 1 ]; then
-    rustup target add "$MACABI_HOST_TARGET"
+  if [ -n "$MACABI_SINGLE_TARGET" ]; then
+    rustup target add "$MACABI_SINGLE_TARGET"
   else
     rustup target add aarch64-apple-ios-macabi x86_64-apple-ios-macabi
   fi
@@ -305,10 +313,10 @@ elif [ "$SIM_ONLY" -eq 1 ]; then
   cargo rustc --manifest-path "$RUST_BRIDGE_DIR/Cargo.toml" -p codex-mobile-client $CARGO_PROFILE_FLAG --target aarch64-apple-ios-sim --crate-type staticlib $CARGO_FEATURES
   copy_sim_artifact "$CARGO_TARGET_DIR_EFFECTIVE/aarch64-apple-ios-sim/$PROFILE/libcodex_mobile_client.a"
 elif [ "$MACABI_ONLY" -eq 1 ]; then
-  if [ "$FAST_MACABI" -eq 1 ]; then
-    echo "==> Building codex-mobile-client for $MACABI_HOST_TARGET ($PROFILE)..."
-    cargo rustc --manifest-path "$RUST_BRIDGE_DIR/Cargo.toml" -p codex-mobile-client $CARGO_PROFILE_FLAG --target "$MACABI_HOST_TARGET" --crate-type staticlib $CARGO_FEATURES
-    cp "$CARGO_TARGET_DIR_EFFECTIVE/$MACABI_HOST_TARGET/$PROFILE/libcodex_mobile_client.a" \
+  if [ -n "$MACABI_SINGLE_TARGET" ]; then
+    echo "==> Building codex-mobile-client for $MACABI_SINGLE_TARGET ($PROFILE)..."
+    cargo rustc --manifest-path "$RUST_BRIDGE_DIR/Cargo.toml" -p codex-mobile-client $CARGO_PROFILE_FLAG --target "$MACABI_SINGLE_TARGET" --crate-type staticlib $CARGO_FEATURES
+    cp "$CARGO_TARGET_DIR_EFFECTIVE/$MACABI_SINGLE_TARGET/$PROFILE/libcodex_mobile_client.a" \
       "$GENERATED_MACABI_DIR/libcodex_mobile_client.a"
   else
     echo "==> Building codex-mobile-client for Mac Catalyst macabi targets ($PROFILE) in parallel..."
