@@ -215,3 +215,24 @@ Android App ──iroh──▶ alleycat daemon (Mac)
 - `AcpClient` 请求多路复用，支持同一手机并行多个 turn。
 - 暴露 mfcli 的 mode（plan 等），映射到手机的协作模式。
 - iOS 装饰项（splash / chooser / 图标）与真机验证；官方图标。
+
+## 12. 修订（2026-09-30，Android 端到端时发现）
+
+**事实**（真实 mfcli 探测，进程目录与会话目录分开）：mfcli 的 ACP agent 只认进程启动目录。
+
+- `session/new {cwd}` 的 `cwd` 被忽略：工具在进程目录执行（`pwd` 返回进程目录），会话文件存在进程目录对应的项目下。
+- `session/list {cwd}` 同样忽略 `cwd`，总是列进程目录项目的会话，并把请求的 `cwd` 原样回填。
+- 在别的项目目录启动的进程里 `session/resume` 会话：`Resource not found`。
+- 会话文件：`~/.codeflicker/projects/<slug>/<sessionId>.jsonl`。slug = 路径小写、非 `[a-z0-9]` 连续字符折叠为一个 `-`、去掉首尾 `-`；超过 80 个字符时截到 80 并追加 `-` + 原路径 SHA-1 的前 8 位十六进制；`/` 的 slug 为空（文件直接在 `projects/` 下）。用户消息行：`{"type":"message","role":"user","content":<string|blocks>}`。
+
+第一次手机任务因此在 daemon 的工作目录 `/` 下执行，绕过了第 5 节的 cwd 保护。
+
+**修订后的设计**（用户选择方案 A）：
+
+1. 通用 `acp-bridge` 新增构建开关 `process_per_cwd`（默认关，Devin / Grok 不受影响）。开启后：
+   - 每个连接按项目目录分进程，池 key 为 `<agent>:<node_id>@<cwd>`，进程以该目录为工作目录启动；
+   - 请求按会话所属目录路由：`thread/start` 用参数 `cwd`；`thread/resume`、`thread/fork` 用参数 `cwd` 或会话已知目录；`turn/*`、`thread/read` 等用会话已知目录；
+   - 不涉及具体会话的请求（初始化、模型发现、账号等）用 `$HOME` 进程；没有可用目录时也用 `$HOME`，绝不用 `/`；
+   - mfcli 池容量提到 16。
+2. `mfcli-bridge` 的 `thread/list` 与 cwd 解析改为直接读会话文件（按上面的 slug 规则为每个候选项目定位目录），不再通过 ACP `session/list`，也就不必为列表给每个项目冷启动一个 mfcli（每次约 4–5 秒）。标题取第一条用户消息（单行、最多 50 个字符，超出加省略号），更新时间取文件修改时间。
+3. 依赖 mfcli 存储布局属于已知风险（同 Devin / Grok 读本地库）；同时向 mfcli 维护方反馈：按 ACP 规范，`session/new` 的 `cwd` 应作为会话工作目录。

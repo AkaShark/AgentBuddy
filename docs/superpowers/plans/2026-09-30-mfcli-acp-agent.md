@@ -2992,3 +2992,19 @@ AgentBuddy 分支推送同样先征得用户同意。
 ## 验收记录
 
 （Task 11 Step 10 填写）
+
+## 修订任务（2026-09-30，见 spec 第 12 节）
+
+### Task 6b: acp-bridge 按项目目录分进程（`process_per_cwd`）
+
+- fake agent 新增 `--spawn-log <path>`（启动时追加进程目录）和配置 `echo_cwd`（prompt 回复里带进程目录）。
+- 测试（`tests/per_cwd.rs`）：两个不同 `cwd` 的 `thread/start` 各自启动一个以该目录为工作目录的进程；某会话的 `turn/start` 进入它所属目录的进程（回复里的目录正确）；`process_per_cwd` 关闭时行为不变（仍是一个进程，工作目录为 daemon 目录）；没有任何目录时用 `$HOME`，不用 `/`；`recycle_process` 回收该连接的全部进程。
+- 实现：`AcpClient::spawn` 接受工作目录；池 `get_client(key, cwd)`；`AcpBridge` 按方法与会话目录选 client；mfcli 构建时开启并把池容量设为 16。
+
+### Task 6c: mfcli-bridge 从会话文件列任务、解析目录
+
+- 新模块 `storage.rs`：`project_slug(path)`（用本机三个已知目录和 `/` 做测试）、`sessions_in(projects_dir, cwd)`（标题、更新时间、跳过没有用户消息的会话、损坏行跳过）、`find_session(projects_dir, cwds, id)`。
+- `thread/list` 与 `resolve_cwd` 改用 `storage`；删除不再使用的 ACP `SessionLister` 列表路径。
+- 测试覆盖：slug 规则（短路径、超长路径、`/`）、文件缺失或损坏、标题截断、按候选目录定位会话、未知会话报错。
+
+完成后重新部署主机（Task 9 Step 2），从 Task 11 Step 3 重新开始端到端。
