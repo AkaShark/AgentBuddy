@@ -37,9 +37,7 @@ struct ContentView: View {
         return themeManager.appearanceMode.userInterfaceStyle
     }
 
-    var body: some View {
-        @Bindable var bindableAppState = appState
-
+    private var layoutContent: some View {
         GeometryReader { geometry in
             ZStack {
                 AgentBuddyTheme.backgroundGradient.ignoresSafeArea()
@@ -87,6 +85,10 @@ struct ContentView: View {
                 composerBottomInset = nextInset
             }
         }
+    }
+
+    private var themedContent: some View {
+        layoutContent
         .environment(appState)
         .environment(approvalCoordinator)
         .environment(conversationWarmup)
@@ -104,6 +106,10 @@ struct ContentView: View {
             MacWindowTitleBarStyler()
         }
         #endif
+    }
+
+    private var observedContent: some View {
+        themedContent
         .onAppear {
             themeManager.syncSystemColorScheme(colorScheme)
             let forceDiscoveryForUITest =
@@ -141,6 +147,12 @@ struct ContentView: View {
         .onChange(of: appModel.snapshot) { _, nextSnapshot in
             appRuntime.handleSnapshot(nextSnapshot)
         }
+    }
+
+    var body: some View {
+        @Bindable var bindableAppState = appState
+
+        observedContent
         .sheet(isPresented: $bindableAppState.showServerPicker, onDismiss: {
             appState.serverPickerEntryPoint = .chooser
         }) {

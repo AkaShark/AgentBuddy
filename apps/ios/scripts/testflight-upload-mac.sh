@@ -482,7 +482,7 @@ fi
 if [[ -n "$build_id" ]]; then
     echo "==> Validating TestFlight readiness"
     validate_log="$BUILD_DIR/testflight-validate.log"
-    if ! asc validate testflight --app "$APP_STORE_APP_ID" --build "$build_id" --strict --output json >"$validate_log" 2>&1; then
+    if ! asc validate testflight --app "$APP_STORE_APP_ID" --build-id "$build_id" --strict --output json >"$validate_log" 2>&1; then
         if [[ "${beta_review_submit_attempted:-0}" == "1" && "${beta_review_submit_succeeded:-0}" != "1" ]]; then
             echo "WARNING: strict TestFlight validation failed after Beta App Review submit failed." >&2
             echo "         Build $build_id is uploaded and assigned; ASC may need manual/retry review submission." >&2

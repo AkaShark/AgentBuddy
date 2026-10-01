@@ -445,7 +445,7 @@ fi
 
 if [[ -n "$build_id" ]]; then
     echo "==> Validating TestFlight readiness"
-    asc validate testflight --app "$APP_STORE_APP_ID" --build "$build_id" --strict --output json >/dev/null
+    asc validate testflight --app "$APP_STORE_APP_ID" --build-id "$build_id" --strict --output json >/dev/null
 fi
 
 if [[ "$PROJECT_VERSION_BUMP_REQUIRED" == "1" ]]; then

@@ -74,7 +74,7 @@ struct HomeNavigationView: View {
         AgentBuddyPlatform.isRegularSurface(horizontalSizeClass: horizontalSizeClass)
     }
 
-    var body: some View {
+    private var lifecycleContent: some View {
         rootNavigationContent
         .task {
             homeDashboardModel.bind(appModel: appModel)
@@ -99,6 +99,10 @@ struct HomeNavigationView: View {
         .onChange(of: navigationPath.count) { _, newCount in
             updateHomeDashboardActivity()
         }
+    }
+
+    private var navigationContent: some View {
+        lifecycleContent
         .onChange(of: pinnedThreadHydrationSignature) { _, _ in
             hydratePinnedThreadsIfNeeded()
         }
@@ -120,6 +124,10 @@ struct HomeNavigationView: View {
             }
             openConversation(key)
         }
+    }
+
+    private var commandContent: some View {
+        navigationContent
         #if targetEnvironment(macCatalyst)
         .onReceive(NotificationCenter.default.publisher(for: .agentBuddyCommandNewSession)) { _ in
             handleNewSessionTap()
@@ -142,6 +150,10 @@ struct HomeNavigationView: View {
             }
         }
         #endif
+    }
+
+    var body: some View {
+        commandContent
         .sheet(item: $directoryPickerSheet) { _ in
             NavigationStack {
                 DirectoryPickerView(
