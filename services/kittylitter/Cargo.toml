@@ -21,11 +21,12 @@ path = "src/main.rs"
 # reproducible builds / GPLv3 source-correspondence (was: branch = "main").
 # tools/scripts/update-alleycat-main.sh leaves this rev alone unless you opt in
 # with AGENTBUDDY_REFRESH_ALLEYCAT=1, so normal builds never float it.
-# d16ee21 is on the fork branch feat/mfcli-agent (draft PR AkaShark/alleycat#2:
-# MyFlicker agent + ACP bridge fixes), stacked on feat/host-push-notifications
-# (draft PR AkaShark/alleycat#1: host push subscriptions); neither is on the
-# fork main yet.
-alleycat = { git = "https://github.com/AkaShark/alleycat.git", rev = "d16ee21dc20a49133e6db4afc727b8bd7ad01ea6" }
+# fb28930 is the head of the fork branch feat/host-push-notifications, which
+# holds all AgentBuddy changes to alleycat: host push subscriptions plus the
+# MyFlicker agent and ACP bridge fixes (AkaShark/alleycat#2, merged into it).
+# It is not on the fork main (open PR AkaShark/alleycat#1), which also carries
+# newer upstream commits.
+alleycat = { git = "https://github.com/AkaShark/alleycat.git", rev = "fb28930c423e45881fde9501771047324ae4a76e" }
 anyhow = "1"
 
 [profile.release]
