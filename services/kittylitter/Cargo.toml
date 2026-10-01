@@ -24,8 +24,8 @@ path = "src/main.rs"
 # fb28930 is the head of the fork branch feat/host-push-notifications, which
 # holds all AgentBuddy changes to alleycat: host push subscriptions plus the
 # MyFlicker agent and ACP bridge fixes (AkaShark/alleycat#2, merged into it).
-# It is not on the fork main (open PR AkaShark/alleycat#1), which also carries
-# newer upstream commits.
+# AgentBuddy maintains alleycat on that branch; the fork main tracks upstream
+# and is not used (AkaShark/alleycat#1 was closed without merging).
 alleycat = { git = "https://github.com/AkaShark/alleycat.git", rev = "fb28930c423e45881fde9501771047324ae4a76e" }
 anyhow = "1"
 
