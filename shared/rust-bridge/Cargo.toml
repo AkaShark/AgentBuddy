@@ -27,10 +27,10 @@ codex-cloud-requirements = { path = "../third_party/codex/codex-rs/cloud-require
 codex-config = { path = "../third_party/codex/codex-rs/config" }
 codex-utils-absolute-path = { path = "../third_party/codex/codex-rs/utils/absolute-path" }
 codex-git-utils = { path = "../third_party/codex/codex-rs/git-utils" }
-alleycat-bridge-core = { git = "https://github.com/AkaShark/alleycat.git", rev = "fb28930c423e45881fde9501771047324ae4a76e" }
-alleycat-pi-bridge = { git = "https://github.com/AkaShark/alleycat.git", rev = "fb28930c423e45881fde9501771047324ae4a76e" }
-alleycat-claude-bridge = { git = "https://github.com/AkaShark/alleycat.git", rev = "fb28930c423e45881fde9501771047324ae4a76e" }
-alleycat-opencode-bridge = { git = "https://github.com/AkaShark/alleycat.git", rev = "fb28930c423e45881fde9501771047324ae4a76e" }
+alleycat-bridge-core = { git = "https://github.com/AkaShark/alleycat.git", rev = "ac8b1d16190e21dfcc4ab28636e765bd73b0d22f" }
+alleycat-pi-bridge = { git = "https://github.com/AkaShark/alleycat.git", rev = "ac8b1d16190e21dfcc4ab28636e765bd73b0d22f" }
+alleycat-claude-bridge = { git = "https://github.com/AkaShark/alleycat.git", rev = "ac8b1d16190e21dfcc4ab28636e765bd73b0d22f" }
+alleycat-opencode-bridge = { git = "https://github.com/AkaShark/alleycat.git", rev = "ac8b1d16190e21dfcc4ab28636e765bd73b0d22f" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "net", "io-util"] }
