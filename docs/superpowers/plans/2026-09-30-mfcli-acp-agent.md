@@ -2991,7 +2991,21 @@ AgentBuddy 分支推送同样先征得用户同意。
 
 ## 验收记录
 
-（Task 11 Step 10 填写）
+2026-10-01，Pixel 9（Android dev 版），Mac 上是用 alleycat `feat/mfcli-agent` 本地构建的 daemon（`/Applications/AgentBuddy.app` 内替换后 ad-hoc 重签）。日志：`~/Library/Logs/com.akashark.agentbuddycli/daemon.log.2026-10-01`。
+
+| Step | 结果 | 证据 |
+|---|---|---|
+| 1 agent 出现 | 通过 | 已有配对要重新配对才会出现新 agent（见后续事项）；重新配对后选择 agent 处有 MyFlicker。 |
+| 2 模型列表 | 通过 | 模型菜单是万擎模型列表（含 Claude Haiku 4.5、DeepSeek V4 Flash 等），不是单个 `mfcli`。 |
+| 3 新任务 | 通过（换了项目目录） | `~/Desktop` 下的项目由 daemon 启动的 mfcli 会卡住（macOS「桌面」文件夹权限，见下）；改在 scratchpad 的 `acp-probe/ws` 项目验收。会话 `adacd055…`：`pwd`、`ls` 命令卡片和「新增 probe.txt」文件卡片都在；09:14:27 `cat /tmp/probe.txt` 输出 `hi`。 |
+| 4 多轮 | 通过（修复后） | 第一次验收时实时视图把后面几轮的回复叠到第一轮的位置上：流式文字条目的 id 每轮从 `acp-agent-0` 重新编号，手机按 id 覆盖。alleycat `c8ed938` 把 id 改成按轮次区分（`tests/item_ids.rs`）。重新部署后同一任务连续两轮（apple / banana）各自显示思考和回复，顺序正确。 |
+| 5 切换模型 / 思考强度 | 模型通过；思考强度有问题 | 对话中切到 DeepSeek V4 Flash 后，会话文件里上一轮 `model` 是 `wanqing/claude-haiku-4.5`，这一轮是 `wanqing/deepseek-v4-flash`，回复「DeepSeek V4 Flash」。思考强度：mfcli 的可选档位随模型变化（Claude Sonnet 5 是 low / medium / high / max，DeepSeek V4 Flash 只有 high / max，Auto、Kimi K2.6 等没有），bridge 的模型列表却给所有模型套用发现会话当前模型的档位，手机上 Claude Sonnet 5 只能选「高」。另外 `session/set_config_option` 会改写 `~/.codeflicker/config.json` 的全局默认模型和思考强度，手机上选模型会影响用户在终端里的默认值。 |
+| 6 历史 | 通过 | `am force-stop` 后重开，进入任务：三轮的用户消息、命令卡片和回复都在，顺序正确（历史来自 `session/load` 回放）。 |
+| 7 闲置恢复 | 通过 | 09:22:22 `Evicting 1 idle clients`（ws 进程）；09:22:35 发消息，`spawning ACP agent process`（工作目录 ws）→ `restoring ACP session in fresh process` → `finalized turn`。 |
+| 8 终端会话 | 通过（有限制） | 在 ws 运行 `mfcli -q "Terminal check: …"`（会话 `b5ec2152`），手机「项目 → ws」列表第一条就是它，进入后历史完整（问题和 `cherry`）。从手机续接：09:55:56 在 ws 起进程、`session/resume` 恢复，回复 `date`，并写回同一个会话文件。限制： `mfcli -q` 不会把目录写进 `~/.codeflicker/data.json` 的 `projects`（目前那里只有 `~/Downloads`），ws 是靠 bridge 自己的索引（`mfcli/mfcli-sessions.json`）找到的；只在终端用 `-q` 跑过、手机从没打开过的项目不会出现在列表里。 |
+| 9 推送 | 未验 | 附加项，本轮没做。 |
+
+`~/Desktop` 项目卡住：同样的环境变量和目录，手动运行 mfcli 不到 5 秒就好；daemon 在 `/tmp`、`$HOME`、`/` 下启动都正常。判断是 macOS 隐私保护拦了「桌面」文件夹：ad-hoc 签名的 AgentBuddy.app 没有授权，每次重签都会让授权失效。需要在「系统设置 → 隐私与安全性 → 完全磁盘访问权限（或文件与文件夹 → 桌面）」给 AgentBuddy 授权，换上正式 sidecar 之后再验一次。
 
 ## 修订任务（2026-09-30，见 spec 第 12 节）
 
