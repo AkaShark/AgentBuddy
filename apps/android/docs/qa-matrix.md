@@ -337,3 +337,16 @@ Replaces the prior WebSocket + base64-PCM audio pump with a platform-native WebR
 | Approval in the open conversation | Card above the composer, one at a time with 「第 N 个，共 M 个」; 「拒绝」/「允许一次」, session grant behind 「本会话都允许…」 + confirmation; submitting / failed (retry) / outcome card; answered elsewhere → 「已在别处处理」 |
 | Approval for another conversation | Non-blocking top banner; tap opens that conversation, close only hides the banner (never a denial) |
 | User-input request | Only inline above the composer (no duplicate overlay); answers are keyed by request id |
+
+## MyFlicker (mfcli) agent (design `docs/superpowers/specs/2026-09-30-mfcli-acp-agent-design.md`)
+
+| Area | Expected (Android) |
+|---|---|
+| Agent picker | Paired Mac with `mfcli` on the login-shell PATH shows MyFlicker (beta, letter icon) |
+| Model list | 万擎 models before the first message; thinking levels low / medium / high / xhigh |
+| New task | Streaming reply; tool calls (command, file edit with diff) render |
+| Model / thinking switch | Next turn uses the new value (session file `model` field) |
+| History | Task survives leaving the screen and force-stopping the app; history replays on open |
+| Idle > 5 min | Next message still works (process respawn + session resume) |
+| Terminal sessions | Session started with `mfcli` in a project from `~/.codeflicker/data.json` is listed and can be continued |
+| Approvals | Not shown on the phone (auto-approved on the host; phase 2) |
