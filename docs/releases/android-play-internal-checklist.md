@@ -2,6 +2,56 @@
 
 Package: `com.akashark.agentbuddy.android`. Release variant: `Release`.
 
+## Console configuration record — 2026-10-02
+
+The Play app is **搭子 AgentBuddy**, with default language `zh-CN`, category
+**Productivity**, support email `aaksharker@gmail.com`, and the repository as
+its public support website. The initial internal release is 1.5.0 (12).
+`ANDROID_PLAY_PUBLISH_ENABLED=true` and
+`ANDROID_PLAY_RELEASE_STATUS=completed` are configured. The service account
+has app-scoped read and testing-track release permissions. API preflight
+passed; this alone does not verify a subsequent CI upload.
+
+Saved in Play Console (pending review where applicable): privacy policy,
+no ads, content rating, no government/financial/health features, category and
+contact details, and the default store listing. The listing includes four
+unmodified Pixel 9 captures of the native task (light/dark), project and host
+screens using the debug gallery's example data. Capture sources are locally
+under `artifacts/google-play/screenshots/pixel9/`; these are not screenshots
+of a production-accessible demo mode. Do not upload the older design mockups
+or placeholder images from the legacy `en-US` listing assets.
+
+The public bilingual privacy policy and deletion instructions are at
+<https://akashark.github.io/AgentBuddy/privacy/>. Source is
+`docs/site/privacy/index.html`; `.github/workflows/privacy-pages.yml` deploys
+only `docs/site` to GitHub Pages when that source changes on `main`.
+
+Outstanding before review:
+
+- **Reviewer access:** the owner cannot provide a dedicated test host. The
+  release app requires a compatible host and has no public, fully featured
+  demo mode. Do not declare unrestricted access or attest that nonexistent
+  review credentials provide complete access. Resolve this prerequisite
+  before saving the access declaration.
+- **Target audience:** the owner selected 13–15, 16–17 and 18+. Play blocks
+  this form until reviewer-access details are completed. The IARC result
+  (ESRB Everyone / PEGI 3) is separate from the intended target audience.
+- **Data safety:** the full form is saved as a draft; Play blocks final save
+  until target-audience details are complete. It includes email, user IDs,
+  messages, photos, voice audio, files, user content/interactions, SDK
+  diagnostics/performance and installation/push identifiers. User-directed
+  transfers and service-provider processing use Play's sharing exceptions;
+  these still appear as collected data. Recheck whenever providers change.
+- **In-app privacy link:** add the public policy link to the shipping app;
+  saving a Console URL does not supply the required in-app link.
+- **Transport:** manual direct `ws://` connections are supported, so the
+  declaration does not claim all data is encrypted in transit. The Console
+  preview consequently displays its "data isn't encrypted" label. Review
+  plaintext transport before public release; do not change the declaration
+  to encrypted without changing and validating actual behavior.
+- Add testers; the Console still requires 12 opted-in closed testers for
+  14 continuous days before applying for production access.
+
 ## Before the first Play upload
 
 Signing and builds do not require an approved Play developer account. Run **Android Play Release** in GitHub Actions with `publish=false` (the default). Download `android-play-release-<run number>` from the completed run; it contains a signed APK, AAB, and SHA-256 checksums. Use the APK for direct installation and keep the AAB for the first Play Console upload.
