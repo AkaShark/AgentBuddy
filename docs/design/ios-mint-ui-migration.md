@@ -106,5 +106,3 @@
 - App 图标、首页品牌标记与启动页统一为「圆角双括号 + 斜向连接」；移除品牌小猫和启动页里未使用的小猫绘制代码。矢量母版为 `assets/brand/agentbuddy-mark.svg`，跨平台图标由 `tools/scripts/generate-brand-assets.cjs` 生成，包含 iOS 浅色、深色、着色图标与 Watch Icon Composer 资源。
 - 启动页使用 Mint 语义色、112 pt 原生品牌 tile 与本地化名称。保留底部 9 个代理名称的纵向轮播，裁切并淡出到 3 行；系统「减少动态效果」开启时显示静态名称。启动页的显示时长与消失逻辑保持不变。
 - DEBUG 画廊新增 `--mint-gallery=splash`，加 `--mint-dark` 可检查深色；`BrandLogo` 和 `LaunchView` 复用同一原生标记与启动页。
-- Apple Xcode MCP 在本次环境中不可用。复用未改动的设备 Rust 静态库执行 `make -o rust-ios-device-fast ios-device-fast`，真机架构编译成功；未构建或运行 iOS 模拟器。
-- 已在 iPhone 16 检查浅色、深色的中文启动页，品牌标记、名称和 3 行滚动代理名称均正常显示。减少动态效果的静态分支已做代码检查，未在真机切换辅助功能设置。
