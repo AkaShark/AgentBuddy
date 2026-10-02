@@ -25,14 +25,14 @@ val androidAbis = rootProject.extra["androidAbis"] as List<String>
 
 android {
     namespace = "com.akashark.agentbuddy.android"
-    compileSdk = 35
+    compileSdk = 36
     ndkVersion = projectPropOrEnv("ANDROID_NDK_VERSION") ?: "30.0.14904198"
 
     defaultConfig {
         applicationId = "com.akashark.agentbuddy.android"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 11
+        targetSdk = 36
+        versionCode = 12
         versionName = "1.5.0"
         buildConfigField("boolean", "ENABLE_ON_DEVICE_BRIDGE", "true")
         buildConfigField("String", "RUNTIME_STARTUP_MODE", "\"hybrid\"")
@@ -177,7 +177,6 @@ dependencies {
         exclude(group = "org.jetbrains", module = "annotations-java5")
     }
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
-    implementation("com.android.billingclient:billing-ktx:7.0.0")
 
     implementation("androidx.media3:media3-exoplayer:1.4.1")
     implementation("androidx.media3:media3-ui:1.4.1")
@@ -186,10 +185,10 @@ dependencies {
     implementation("io.github.webrtc-sdk:android:144.7559.04")
 
     // Alleycat remote-host pairing QR scanner
-    implementation("androidx.camera:camera-core:1.3.4")
-    implementation("androidx.camera:camera-camera2:1.3.4")
-    implementation("androidx.camera:camera-lifecycle:1.3.4")
-    implementation("androidx.camera:camera-view:1.3.4")
+    implementation("androidx.camera:camera-core:1.4.2")
+    implementation("androidx.camera:camera-camera2:1.4.2")
+    implementation("androidx.camera:camera-lifecycle:1.4.2")
+    implementation("androidx.camera:camera-view:1.4.2")
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
 
     implementation("androidx.glance:glance-appwidget:1.1.0")
