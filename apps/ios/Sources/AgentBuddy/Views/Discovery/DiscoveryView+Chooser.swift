@@ -70,6 +70,7 @@ extension DiscoveryView {
         "hermes",
         "devin",
         "grok",
+        "mfcli",
     ]
 
     /// One connection option. The recommended QR option uses the brand
