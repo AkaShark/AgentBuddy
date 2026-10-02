@@ -37,8 +37,8 @@ typealias AgentRuntimeKind = String
 
 /**
  * Lookup hook into the Rust-owned `AgentMetadataStore`. Wired up at
- * app launch in `AgentBuddyApplication`. Returns `null` before the first
- * probe response has populated the cache.
+ * app launch in `AppModel`. Returns `null` before the first probe
+ * response has populated the cache.
  */
 object AgentRuntimeMetadataProvider {
     var lookup: ((String) -> AppAgentMetadata?)? = null

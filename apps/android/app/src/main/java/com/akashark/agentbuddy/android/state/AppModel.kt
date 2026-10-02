@@ -16,6 +16,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import uniffi.codex_mobile_client.AppClient
 import com.akashark.agentbuddy.android.ui.common.AgentRuntimeKind
+import com.akashark.agentbuddy.android.ui.common.AgentRuntimeMetadataProvider
 import uniffi.codex_mobile_client.AppSnapshotRecord
 import uniffi.codex_mobile_client.AppStore
 import uniffi.codex_mobile_client.AppStoreSubscription
@@ -127,6 +128,11 @@ class AppModel private constructor(context: android.content.Context) {
         // directory. Without setting it at launch the hook is a silent no-op.
         client.setSavedAppsDirectory(SavedAppsDirectory.path(context))
         client.setSlingshotCredentialsDirectory(MobilePreferencesDirectory.path(context))
+        // Agent labels, BETA badges, sort order and capability flags come
+        // from the Rust-owned `AgentMetadataStore`. Without this hook every
+        // agent shows its title-cased id ("Mfcli") and default capabilities.
+        AgentRuntimeMetadataProvider.lookup = client::agentMetadata
+        AgentRuntimeMetadataProvider.all = client::allAgentMetadata
         discovery = DiscoveryBridge()
         serverBridge = ServerBridge()
         ssh = SshBridge()
