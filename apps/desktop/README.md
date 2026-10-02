@@ -52,6 +52,20 @@ CI：打 `desktop-vX.Y.Z` tag 触发 `.github/workflows/desktop-release.yml`，�
 Apple 超时后仍会继续处理，可用保存的 ID 执行 `xcrun notarytool info <id>` / `log <id>`
 （带同一套认证参数）检查结果；确认 Accepted 后可对保留的 DMG 执行 `xcrun stapler staple` / `validate`。
 
+## 系统代理与完成通知
+
+macOS 主机的 HTTP 请求支持系统设置中的 HTTP/HTTPS 代理，无需把终端里的
+`HTTPS_PROXY` 写进 LaunchAgent plist。显式代理环境变量仍按 reqwest 的规则生效。
+此支持针对静态 HTTP/HTTPS 代理，不包含 PAC 自动代理脚本或系统 SOCKS-only 配置。
+
+推送连接在下次发送时最多复用 30 秒，之后重新读取代理配置；网络失败也会让下一次
+重试重建连接。重试时间仍受持久化队列的退避和服务端 `Retry-After` 控制，所以切换
+代理不代表通知会立即重发。OpenCode、Hermes 和本地推送测试地址的回环连接始终直连。
+
+排查时使用 sidecar 的 `push status --json` 查看订阅数、队列深度、最近成功和错误。
+Worker 根路径返回 404 只能验证网络连通；完整验收仍需新回合触发的订阅、事件投递及
+手机收到通知。队列超过 24 小时的项目和失效订阅不会无限补发。
+
 ## 目录
 
 - `src/` React 前端；`src/lib/host.ts` 是唯一的 `invoke` 入口。

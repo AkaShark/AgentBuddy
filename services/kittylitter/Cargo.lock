@@ -75,7 +75,7 @@ dependencies = [
 [[package]]
 name = "alleycat"
 version = "0.1.0"
-source = "git+https://github.com/AkaShark/alleycat.git?rev=4e95effd9f8d51cbee4d1e64c1d1bf79acb7d1be#4e95effd9f8d51cbee4d1e64c1d1bf79acb7d1be"
+source = "git+https://github.com/AkaShark/alleycat.git?rev=e5d9eb901d766d9104801b27f43e8ab367f05a2f#e5d9eb901d766d9104801b27f43e8ab367f05a2f"
 dependencies = [
  "alleycat-acp-bridge",
  "alleycat-amp-bridge",
@@ -120,7 +120,7 @@ dependencies = [
 [[package]]
 name = "alleycat-acp-bridge"
 version = "0.1.0"
-source = "git+https://github.com/AkaShark/alleycat.git?rev=4e95effd9f8d51cbee4d1e64c1d1bf79acb7d1be#4e95effd9f8d51cbee4d1e64c1d1bf79acb7d1be"
+source = "git+https://github.com/AkaShark/alleycat.git?rev=e5d9eb901d766d9104801b27f43e8ab367f05a2f#e5d9eb901d766d9104801b27f43e8ab367f05a2f"
 dependencies = [
  "alleycat-bridge-core",
  "alleycat-codex-proto",
@@ -143,7 +143,7 @@ dependencies = [
 [[package]]
 name = "alleycat-amp-bridge"
 version = "0.1.0"
-source = "git+https://github.com/AkaShark/alleycat.git?rev=4e95effd9f8d51cbee4d1e64c1d1bf79acb7d1be#4e95effd9f8d51cbee4d1e64c1d1bf79acb7d1be"
+source = "git+https://github.com/AkaShark/alleycat.git?rev=e5d9eb901d766d9104801b27f43e8ab367f05a2f#e5d9eb901d766d9104801b27f43e8ab367f05a2f"
 dependencies = [
  "alleycat-bridge-core",
  "alleycat-claude-bridge",
@@ -166,7 +166,7 @@ dependencies = [
 [[package]]
 name = "alleycat-bridge-core"
 version = "0.1.0"
-source = "git+https://github.com/AkaShark/alleycat.git?rev=4e95effd9f8d51cbee4d1e64c1d1bf79acb7d1be#4e95effd9f8d51cbee4d1e64c1d1bf79acb7d1be"
+source = "git+https://github.com/AkaShark/alleycat.git?rev=e5d9eb901d766d9104801b27f43e8ab367f05a2f#e5d9eb901d766d9104801b27f43e8ab367f05a2f"
 dependencies = [
  "alleycat-codex-proto",
  "anyhow",
@@ -175,6 +175,7 @@ dependencies = [
  "chrono",
  "dashmap",
  "futures",
+ "reqwest 0.12.28",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -185,7 +186,7 @@ dependencies = [
 [[package]]
 name = "alleycat-claude-bridge"
 version = "0.1.0"
-source = "git+https://github.com/AkaShark/alleycat.git?rev=4e95effd9f8d51cbee4d1e64c1d1bf79acb7d1be#4e95effd9f8d51cbee4d1e64c1d1bf79acb7d1be"
+source = "git+https://github.com/AkaShark/alleycat.git?rev=e5d9eb901d766d9104801b27f43e8ab367f05a2f#e5d9eb901d766d9104801b27f43e8ab367f05a2f"
 dependencies = [
  "alleycat-bridge-core",
  "alleycat-codex-proto",
@@ -209,7 +210,7 @@ dependencies = [
 [[package]]
 name = "alleycat-codex-proto"
 version = "0.1.0"
-source = "git+https://github.com/AkaShark/alleycat.git?rev=4e95effd9f8d51cbee4d1e64c1d1bf79acb7d1be#4e95effd9f8d51cbee4d1e64c1d1bf79acb7d1be"
+source = "git+https://github.com/AkaShark/alleycat.git?rev=e5d9eb901d766d9104801b27f43e8ab367f05a2f#e5d9eb901d766d9104801b27f43e8ab367f05a2f"
 dependencies = [
  "chrono",
  "serde",
@@ -220,7 +221,7 @@ dependencies = [
 [[package]]
 name = "alleycat-devin-bridge"
 version = "0.1.0"
-source = "git+https://github.com/AkaShark/alleycat.git?rev=4e95effd9f8d51cbee4d1e64c1d1bf79acb7d1be#4e95effd9f8d51cbee4d1e64c1d1bf79acb7d1be"
+source = "git+https://github.com/AkaShark/alleycat.git?rev=e5d9eb901d766d9104801b27f43e8ab367f05a2f#e5d9eb901d766d9104801b27f43e8ab367f05a2f"
 dependencies = [
  "alleycat-acp-bridge",
  "alleycat-bridge-core",
@@ -235,7 +236,7 @@ dependencies = [
 [[package]]
 name = "alleycat-droid-bridge"
 version = "0.1.0"
-source = "git+https://github.com/AkaShark/alleycat.git?rev=4e95effd9f8d51cbee4d1e64c1d1bf79acb7d1be#4e95effd9f8d51cbee4d1e64c1d1bf79acb7d1be"
+source = "git+https://github.com/AkaShark/alleycat.git?rev=e5d9eb901d766d9104801b27f43e8ab367f05a2f#e5d9eb901d766d9104801b27f43e8ab367f05a2f"
 dependencies = [
  "alleycat-bridge-core",
  "alleycat-codex-proto",
@@ -254,7 +255,7 @@ dependencies = [
 [[package]]
 name = "alleycat-grok-bridge"
 version = "0.1.0"
-source = "git+https://github.com/AkaShark/alleycat.git?rev=4e95effd9f8d51cbee4d1e64c1d1bf79acb7d1be#4e95effd9f8d51cbee4d1e64c1d1bf79acb7d1be"
+source = "git+https://github.com/AkaShark/alleycat.git?rev=e5d9eb901d766d9104801b27f43e8ab367f05a2f#e5d9eb901d766d9104801b27f43e8ab367f05a2f"
 dependencies = [
  "alleycat-acp-bridge",
  "alleycat-bridge-core",
@@ -270,7 +271,7 @@ dependencies = [
 [[package]]
 name = "alleycat-hermes-bridge"
 version = "0.1.0"
-source = "git+https://github.com/AkaShark/alleycat.git?rev=4e95effd9f8d51cbee4d1e64c1d1bf79acb7d1be#4e95effd9f8d51cbee4d1e64c1d1bf79acb7d1be"
+source = "git+https://github.com/AkaShark/alleycat.git?rev=e5d9eb901d766d9104801b27f43e8ab367f05a2f#e5d9eb901d766d9104801b27f43e8ab367f05a2f"
 dependencies = [
  "alleycat-bridge-core",
  "alleycat-codex-proto",
@@ -295,7 +296,7 @@ dependencies = [
 [[package]]
 name = "alleycat-mfcli-bridge"
 version = "0.1.0"
-source = "git+https://github.com/AkaShark/alleycat.git?rev=4e95effd9f8d51cbee4d1e64c1d1bf79acb7d1be#4e95effd9f8d51cbee4d1e64c1d1bf79acb7d1be"
+source = "git+https://github.com/AkaShark/alleycat.git?rev=e5d9eb901d766d9104801b27f43e8ab367f05a2f#e5d9eb901d766d9104801b27f43e8ab367f05a2f"
 dependencies = [
  "alleycat-acp-bridge",
  "alleycat-bridge-core",
@@ -312,7 +313,7 @@ dependencies = [
 [[package]]
 name = "alleycat-opencode-bridge"
 version = "0.1.0"
-source = "git+https://github.com/AkaShark/alleycat.git?rev=4e95effd9f8d51cbee4d1e64c1d1bf79acb7d1be#4e95effd9f8d51cbee4d1e64c1d1bf79acb7d1be"
+source = "git+https://github.com/AkaShark/alleycat.git?rev=e5d9eb901d766d9104801b27f43e8ab367f05a2f#e5d9eb901d766d9104801b27f43e8ab367f05a2f"
 dependencies = [
  "alleycat-bridge-core",
  "anyhow",
@@ -336,7 +337,7 @@ dependencies = [
 [[package]]
 name = "alleycat-pi-bridge"
 version = "0.1.0"
-source = "git+https://github.com/AkaShark/alleycat.git?rev=4e95effd9f8d51cbee4d1e64c1d1bf79acb7d1be#4e95effd9f8d51cbee4d1e64c1d1bf79acb7d1be"
+source = "git+https://github.com/AkaShark/alleycat.git?rev=e5d9eb901d766d9104801b27f43e8ab367f05a2f#e5d9eb901d766d9104801b27f43e8ab367f05a2f"
 dependencies = [
  "alleycat-bridge-core",
  "alleycat-codex-proto",
@@ -360,7 +361,7 @@ dependencies = [
 [[package]]
 name = "alleycat-shell-bridge"
 version = "0.1.0"
-source = "git+https://github.com/AkaShark/alleycat.git?rev=4e95effd9f8d51cbee4d1e64c1d1bf79acb7d1be#4e95effd9f8d51cbee4d1e64c1d1bf79acb7d1be"
+source = "git+https://github.com/AkaShark/alleycat.git?rev=e5d9eb901d766d9104801b27f43e8ab367f05a2f#e5d9eb901d766d9104801b27f43e8ab367f05a2f"
 dependencies = [
  "alleycat-bridge-core",
  "anyhow",
@@ -1864,9 +1865,11 @@ dependencies = [
  "percent-encoding",
  "pin-project-lite",
  "socket2",
+ "system-configuration",
  "tokio",
  "tower-service",
  "tracing",
+ "windows-registry",
 ]
 
 [[package]]

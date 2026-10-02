@@ -21,14 +21,10 @@ path = "src/main.rs"
 # reproducible builds / GPLv3 source-correspondence (was: branch = "main").
 # tools/scripts/update-alleycat-main.sh leaves this rev alone unless you opt in
 # with AGENTBUDDY_REFRESH_ALLEYCAT=1, so normal builds never float it.
-# 4e95eff is the head of the fork branch feat/host-push-notifications, which
-# holds all AgentBuddy changes to alleycat: host push subscriptions, the
-# MyFlicker agent and ACP bridge fixes (AkaShark/alleycat#2, merged into it),
-# ACP turn/start answering while the prompt runs, and ACP commands without a
-# cwd getting the session cwd.
-# AgentBuddy maintains alleycat on that branch; the fork main tracks upstream
-# and is not used (AkaShark/alleycat#1 was closed without merging).
-alleycat = { git = "https://github.com/AkaShark/alleycat.git", rev = "4e95effd9f8d51cbee4d1e64c1d1bf79acb7d1be" }
+# Host-only system-proxy fix on codex/host-system-proxy, based on the
+# feat/host-push-notifications maintenance branch (including the ACP fixes).
+# The mobile bridge dependencies stay on their existing revision.
+alleycat = { git = "https://github.com/AkaShark/alleycat.git", rev = "e5d9eb901d766d9104801b27f43e8ab367f05a2f" }
 anyhow = "1"
 
 [profile.release]
