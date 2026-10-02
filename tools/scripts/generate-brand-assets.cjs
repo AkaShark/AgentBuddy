@@ -40,9 +40,6 @@ async function main() {
     await write(relative, data);
     return data;
   }
-  await write('assets/brand/app-icon.svg', light);
-  await write('assets/brand/app-icon-dark.svg', dark);
-  await write('assets/brand/app-icon-macos.svg', mac);
   await png(light, 1024, `${ios}/Assets.xcassets/AppIcon.appiconset/Icon-1024.png`, true);
   await png(dark, 1024, `${ios}/Assets.xcassets/AppIcon.appiconset/Icon-1024-dark.png`, true);
   await png(tinted, 1024, `${ios}/Assets.xcassets/AppIcon.appiconset/Icon-1024-tinted.png`, true);
