@@ -26,31 +26,31 @@ The public bilingual privacy policy and deletion instructions are at
 `docs/site/privacy/index.html`; `.github/workflows/privacy-pages.yml` deploys
 only `docs/site` to GitHub Pages when that source changes on `main`.
 
-Outstanding before review:
+Latest completion pass (2026-10-02):
 
-- **Reviewer access:** the owner cannot provide a dedicated test host. The
-  release app requires a compatible host and has no public, fully featured
-  demo mode. Do not declare unrestricted access or attest that nonexistent
-  review credentials provide complete access. Resolve this prerequisite
-  before saving the access declaration.
-- **Target audience:** the owner selected 13–15, 16–17 and 18+. Play blocks
-  this form until reviewer-access details are completed. The IARC result
-  (ESRB Everyone / PEGI 3) is separate from the intended target audience.
-- **Data safety:** the full form is saved as a draft; Play blocks final save
-  until target-audience details are complete. It includes email, user IDs,
-  messages, photos, voice audio, files, user content/interactions, SDK
-  diagnostics/performance and installation/push identifiers. User-directed
-  transfers and service-provider processing use Play's sharing exceptions;
-  these still appear as collected data. Recheck whenever providers change.
-- **In-app privacy link:** add the public policy link to the shipping app;
-  saving a Console URL does not supply the required in-app link.
-- **Transport:** manual direct `ws://` connections are supported, so the
-  declaration does not claim all data is encrypted in transit. The Console
-  preview consequently displays its "data isn't encrypted" label. Review
-  plaintext transport before public release; do not change the declaration
-  to encrypted without changing and validating actual behavior.
-- Add testers; the Console still requires 12 opted-in closed testers for
-  14 continuous days before applying for production access.
+- Advertising ID saved as **not used**; the Console now shows no outstanding
+  app-content declarations. The version-12 AAB does not request `AD_ID`.
+- Target audience is saved as 13–15, 16–17 and 18+; Data safety is saved.
+- The owner chose to retain **no access restrictions** in login details.
+  This does not resolve reviewer access: the release still needs a compatible
+  host. The owner has no test host. Do not describe this as verified full access.
+- Store asset AI labels apply to the AI-assisted icon and feature graphic.
+  The four unmodified device screenshots are not AI image generations.
+- Settings now contains in-app privacy/deletion and AI-content-report links on
+  Android and iOS. Reports use the same hosted, script-free form without an
+  account or host. See `services/content-reports/README.md` for private review
+  and deletion; no report content or admin credentials belong in the repository.
+- Manual direct `ws://` remains supported. Data safety continues to say not all
+  data is encrypted in transit. Changing that answer requires changing and
+  validating the actual connection behavior.
+- The owner will recruit testers. Console currently shows 0 enrolled closed
+  testers; at least 12 must remain opted in for 14 continuous days before the
+  production-access application.
+
+Validation: Android debug compile, unit tests and APK build passed; iOS physical
+arm64 compile passed after project regeneration; the report service's nine tests
+passed. CI upload and device installation must be verified against the new build,
+not inferred from the API preflight or an older workflow run.
 
 ## Before the first Play upload
 

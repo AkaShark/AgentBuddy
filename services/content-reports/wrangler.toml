@@ -1,0 +1,15 @@
+name = "agentbuddy-content-reports"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+workers_dev = true
+
+[durable_objects]
+bindings = [{ name = "REPORTS", class_name = "ContentReports" }]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ContentReports"]
+
+# REPORT_ADMIN_TOKEN is a Worker secret; never ship it in the app.
+[observability]
+enabled = false

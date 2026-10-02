@@ -147,6 +147,10 @@ internal fun SettingsTopLevelContent(
             }
         }
 
+        settingsSection("支持与隐私", key = "support") {
+            SupportLinks()
+        }
+
         settingsSection("服务器", key = "servers") {
             if (state.servers.isEmpty()) {
                 SettingsNoteRow("未连接服务器", icon = Icons.Outlined.Info)

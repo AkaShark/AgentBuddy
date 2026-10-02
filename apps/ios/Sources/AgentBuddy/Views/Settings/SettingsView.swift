@@ -41,6 +41,7 @@ struct SettingsView: View {
                 petSection
                 experimentalSection
                 accountSection
+                supportSection
                 serversSection
             }
             .settingsMintList()
