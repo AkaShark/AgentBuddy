@@ -228,13 +228,28 @@ struct ModelPickerEffortChips: View {
                 ForEach(efforts) { effort in
                     let value = effort.reasoningEffort.wireValue
                     ModelPickerChip(
-                        title: Text(verbatim: value),
+                        title: Text(effort.reasoningEffort.chipTitle),
                         isSelected: value == selection,
                         action: { onSelect(value) }
                     )
                 }
             }
             .padding(.horizontal, contentInset)
+        }
+    }
+}
+
+private extension ReasoningEffort {
+    /// Chip label; the wire value (`low`, `xhigh`, …) is what gets sent.
+    var chipTitle: LocalizedStringKey {
+        switch self {
+        case .none: return "None"
+        case .minimal: return "Minimal"
+        case .low: return "Low"
+        case .medium: return "Medium"
+        case .high: return "High"
+        case .xHigh: return "Extra high"
+        case .max: return "Max"
         }
     }
 }

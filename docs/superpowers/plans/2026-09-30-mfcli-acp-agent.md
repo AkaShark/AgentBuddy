@@ -3009,6 +3009,42 @@ AgentBuddy 分支推送同样先征得用户同意。
 
 2026-10-01 收尾：alleycat `feat/mfcli-agent` 推到 AkaShark/alleycat（`d16ee21`，draft PR AkaShark/alleycat#2，叠在 #1 上），两处 pin 改为 `d16ee21`，`cargo check`（kittylitter）和 `make rust-check` 通过；`make desktop-sidecar` 用 pin 的源码构建正式 sidecar，替换进 `/Applications/AgentBuddy.app` 并重签；`make android` + `make android-install` 用新 pin 重建 JNI 库并装到 Pixel 9。用户给 AgentBuddy 开了完全磁盘访问权限后，`~/Desktop/Project/Person/Project/AgentBuddy` 项目里的 MyFlicker 任务（会话 `4fe043fb…`）在该目录起进程、约 2.5 秒恢复会话，`pwd` 输出该目录，回复 `grape`，不再卡住。注意：每次 ad-hoc 重签都会让这个授权失效，需要重新授权。
 
+### iOS（iPhone 16）
+
+2026-10-01 至 10-02（UTC 10-02 02:30–02:51），iPhone 16（iOS 26.5），分支 `feat/ios-mfcli` 的 Debug 版：用 Xcode MCP 编译，`devicectl` 安装；手机界面用 WebDriverAgent 操作和截图，手机端 Rust 日志用 `devicectl device process launch --console` 抓取。Mac 上的 daemon 先是 alleycat `ac8b1d1`，修复命令卡片后换成 `4e95eff` 的正式 sidecar（`make desktop-sidecar`，替换进 `/Applications/AgentBuddy.app` 并重签，用户重新开了完全磁盘访问权限）。项目目录：`~/Desktop/Project/Person/Project/mfcli-ios-qa`（验收专用，验收后已删除），任务会话 `8b13171c…`，终端会话 `bfd290a4`。
+
+| Step | 结果 | 证据 |
+|---|---|---|
+| 1 agent 出现 | 通过 | 这台 iPhone 的配对本来就选了 mfcli，不用重新配对：daemon 日志 `connect: dispatching to agent agent=mfcli`。新建任务的「搭档、模型与权限」里有 Codex 8 / MyFlicker 29 两个搭档；配对选择页的「兼容」图标条末尾是 MyFlicker 的「M」字母头像。 |
+| 2 模型列表 | 通过 | 万擎模型列表比 Android 验收时多了 DeepSeek V4.1 Flash、Kimi K3 等。档位和 mfcli 实际报告的一致（用 ACP 直接问 mfcli 核对）：Claude Sonnet 5 是 低 / 中 / 高 / 极高（mfcli 为 low / medium / high / max）；DeepSeek V4 Flash 是 高 / 极高（high / max）；DeepSeek V4.1 Flash 和 Kimi K3 是 低 / 高 / 极高（low / high / max）；Auto 和 Kimi K2.6 没有推理强度区。iOS 原来直接显示 `low` / `xhigh`，`b0db9b8` 改成和 Android 一样的中文名。 |
+| 3 新任务 | 通过（修复后） | DeepSeek V4 Flash 新建任务，回复流式出现，「Added hello-ios.txt」文件卡片在，磁盘上的文件内容是 `hello from iPhone 16`。第一次验收时 `pwd` / `ls` 的命令卡片只在重新打开任务后才出现，实时视图里没有，原因和修复见下。换上 `4e95eff` 后，第四轮的 `date && ls` 和第六轮的 `pwd` 命令卡片都实时出现。手机日志里能看到 `acp-tool-call_…` 的 `item/started` / `item/completed`，还有 `turn/completed`。 |
+| 4 多轮 | 通过 | 同一任务共 7 轮（hello / apple / banana / cherry / Claude 的回复 / lemon / kiwi）。每轮的思考、命令和回复都在自己的位置，没有覆盖前面的回复。 |
+| 5 切换模型 / 思考强度 | 通过 | 在 DeepSeek V4 Flash 的任务里切到 Claude Sonnet 5 + 低，第五轮会话文件里是 `model: wanqing/claude-5-sonnet`（前四轮是 `wanqing/deepseek-v4-flash`），`~/.codeflicker/config.json` 是 `thinkingLevel: low`。验收结束后已改回 `wanqing/gpt-6-astra` / `high`。 |
+| 6 历史 | 通过 | 强杀后重开任务（WDA terminate / launch），前五轮的用户消息、`pwd` / `ls` / `ls -la` / `echo` / `cat` / `date && ls` 命令卡片、文件卡片和回复都在，顺序正确。 |
+| 7 闲置恢复 | 通过 | 02:49:12 `Evicting 2 idle clients`（包括 mfcli-ios-qa 进程）；02:49:32 打开任务，在 mfcli-ios-qa 目录 `spawning ACP agent process`；02:49:55 发消息，`restoring ACP session in fresh process`（`session/resume`），02:50:06 `finalized turn`，回复 `lemon`。 |
+| 8 终端会话 | 通过（有限制） | 在 mfcli-ios-qa 运行 `mfcli -q "reply with only the word cherry"`（会话 `bfd290a4`）。刷新任务列表后，「项目 → mfcli-ios-qa」的最近任务第一条就是它；打开后历史完整（问题和 `cherry`）。从手机回复，回复 `plum`，写回同一个会话文件。限制：iOS 冷启动不会调用 `thread/list`，终端新建的任务要等列表刷新（例如打开「全部任务」）后才出现。 |
+| 9 推送 | 未通过（环境） | 手机订阅成功（`push subscription accepted`），回合结束后主机也排队了推送（`turn terminal queued for push`），但通知没有发出。原因是这台 Mac 直连 `workers.dev` 会超时，只能走代理，而 launchd 启动的 daemon 没有代理，Worker 的 `register` 一直失败。 |
+
+**命令卡片只在重开后出现（第 3 步）**
+- mfcli 的 `execute` 工具调用既没有 `rawInput.cwd`，也没有 `locations`，acp-bridge 就把 `commandExecution` 的 `cwd` 写成了 `""`。
+- 上游 codex 把 `cwd` 定义为 `AbsolutePathBuf`，手机端的 app-server client 解析这条 `item/started` / `item/completed` 时失败。整条通知会被静默丢掉（`app_server_event_from_notification` 里的 `Err(_) => None`）。这种回合的 `turn/completed` 里带着同一条命令，也一起被丢掉。
+- 历史能显示，是因为响应是带 base path 解析的。
+- Android 用同一套 Rust 和同一个 client，同样受影响。
+- alleycat 自己的 proto 把 `cwd` 定义为 `String`，所以主机测试一直没有发现。
+- 修复是 alleycat `4e95eff`（在 `feat/host-push-notifications` 上）：实时流和 `session/load` 回放都改用会话目录（不知道时用 `/`），并加了测试。
+- AgentBuddy `1657b41` 把两处 pin 改为 `4e95eff`；`cargo check`（kittylitter）和 `make rust-check` 都通过。
+
+**「Mfcli」标签**
+- iOS 没有这个问题。`AppModel.init` 把 `AgentRuntimeMetadataProvider` 接到了 `AppClient` 的 `AgentMetadataStore`。会话头部副标题是「MyFlicker · Sharkers-MacBook-Pro.local」，回复标签是「搭子 · MyFlicker」，输入框的搭档芯片是「MyFlicker」。iOS 的模型行没有副标题，图标的无障碍标签是 MyFlicker。
+- Android 的 `AgentRuntimeMetadataProvider.lookup` / `.all` 从来没有被赋值，所有标签都退回到首字母大写的 id。BETA、排序和能力开关也都用的是默认值。
+- `6a7e78e` 在 Android 的 `AppModel` 里把它接上了。审查发现，接上之后 Android 的 SSH 登录会把 Codex 送进 SSH 桥接选择器，所以又按 iOS 的规则排除了 `codex`。
+- `make android-debug` 编译通过；Pixel 9 这次连不上，Android 真机还没复验。
+
+**看到但没有处理（与 MyFlicker 无关）**
+- 新任务的标题在 iOS 上是英文「Untitled session」。
+- 新建项目的目录选择器有三个问题：切换主机后标签要过一会儿才更新；在 `/` 下「前往路径」输入绝对路径会得到 `//Users/…`；主目录显示为 `~` 时列目录失败过一次。
+- 「全部任务」的分组副标题显示主机的 node id，而不是主机名。
+
 ## 修订任务（2026-09-30，见 spec 第 12 节）
 
 ### Task 6b: acp-bridge 按项目目录分进程（`process_per_cwd`）

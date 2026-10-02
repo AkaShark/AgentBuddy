@@ -706,6 +706,12 @@
 "Partner" = "搭档";
 "Model" = "模型";
 "Reasoning effort" = "推理强度";
+"Minimal" = "极低";
+"Low" = "低";
+"Medium" = "中";
+"High" = "高";
+"Extra high" = "极高";
+"Max" = "最高";
 "Mode and access" = "模式与权限";
 "Search models" = "搜索模型";
 "Proposes a plan before making changes." = "先提出计划，再动手修改。";
