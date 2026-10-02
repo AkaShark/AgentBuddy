@@ -38,6 +38,22 @@ Current tests (`app/src/test/java/com/akashark/agentbuddy/android/`):
 
 ## Manual Matrix
 
+### Connection mark and startup screen (2026-10-02)
+
+| Check | Android | iOS parity |
+|---|---|---|
+| Brand mark | Native connection vector replaces the cat in the startup tile and in-app brand tiles; both use the same component with brand/onBrand colors and proportional corners | Same 24-unit paths, round 2.8-unit strokes, and 32/112 corner ratio |
+| Startup layout | 112dp brand tile, wordmark, theme background; light/dark Pixel 9 screenshots reviewed | Same tile, spacing, typography roles, and center offset |
+| Agent carousel | Three clipped/faded rows; codex → pi → amp → opencode → claude → droid → hermes → devin → grok; no provider icons | Same names, order and 0.9-second timing |
+| Remove animations | Two Pixel 9 captures 1.2 seconds apart remain on codex; original system animation setting restored | Reduce Motion keeps the first frame |
+| System splash | Default Mint light/dark background with a mint icon tile | System launch remains OS-managed; the in-app splash uses the selected theme |
+| Startup handoff | Normal cold launch reaches the home screen; existing 800ms minimum / 3s maximum unchanged | Existing lifecycle timing retained |
+
+Validation: cached-native `:app:assembleDebug` passed; installed and reviewed on
+physical Pixel 9. Screenshots are in `artifacts/brand-refresh-2026-10-02/`.
+The DEBUG gallery accepts `--es mint_gallery splash` and `--ez mint_dark true`
+for repeatable review without starting the runtime.
+
 ### Google Play onboarding / API 36 (2026-10-01)
 
 - Compile SDK and target SDK are 36; `:app:compileDebugKotlin` and `:app:testDebugUnitTest` pass locally.

@@ -25,6 +25,9 @@ object BuddySpacing {
  * global "corner radius" knob (handoff P0-1).
  */
 object BuddyRadius {
+    /** Large brand tile on the startup screen. */
+    val splashMark = 32.dp
+
     /** Small controls: segmented items, small tiles. */
     val control = 12.dp
 
@@ -81,6 +84,14 @@ object BuddyShapes {
 }
 
 object BuddySize {
+    /** Compact application identity tile. */
+    val brandMark = 32.dp
+
+    /** Shared iOS / Android startup composition. */
+    val splashMark = 112.dp
+    val splashProviderWidth = 104.dp
+    val splashProviderRow = 22.dp
+
     /** Default control height (buttons, rows, inputs). */
     val control = 48.dp
 

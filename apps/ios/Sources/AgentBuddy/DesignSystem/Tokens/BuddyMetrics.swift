@@ -43,6 +43,8 @@ enum BuddyRadius {
     static let sheet: CGFloat = 30
     /// Icon tiles inside rows (status tile, project initial).
     static let tile: CGFloat = 16
+    /// Brand tiles keep the same silhouette from header to splash.
+    static let brandTileRatio: CGFloat = 32.0 / 112.0
 }
 
 /// User message bubble corners: top-leading / top-trailing / bottom-trailing /
@@ -55,6 +57,10 @@ enum BuddyBubbleRadius {
 // MARK: - Sizes
 
 enum BuddySize {
+    static let brandMark: CGFloat = 32
+    static let splashMark: CGFloat = 112
+    /// Fits the longest bundled provider name in the splash's code type style.
+    static let splashAgentName: CGFloat = 92
     /// Default control height (buttons, rows, inputs).
     static let control: CGFloat = 48
     /// Minimum iOS hit target; icons stay 20–24 and the hit area grows around them.

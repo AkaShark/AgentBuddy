@@ -3,12 +3,12 @@ import SwiftUI
 #if DEBUG
 /// DEBUG-only state gallery for verifying the Mint UI on a physical device
 /// without a connected host. Launch with `--mint-gallery=<page>` where page is
-/// `home`, `projects`, `hosts`, `newtask`, `conversation`, `approvals` or
+/// `splash`, `home`, `projects`, `hosts`, `newtask`, `conversation`, `approvals` or
 /// `composer`, `accessories`, `prompts`, `addhost`, `pair`, `tasks`, `info`, `models`, `settings` or `expanded`; add `--mint-dark` for
 /// the dark palette. Nothing here writes user preferences.
 struct MintGalleryView: View {
     enum Page: String {
-        case home, conversation, approvals, composer, accessories, prompts, addhost, pair, tasks, info, models, settings, expanded, newtask, projects, hosts
+        case splash, home, conversation, approvals, composer, accessories, prompts, addhost, pair, tasks, info, models, settings, expanded, newtask, projects, hosts
     }
 
     static var requestedPage: Page? {
@@ -56,6 +56,8 @@ struct MintGalleryView: View {
     @ViewBuilder
     private var page: some View {
         switch Self.requestedPage ?? .home {
+        case .splash:
+            AnimatedSplashView(appReady: true) {}
         case .home:
             NavigationStack {
                 HomeShellView(

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 24 24">
+  <title>AgentBuddy — paired links</title>
+  <g fill="none" stroke="#172B20" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M13 5H9C6.79 5 5 6.79 5 9V13"/>
+    <path d="M11 19H15C17.21 19 19 17.21 19 15V11"/>
+    <path d="M10 14L14 10"/>
+  </g>
+</svg>

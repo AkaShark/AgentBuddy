@@ -282,7 +282,11 @@ pub fn install(app: &AppHandle) -> tauri::Result<()> {
         ],
     )?;
 
-    let mut builder = TrayIconBuilder::with_id("main")
+    // A template mark lets macOS choose a legible colour for either menu-bar appearance.
+    let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/tray-icon.png"))?;
+    TrayIconBuilder::with_id("main")
+        .icon(icon)
+        .icon_as_template(true)
         .tooltip("AgentBuddy")
         .menu(&menu)
         .show_menu_on_left_click(false)
@@ -304,11 +308,8 @@ pub fn install(app: &AppHandle) -> tauri::Result<()> {
             {
                 toggle_window(tray.app_handle());
             }
-        });
-    if let Some(icon) = app.default_window_icon().cloned() {
-        builder = builder.icon(icon);
-    }
-    builder.build(app)?;
+        })
+        .build(app)?;
 
     app.manage(TrayHandles { status, start_stop, autostart });
     Ok(())

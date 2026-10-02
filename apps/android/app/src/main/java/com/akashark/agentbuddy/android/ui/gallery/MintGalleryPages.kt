@@ -1,11 +1,14 @@
 package com.akashark.agentbuddy.android.ui.gallery
 
+import com.akashark.agentbuddy.android.ui.AnimatedSplashScreen
+
 /**
  * Registered gallery pages. Each feature adds its page here; keep one entry
  * per line so parallel additions merge cleanly.
  */
 val mintGalleryPages: List<MintGalleryPage> =
     listOf(
+        MintGalleryPage("splash", "启动画面") { AnimatedSplashScreen() },
         MintGalleryPage("components", "组件") { GalleryComponentsPage() },
         MintGalleryPage("settings", "设置") { GallerySettingsPage() },
         MintGalleryPage("appearance", "外观") { GalleryAppearancePage() },

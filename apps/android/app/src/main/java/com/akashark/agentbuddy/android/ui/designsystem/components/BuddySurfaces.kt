@@ -159,7 +159,12 @@ fun BuddyIconTile(
     foreground: Color = AgentBuddyTheme.textPrimary,
     size: Dp = BuddySize.rowTile,
 ) {
-    val shape = RoundedCornerShape(min(BuddyRadius.tile, size * 0.36f))
+    val radius = if (content == BuddyTileContent.BrandMark) {
+        size * (BuddyRadius.splashMark.value / BuddySize.splashMark.value)
+    } else {
+        min(BuddyRadius.tile, size * 0.36f)
+    }
+    val shape = RoundedCornerShape(radius)
     Box(
         modifier =
             modifier
@@ -180,7 +185,7 @@ fun BuddyIconTile(
                     maxLines = 1,
                 )
             BuddyTileContent.BrandMark ->
-                Icon(BuddyCatIcon, contentDescription = null, tint = foreground, modifier = Modifier.size(size * 0.56f))
+                Icon(BuddyLinkIcon, contentDescription = null, tint = foreground, modifier = Modifier.size(size * 0.80f))
         }
     }
 }

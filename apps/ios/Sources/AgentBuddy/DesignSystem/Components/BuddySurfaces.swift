@@ -159,9 +159,14 @@ struct BuddyIconTile: View {
     var foreground: Color = AgentBuddyTheme.textPrimary
     var size: CGFloat = BuddySize.rowTile
 
+    private var cornerRadius: CGFloat {
+        if case .brandMark = content { return size * BuddyRadius.brandTileRatio }
+        return min(BuddyRadius.tile, size * 0.36)
+    }
+
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: min(BuddyRadius.tile, size * 0.36), style: .continuous)
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .fill(fill)
             switch content {
             case .symbol(let name):
@@ -171,9 +176,9 @@ struct BuddyIconTile: View {
                 Text(verbatim: letter)
                     .font(.system(size: size * 0.42, weight: .semibold))
             case .brandMark:
-                BuddyCatShape()
-                    .stroke(style: StrokeStyle(lineWidth: max(1.2, size / 24), lineCap: .round, lineJoin: .round))
-                    .frame(width: size * 0.5, height: size * 0.5)
+                BuddyLinkShape()
+                    .stroke(style: StrokeStyle(lineWidth: size * 0.8 * 2.8 / 24, lineCap: .round, lineJoin: .round))
+                    .frame(width: size * 0.8, height: size * 0.8)
             }
         }
         .foregroundStyle(foreground)

@@ -18,33 +18,34 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySize
 import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySpacing
 import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyTextStyle
 import com.akashark.agentbuddy.android.ui.designsystem.tokens.buddyTextStyle
 
-// Lucide "cat" outline (ISC licence, see
-// artifacts/design/agentbuddy-ui-v1/spec/LUCIDE-LICENSE.txt), on its 24×24 grid.
-private const val CAT_HEAD =
-    "M12 5c.67 0 1.35.09 2 .26 1.78-2 5.03-2.84 6.42-2.26 1.4.58-.42 7-.42 7 .57 1.07 1 2.24 1 3.44" +
-        "C21 17.9 16.97 21 12 21s-9-3-9-7.56c0-1.25.5-2.4 1-3.44 0 0-1.89-6.42-.5-7 1.39-.58 4.72.23 6.5 2.23" +
-        "A9.04 9.04 0 0 1 12 5Z"
-private const val CAT_FACE = "M8 14v.5 M16 14v.5 M11.25 16.25h1.5L12 17l-.75-.75Z"
+// Two open corners joined by a diagonal: the shared AgentBuddy connection mark.
+// Keep these paths in sync with the iOS mark and source brand artwork.
+private val LINK_PATHS = listOf(
+    "M13 5 H9 C6.79 5 5 6.79 5 9 V13",
+    "M11 19 H15 C17.21 19 19 17.21 19 15 V11",
+    "M10 14 L14 10",
+)
 
 /** The app mark as a stroked vector; tint it like any icon. */
-val BuddyCatIcon: ImageVector by lazy {
+val BuddyLinkIcon: ImageVector by lazy {
     ImageVector.Builder(
-        name = "BuddyCat",
+        name = "BuddyLink",
         defaultWidth = 24.dp,
         defaultHeight = 24.dp,
         viewportWidth = 24f,
         viewportHeight = 24f,
     ).apply {
-        for (data in listOf(CAT_HEAD, CAT_FACE)) {
+        for (data in LINK_PATHS) {
             addPath(
                 pathData = PathParser().parsePathString(data).toNodes(),
                 fill = null,
                 stroke = SolidColor(Color.Black),
-                strokeLineWidth = 1.8f,
+                strokeLineWidth = 2.8f,
                 strokeLineCap = StrokeCap.Round,
                 strokeLineJoin = StrokeJoin.Round,
             )
@@ -52,17 +53,17 @@ val BuddyCatIcon: ImageVector by lazy {
     }.build()
 }
 
-/** App mark: cat outline on an `action` tile (deep green in light, mint in dark). */
+/** App identity tile using the theme's brand surface and ink. */
 @Composable
 fun BuddyBrandMark(
     modifier: Modifier = Modifier,
-    size: Dp = 32.dp,
+    size: Dp = BuddySize.brandMark,
 ) {
     BuddyIconTile(
         content = BuddyTileContent.BrandMark,
         modifier = modifier,
-        fill = AgentBuddyTheme.action,
-        foreground = AgentBuddyTheme.onAction,
+        fill = AgentBuddyTheme.brand,
+        foreground = AgentBuddyTheme.onBrand,
         size = size,
     )
 }
@@ -71,7 +72,7 @@ fun BuddyBrandMark(
 @Composable
 fun BuddyWordmark(
     modifier: Modifier = Modifier,
-    markSize: Dp = 32.dp,
+    markSize: Dp = BuddySize.brandMark,
 ) {
     Row(
         modifier = modifier.semantics(mergeDescendants = true) { heading() },
