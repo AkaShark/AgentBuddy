@@ -48,7 +48,7 @@ Current tests (`app/src/test/java/com/akashark/agentbuddy/android/`):
 | Agent carousel | Three clipped/faded rows; codex → pi → amp → opencode → claude → droid → hermes → devin → grok; no provider icons | Same names, order and 0.9-second timing |
 | Remove animations | Two Pixel 9 captures 1.2 seconds apart remain on codex; original system animation setting restored | Reduce Motion keeps the first frame |
 | System splash | Native and Compose launch layers share the rounded tile and Mint light/dark palette; Android 12+ persists the app's light/dark/system preference for the next starting window | Android-specific OS integration; iOS launch behavior unchanged |
-| Startup handoff | Native layer fades into the matching Compose mark; the 800ms branding deadline starts in `onCreate`, so initialization consumes that time instead of adding a second 800ms wait; 3s fallback measured from the same start when content fails | Android-specific timing; no iOS follow-up needed |
+| Startup handoff | Native layer fades into the matching Compose mark; the 2.8s branding deadline starts in `onCreate` (extended by 2s for carousel visibility), so initialization consumes that time instead of adding a second wait; 3s fallback measured from the same start when content fails | Android-specific timing following the handoff fix; iOS timing unchanged |
 | Activity recreation | Appearance changes and other configuration recreation skip the Compose branding overlay | Platform lifecycle behavior |
 | Compact height | Pixel 9 landscape keeps the mark centered and the carousel clear; title hides first, then footer padding shrinks when needed; extremely short windows show only the mark | Android layout accommodates its fixed system-mark position |
 
