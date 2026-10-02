@@ -1,0 +1,24 @@
+name: Content Reports CI
+on:
+  push:
+    branches: [main]
+    paths: ['services/content-reports/**', '.github/workflows/content-reports-ci.yml']
+  pull_request:
+    paths: ['services/content-reports/**', '.github/workflows/content-reports-ci.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: services/content-reports/package-lock.json
+      - run: npm ci
+        working-directory: services/content-reports
+      - run: npm run typecheck && npm test
+        working-directory: services/content-reports

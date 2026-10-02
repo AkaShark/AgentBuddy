@@ -235,6 +235,7 @@
 		367FEE637B428486D27CF5F7 /* SwiftSshTrustBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBFD536485393E6DC532114D /* SwiftSshTrustBackend.swift */; };
 		36B9AA19881AD3D12E336FE6 /* vitesse-dark.json in Resources */ = {isa = PBXBuildFile; fileRef = 5FBA3340F7C397C9F6A5F7FC /* vitesse-dark.json */; };
 		36C1234C67D4BD9E589614E1 /* CarPlay.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2B115BA090231D70E5E25436 /* CarPlay.framework */; };
+		3703D73C8D497017872EC1BF /* SettingsView+Support.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05C1C3EF7EA7F2A449193A32 /* SettingsView+Support.swift */; };
 		372DC28B023636F4F085480B /* SessionsModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D74BF327AF327905791D2681 /* SessionsModel.swift */; };
 		37AF50AFBA28FB34BC3A9E9A /* HomeNavigationView+ThreadActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65C90B5B86D933BFC7665E04 /* HomeNavigationView+ThreadActions.swift */; };
 		37D3D512F2EB0358A96B7EAC /* TurnLiveActivityController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6568FF76D07EC37A7C851CA /* TurnLiveActivityController.swift */; };
@@ -393,6 +394,7 @@
 		586C08216FEB62267AD626CF /* HomeNavigationView+PinnedHydration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62B571F13CDD2DB620C3A5C9 /* HomeNavigationView+PinnedHydration.swift */; };
 		58C00D28010E0898E3392EE0 /* catppuccin-macchiato.json in Resources */ = {isa = PBXBuildFile; fileRef = 03CFA6011F60E0BDB16F42B0 /* catppuccin-macchiato.json */; };
 		58C38B97AFA1B37741157DD4 /* WebRTC in Frameworks */ = {isa = PBXBuildFile; productRef = C565B7713842008E84F039E9 /* WebRTC */; };
+		58FC00D2863958B0A86B8942 /* SettingsView+Support.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05C1C3EF7EA7F2A449193A32 /* SettingsView+Support.swift */; };
 		596DAB6C92E7769F11897440 /* WatchHapticDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2506B33FC7C0CD473279128B /* WatchHapticDetector.swift */; };
 		59E48CDA626D586C22322A05 /* WallpaperTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA85C161D29D4AE5EC1378C0 /* WallpaperTypes.swift */; };
 		5A29D99DDBE1881CDFCB6328 /* absolutely-dark.json in Resources */ = {isa = PBXBuildFile; fileRef = 438B7301AD38271DA6A5885F /* absolutely-dark.json */; };
@@ -1231,6 +1233,7 @@
 		044AB63014D7C23EE38D5E05 /* ConversationTurnDiffRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationTurnDiffRow.swift; sourceTree = "<group>"; };
 		052C150E6585F00959E4E5C6 /* OpenServerOnWatchIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenServerOnWatchIntent.swift; sourceTree = "<group>"; };
 		0582C942F36CD23FA5ED923D /* brand_logo.svg */ = {isa = PBXFileReference; path = brand_logo.svg; sourceTree = "<group>"; };
+		05C1C3EF7EA7F2A449193A32 /* SettingsView+Support.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SettingsView+Support.swift"; sourceTree = "<group>"; };
 		0642D540F36267E4693036CD /* HomeDashboardSupportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeDashboardSupportTests.swift; sourceTree = "<group>"; };
 		064A0934B6992F534C3AE2B9 /* ConversationItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationItem.swift; sourceTree = "<group>"; };
 		0688BF79726449EA5E1FCABC /* RealtimeConversationProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealtimeConversationProtocolTests.swift; sourceTree = "<group>"; };
@@ -1982,6 +1985,7 @@
 				33E36638C5E149B6A67CB859 /* SettingsView+PetAndExperimental.swift */,
 				94751619AD2BE7CAF1E58873 /* SettingsView+ServerConnection.swift */,
 				43599496E76CACA3E25605D0 /* SettingsView+Servers.swift */,
+				05C1C3EF7EA7F2A449193A32 /* SettingsView+Support.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -3150,7 +3154,7 @@
 					};
 					FB10F64474F8F06D5D296857 = {
 						DevelopmentTeam = HNKUYWPBVC;
-						SystemCapabilities = "[\"com.apple.Push\": [\"enabled\": true], \"com.apple.BackgroundModes\": [\"enabled\": true]]";
+						SystemCapabilities = "[\"com.apple.BackgroundModes\": [\"enabled\": true], \"com.apple.Push\": [\"enabled\": true]]";
 					};
 				};
 			};
@@ -3728,6 +3732,7 @@
 				695D7D907C282708C496B0FB /* SettingsView+PetAndExperimental.swift in Sources */,
 				48A8FA18AF829A7B95E14CE7 /* SettingsView+ServerConnection.swift in Sources */,
 				820BAA69AEBA4FDF5BD63D81 /* SettingsView+Servers.swift in Sources */,
+				3703D73C8D497017872EC1BF /* SettingsView+Support.swift in Sources */,
 				EF038FC6FD8AF122D549C2E8 /* SettingsView.swift in Sources */,
 				B2B429338DF6AF54232CCA62 /* SilentAudioKeeper.swift in Sources */,
 				5B2D669F5037E1B823265309 /* SshSessionStore.swift in Sources */,
@@ -4168,6 +4173,7 @@
 				4B590849E040D498F065970B /* SettingsView+PetAndExperimental.swift in Sources */,
 				542DBB24A52E28BF4EFF41D4 /* SettingsView+ServerConnection.swift in Sources */,
 				B23B40576C1003FE830CB519 /* SettingsView+Servers.swift in Sources */,
+				58FC00D2863958B0A86B8942 /* SettingsView+Support.swift in Sources */,
 				3BE0CC268915DE81F865F37D /* SettingsView.swift in Sources */,
 				C93B79C268A916E62AFA51DE /* SilentAudioKeeper.swift in Sources */,
 				B6E713BDA36559BCB19AE71F /* SshSessionStore.swift in Sources */,

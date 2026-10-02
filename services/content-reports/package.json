@@ -1,0 +1,16 @@
+{
+  "name": "agentbuddy-content-reports",
+  "version": "0.1.0",
+  "private": true,
+  "license": "GPL-3.0-only WITH LicenseRef-App-Store-Google-Play-Exception",
+  "scripts": {
+    "test": "node --test tests/*.cjs",
+    "typecheck": "tsc --noEmit",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "4.20260312.1",
+    "typescript": "5.9.3",
+    "wrangler": "4.72.0"
+  }
+}

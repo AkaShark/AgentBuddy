@@ -359,3 +359,12 @@ Replaces the prior WebSocket + base64-PCM audio pump with a platform-native WebR
 | Idle > 5 min | Next message still works (process respawn + session resume) |
 | Terminal sessions | Session started with `mfcli` in a project from `~/.codeflicker/data.json` is listed and can be continued |
 | Approvals | Not shown on the phone (auto-approved on the host; phase 2) |
+
+## Store readiness (2026-10-02)
+
+Android and iOS settings expose the public privacy/deletion policy and a hosted
+in-app AI content report form without a host connection. No conversation is
+attached automatically. Android compile/unit tests/APK and iOS physical-arm64
+compile passed. Backend tests cover consent, size, origin, admin authentication,
+rate limits, idempotency, retention and storage failure. Physical Android UI
+verification remains pending while no device is connected.
