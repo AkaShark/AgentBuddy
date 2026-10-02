@@ -25,13 +25,13 @@ val androidAbis = rootProject.extra["androidAbis"] as List<String>
 
 android {
     namespace = "com.akashark.agentbuddy.android"
-    compileSdk = 35
+    compileSdk = 36
     ndkVersion = projectPropOrEnv("ANDROID_NDK_VERSION") ?: "30.0.14904198"
 
     defaultConfig {
         applicationId = "com.akashark.agentbuddy.android"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 11
         versionName = "1.5.0"
         buildConfigField("boolean", "ENABLE_ON_DEVICE_BRIDGE", "true")

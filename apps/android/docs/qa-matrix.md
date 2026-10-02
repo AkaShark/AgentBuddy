@@ -38,6 +38,14 @@ Current tests (`app/src/test/java/com/akashark/agentbuddy/android/`):
 
 ## Manual Matrix
 
+### Google Play onboarding / API 36 (2026-10-01)
+
+- Compile SDK and target SDK are 36; `:app:compileDebugKotlin` and `:app:testDebugUnitTest` pass locally.
+- Play release/preflight script tests and release workflow `actionlint` checks pass.
+- First signed API 36 AAB upload, Play App Signing, service-account app permissions and internal tester installation remain pending Console setup.
+- Before tester rollout, smoke-test Android 16 launch, system back navigation, keyboard/insets, remote pairing, notifications and voice on device. JVM tests do not validate target-SDK behavior changes.
+- This is Android distribution configuration; iOS runtime/parity behavior is unchanged.
+
 | Area | Expected |
 |---|---|
 | App launch | App launches and can start a local bridge-backed session |
