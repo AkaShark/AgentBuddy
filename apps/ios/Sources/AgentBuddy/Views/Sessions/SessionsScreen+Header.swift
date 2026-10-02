@@ -28,11 +28,7 @@ extension SessionsScreen {
         }
         .buttonStyle(BuddyButtonStyle(kind: .primary, isLoading: isStartingNewSession))
         .disabled(isStartingNewSession)
-        // Mac builds (Catalyst + iOS-on-Mac) bind Cmd+N at the menu
-        // level via `MacCommands`; the in-view shortcut would either
-        // double-bind (Catalyst) or be the only binding (iOS-on-Mac
-        // doesn't get menus, so we keep it on then).
-        .keyboardShortcut(AgentBuddyPlatform.isCatalyst ? nil : KeyboardShortcut("n", modifiers: [.command]))
+        .keyboardShortcut("n", modifiers: [.command])
         .accessibilityIdentifier("sessions.newSessionButton")
     }
 

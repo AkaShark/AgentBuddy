@@ -33,20 +33,6 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         AgentBuddyPlatform.bootstrapLocalRuntimeIfNeeded()
         LLog.bootstrap()
 
-        #if targetEnvironment(macCatalyst)
-        // On unsandboxed Mac Catalyst, send the spawned codex child a
-        // SIGTERM during termination so it does not outlive the app.
-        // willTerminate runs on the main thread and gives ~5s; the
-        // blocking variant detaches the actual stop off the main actor
-        // so awaiting it does not deadlock.
-        NotificationCenter.default.addObserver(
-            forName: UIApplication.willTerminateNotification,
-            object: nil,
-            queue: .main
-        ) { _ in
-            LocalCodexBootstrap.shared.stopBlocking(timeout: 2.5)
-        }
-        #endif
 
         NotificationCenter.default.addObserver(
             forName: UIApplication.protectedDataDidBecomeAvailableNotification,
@@ -114,8 +100,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
 
     func applicationWillTerminate(_ application: UIApplication) {
         // Best-effort graceful shutdown of the iroh endpoint. iOS only
-        // fires this hook reliably on Catalyst (NSApplicationDelegate)
-        // and on OS-initiated terminations from background — swipe-up-
+        // may fire this hook on OS-initiated terminations from background — swipe-up-
         // to-kill from app switcher does NOT fire it. Acceptable: the
         // cost of skipping is one "Aborting ungracefully" log on iroh's
         // side and the daemon waiting up to its idle timeout to reap

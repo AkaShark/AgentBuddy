@@ -45,31 +45,7 @@ struct ExperimentalFeaturesView: View {
                 .tint(AgentBuddyTheme.action)
                 .settingsMintRow()
 
-                #if DEBUG
-                NavigationLink {
-                    ProximityPairView()
-                } label: {
-                    SettingsMintRowLabel(
-                        "Pair",
-                        subtitle: "Walk-up pairing with proximity + haptics",
-                        systemImage: "wave.3.right"
-                    )
-                }
-                .settingsMintRow()
-                #endif
 
-                #if !targetEnvironment(macCatalyst) && DEBUG
-                NavigationLink {
-                    UWBDebugView()
-                } label: {
-                    SettingsMintRowLabel(
-                        "UWB Debug",
-                        subtitle: "Live distance & direction to a paired Mac",
-                        systemImage: "dot.radiowaves.left.and.right"
-                    )
-                }
-                .settingsMintRow()
-                #endif
             } header: {
                 Text("Debug")
                     .settingsMintHeader()

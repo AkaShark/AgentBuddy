@@ -52,7 +52,6 @@
 	<array>
 		<string>_codex._tcp</string>
 		<string>_ssh._tcp</string>
-		<string>_litter-pair._tcp</string>
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Codex discovers coding agents and SSH servers on your local network.</string>
@@ -60,10 +59,6 @@
 	<string>AgentBuddy uses the camera to capture photos for conversations.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>AgentBuddy uses the microphone for voice-to-text input.</string>
-	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>AgentBuddy uses Bluetooth to detect when your iPhone is near your paired Mac.</string>
-	<key>NSNearbyInteractionUsageDescription</key>
-	<string>AgentBuddy uses Nearby Interaction to confirm your iPhone and Mac are close before pairing.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>NSSupportsLiveActivitiesFrequentUpdates</key>

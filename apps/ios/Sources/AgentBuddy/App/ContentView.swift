@@ -101,11 +101,6 @@ struct ContentView: View {
             InterfaceStyleSynchronizer(style: effectiveInterfaceStyle)
                 .frame(width: 0, height: 0)
         }
-        #if targetEnvironment(macCatalyst)
-        .background {
-            MacWindowTitleBarStyler()
-        }
-        #endif
     }
 
     private var observedContent: some View {
@@ -180,11 +175,6 @@ struct ContentView: View {
                         .frame(width: 0, height: 0)
                 }
         }
-        #if targetEnvironment(macCatalyst)
-        .onReceive(NotificationCenter.default.publisher(for: .agentBuddyCommandShowSettings)) { _ in
-            appState.showSettings = true
-        }
-        #endif
     }
 
     private func standardHomeNavigationView(topInset: CGFloat, bottomInset: CGFloat) -> some View {

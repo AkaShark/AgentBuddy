@@ -19,7 +19,7 @@ extension NetworkDiscovery {
 
 @MainActor
 /// Resolved Bonjour service — name, host (first IPv4), and port. Shared
-/// shape for `_codex._tcp`, `_ssh._tcp`, and `_litter-pair._tcp.` clients.
+/// shape for `_codex._tcp` and `_ssh._tcp` clients.
 struct BonjourResolvedService: Hashable {
     let name: String
     let host: String

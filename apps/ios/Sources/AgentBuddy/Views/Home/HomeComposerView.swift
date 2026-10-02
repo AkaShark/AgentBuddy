@@ -54,7 +54,7 @@ struct HomeComposerView: View {
     }
 
     private var attachSheetDetentHeight: CGFloat {
-        let showsCamera = !AgentBuddyPlatform.isCatalyst
+        let showsCamera = true
         let count = 2 + (showsCamera ? 1 : 0)
         return count >= 3 ? 300 : 240
     }
@@ -163,7 +163,7 @@ struct HomeComposerView: View {
                     showAttachMenu = false
                     showFileImporter = true
                 },
-                onTakePhoto: AgentBuddyPlatform.isCatalyst ? nil : {
+                onTakePhoto: {
                     showAttachMenu = false
                     showCamera = true
                 }

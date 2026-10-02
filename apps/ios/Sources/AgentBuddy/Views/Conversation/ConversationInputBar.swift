@@ -186,11 +186,6 @@ struct ConversationInputBar: View {
             hasLoggedKeyboardShown = true
             os_signpost(.event, log: conversationViewSignpostLog, name: "KeyboardShown")
         }
-        #if targetEnvironment(macCatalyst)
-        .onReceive(NotificationCenter.default.publisher(for: .agentBuddyCommandSendComposer)) { _ in
-            handleSend()
-        }
-        #endif
         .onDisappear {
             if voiceManager.isRecording { voiceManager.cancelRecording() }
             popupRefreshTask?.cancel()

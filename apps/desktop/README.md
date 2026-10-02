@@ -32,6 +32,10 @@ CI 将停止守护进程放在独立的 `always()` 步骤中，测试失败也�
 
 ## 发布
 
+这是项目唯一的 macOS 应用。旧 iOS Catalyst target 与发布流水线已移除。
+桌面包标识为 `com.akashark.agentbuddy.host`，当前分发方式是 Developer ID 签名、公证后的 DMG；
+现有构建配置未提供 Mac App Store / TestFlight 上传流程。
+
 ```bash
 APPLE_SIGNING_IDENTITY="Developer ID Application: … (HNKUYWPBVC)" \
 APPLE_API_KEY=<key id> APPLE_API_ISSUER=<issuer id> \

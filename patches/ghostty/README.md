@@ -29,7 +29,7 @@ build with `GHOSTTY_KEEP_ZIG_CACHE=1` so zig reuses it instead of re-fetching.
 
 ## Proxy handling
 
-The iOS (including Mac Catalyst) and Android Ghostty build scripts default to
+The iOS and Android Ghostty build scripts default to
 removing uppercase and lowercase HTTP/HTTPS/ALL proxy variables only within
 the Zig build subprocess. This avoids the HTTP 400 observed with the local
 port-7897 proxy. Git/submodule sync and the invoking shell retain their settings.

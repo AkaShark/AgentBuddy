@@ -10,14 +10,9 @@ options:
     icon:
       file: true
 
-# DeveloperID is a release-style configuration used by the Mac Catalyst
-# direct-distribution lane (notarized .dmg). It points the AgentBuddyMac target
-# at a separate, unsandboxed entitlements file so the app can spawn a local
-# `codex app-server`. The Mac App Store lane stays on Release with sandbox.
 configs:
   Debug: debug
   Release: release
-  DeveloperID: release
 
 settings:
   base:
@@ -71,7 +66,6 @@ targets:
         excludes:
           - "**/*.h"
           - "AppIcon.icon"
-          - "**/Info-Catalyst-InfoPlist.strings"
       - path: Sources/AgentBuddy/Bridge/UniFFICodexClient.generated.swift
       - path: Sources/AgentBuddyLiveActivity/CodexTurnLiveActivity.swift
       - path: Sources/AgentBuddyWatch/Models/WatchModels.swift
@@ -107,7 +101,7 @@ targets:
       - package: Nuke
         product: NukeUI
       # Embeds AgentBuddyLiveActivity.appex (PlugIns) and AgentBuddyWatch.app
-      # (Watch). AgentBuddyMac intentionally does not depend on these.
+      # (Watch).
       - target: AgentBuddyLiveActivity
         embed: true
       - target: AgentBuddyWatch
@@ -115,6 +109,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.akashark.agentbuddy
+        SUPPORTS_MACCATALYST: NO
         INFOPLIST_KEY_CFBundleDisplayName: "AgentBuddy"
         INFOPLIST_FILE: Sources/AgentBuddy/Info.plist
         SWIFT_OBJC_BRIDGING_HEADER: Sources/AgentBuddy/Bridge/codex_bridge_objc.h
@@ -134,118 +129,6 @@ targets:
           PROVISIONING_PROFILE_SPECIFIER: "$(APP_PROVISIONING_PROFILE_SPECIFIER)"
           APP_PROVISIONING_PROFILE_SPECIFIER: ""
           OTHER_LDFLAGS: "$(inherited) -lc++ -lz -lresolv -lcodex_mobile_client -lghostty"
-  AgentBuddyMac:
-    type: application
-    platform: auto
-    supportedDestinations:
-      - macCatalyst
-    entitlements:
-      path: Sources/AgentBuddy/AgentBuddy-Catalyst.entitlements
-      properties:
-        aps-environment: production
-        # iCloud KVS sync (Feature C). Re-add when the iCloud container
-        # `iCloud.com.akashark.agentbuddy` exists in the Apple Developer Portal
-        # AND the Mac App Store profile is regenerated to include the iCloud
-        # capability. Direct-dist (DeveloperID entitlements) keeps the key
-        # because Developer ID apps validate iCloud at runtime, not via profile.
-        # com.apple.developer.ubiquity-kvstore-identifier: $(TeamIdentifierPrefix)iCloud.com.akashark.agentbuddy
-        com.apple.security.application-groups:
-          - group.com.akashark.agentbuddy
-        com.apple.security.app-sandbox: true
-        com.apple.security.device.bluetooth: true
-        com.apple.security.files.user-selected.read-write: true
-        com.apple.security.network.client: true
-        com.apple.security.network.server: true
-    sources:
-      - path: Sources/AgentBuddy
-        excludes:
-          - CarPlay/**
-          - Info.plist
-          # Xcode maps Info-Catalyst-InfoPlist.strings to InfoPlist.strings
-          # for this target; including both produces the same output twice.
-          - "**/InfoPlist.strings"
-          - AgentBuddy.entitlements
-          - AgentBuddy-Catalyst.entitlements
-          - AgentBuddy-Catalyst-DeveloperID.entitlements
-          - "Models/AppLifecycleController*.swift"
-          - "Models/AppRuntimeController*.swift"
-          - "Models/CodexTurnAttributes*.swift"
-          - "Models/CodexVoiceCallAttributes*.swift"
-          - "Models/OrientationResponder*.swift"
-          - "Models/RealtimeWebRtcSession*.swift"
-          - "Models/StableSafeAreaInsets*.swift"
-          - "Models/TurnLiveActivityController*.swift"
-          - "Models/VoiceRuntimeController*.swift"
-          - "Models/VoiceSessionControl*.swift"
-          - "Models/VoiceSessionModels*.swift"
-          - "Models/WatchCompanionBridge*.swift"
-          - "Models/WatchProjection*.swift"
-          - "Views/HomeVoiceOrbButton*.swift"
-          - "Views/InlineVoiceButton*.swift"
-          - "Views/InlineVoiceStatusStrip*.swift"
-          - "Views/LiveActivityPreview*.swift"
-          - "Views/LockScreenCardView*.swift"
-          - "Views/RealtimeVoiceScreen*.swift"
-          - "Views/VoiceCallView*.swift"
-          - "**/*.h"
-      - path: Sources/AgentBuddy/Bridge/UniFFICodexClient.generated.swift
-    resources:
-      - path: Sources/AgentBuddy/Resources/Fonts
-      - path: Sources/AgentBuddy/Resources/Themes
-      - path: Sources/AgentBuddy/Resources/home_cat.png
-      - path: Sources/AgentBuddy/Resources/home_cat_entrance.png
-    dependencies:
-      - sdk: Security.framework
-      - sdk: SystemConfiguration.framework
-      - sdk: Network.framework
-      - package: Hairball
-        product: HairballUI
-      - package: Nuke
-        product: Nuke
-      - package: Nuke
-        product: NukeUI
-    settings:
-      base:
-        PRODUCT_NAME: AgentBuddy
-        PRODUCT_BUNDLE_IDENTIFIER: com.akashark.agentbuddy
-        DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER: NO
-        INFOPLIST_FILE: Sources/AgentBuddy/Info-Catalyst.plist
-        ASSETCATALOG_COMPILER_APPICON_NAME: AppIconMac
-        SWIFT_OBJC_BRIDGING_HEADER: Sources/AgentBuddy/Bridge/codex_bridge_objc.h
-        SUPPORTS_MACCATALYST: YES
-        SUPPORTS_MACCATALYST_OPTIMIZED_FOR_MAC: YES
-        MACOSX_DEPLOYMENT_TARGET: "14.0"
-        "LIBRARY_SEARCH_PATHS[sdk=macosx*]": "$(inherited) $(PROJECT_DIR)/GeneratedRust/ios-macabi"
-      configs:
-        Debug:
-          CODE_SIGN_STYLE: "$(APP_CODE_SIGN_STYLE)"
-          APP_CODE_SIGN_STYLE: Automatic
-          PROVISIONING_PROFILE_SPECIFIER: "$(APP_PROVISIONING_PROFILE_SPECIFIER)"
-          APP_PROVISIONING_PROFILE_SPECIFIER: ""
-          OTHER_LDFLAGS: "$(inherited) -lc++ -lz -lresolv -lcodex_mobile_client -lghostty"
-        Release:
-          CODE_SIGN_STYLE: "$(APP_CODE_SIGN_STYLE)"
-          APP_CODE_SIGN_STYLE: Automatic
-          CODE_SIGN_IDENTITY: "$(APP_CODE_SIGN_IDENTITY)"
-          APP_CODE_SIGN_IDENTITY: ""
-          PROVISIONING_PROFILE_SPECIFIER: "$(APP_PROVISIONING_PROFILE_SPECIFIER)"
-          APP_PROVISIONING_PROFILE_SPECIFIER: ""
-          OTHER_LDFLAGS: "$(inherited) -lc++ -lz -lresolv -lcodex_mobile_client -lghostty"
-        # Direct-distribution (notarized .dmg) lane. Re-points
-        # CODE_SIGN_ENTITLEMENTS at the unsandboxed entitlements file so the
-        # Mac build can spawn a local `codex app-server`. Same automatic
-        # signing flow as Release; the actual cert is selected via the
-        # APP_CODE_SIGN_IDENTITY override the script passes through.
-        DeveloperID:
-          CODE_SIGN_STYLE: "$(APP_CODE_SIGN_STYLE)"
-          APP_CODE_SIGN_STYLE: Automatic
-          CODE_SIGN_IDENTITY: "$(APP_CODE_SIGN_IDENTITY)"
-          APP_CODE_SIGN_IDENTITY: ""
-          PROVISIONING_PROFILE_SPECIFIER: "$(APP_PROVISIONING_PROFILE_SPECIFIER)"
-          APP_PROVISIONING_PROFILE_SPECIFIER: ""
-          OTHER_LDFLAGS: "$(inherited) -lc++ -lz -lresolv -lcodex_mobile_client -lghostty"
-          ENABLE_HARDENED_RUNTIME: YES
-          CODE_SIGN_ENTITLEMENTS: Sources/AgentBuddy/AgentBuddy-Catalyst-DeveloperID.entitlements
   AgentBuddyLiveActivity:
     type: app-extension
     platform: iOS
@@ -439,20 +322,3 @@ schemes:
     management:
       isShown: true
       orderHint: 1
-  AgentBuddyMac:
-    build:
-      targets:
-        AgentBuddyMac: all
-    run:
-      config: Debug
-    profile:
-      config: Release
-    analyze:
-      config: Debug
-    # Default archive uses Release (sandboxed) for the App Store lane.
-    # The direct-distribution script overrides via `-configuration DeveloperID`.
-    archive:
-      config: Release
-    management:
-      isShown: true
-      orderHint: 3

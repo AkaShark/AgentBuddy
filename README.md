@@ -76,7 +76,7 @@ App 会自动在局域网发现守护进程，也可以手动配对或通过 SSH
 ## 仓库布局
 
 ```
-apps/ios/                      iOS / watchOS / Mac Catalyst App（AgentBuddy scheme，project.yml 是唯一真源）
+apps/ios/                      iOS / watchOS App（AgentBuddy scheme，project.yml 是唯一真源）
 apps/android/                  Android App（Compose UI，Gradle 构建，包名 com.akashark.agentbuddy.android）
 apps/desktop/                  macOS 菜单栏主机 App（Tauri v2 + React/TS）
 shared/rust-bridge/

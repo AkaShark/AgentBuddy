@@ -195,9 +195,9 @@ ANDROID_RUST_SOURCES := $(shell find $(RUST_DIR) \
 
 $(shell mkdir -p $(STAMPS))
 
-.PHONY: all ios ios-sim ios-sim-fast ios-sim-run ios-device ios-device-fast ios-device-run ios-device-stop ios-run verify-ios-project catalyst catalyst-run catalyst-fast catalyst-fast-run mac-direct mac-direct-run mac-direct-fast mac-direct-fast-run \
+.PHONY: all ios ios-sim ios-sim-fast ios-sim-run ios-device ios-device-fast ios-device-run ios-device-stop ios-run verify-ios-project \
 	android android-fast android-tools android-emulator-fast android-emulator-run android-device-run android-release android-debug android-install android-emulator-install \
-	rust-ios rust-ios-package rust-ios-device-release rust-mac-release rust-ios-device-fast rust-ios-sim-fast rust-ios-macabi-fast rust-android rust-check rust-test rust-host-dev \
+	rust-ios rust-ios-package rust-ios-device-release rust-ios-device-fast rust-ios-sim-fast rust-android rust-check rust-test rust-host-dev \
 	android-alpine-fs proot-android \
 	ghostty-ios ghostty-android \
 	alleycat-main \
@@ -206,7 +206,7 @@ $(shell mkdir -p $(STAMPS))
 	ios-build ios-build-sim ios-build-sim-fast ios-build-device ios-build-device-fast \
 	watch watch-sim watch-sim-run watch-device watch-typecheck watch-register \
 	test test-rust test-ios test-android \
-	ios-release-prep mac-release-prep testflight mac-testflight mac-direct-dist appstore-release play-upload play-release \
+	ios-release-prep testflight appstore-release play-upload play-release \
 	desktop-sidecar desktop-dev desktop-build desktop-dist \
 	clean clean-rust clean-ios clean-android \
 	rebuild-bindings kittylitter kittylitter-restart tui tui-run help
@@ -228,98 +228,6 @@ ios-sim-fast: ios-build-sim-fast
 ios-device: ios-build-device
 ios-device-fast: ios-build-device-fast
 
-# Mac Catalyst build. Uses the same rust-ios-package (macabi arches)
-# + xcgen chain, but targets the `AgentBuddyMac` scheme and writes into a
-# separate DerivedData path so it doesn't collide with the iOS sim build
-# cache.
-CATALYST_DERIVED_DATA := $(IOS_DIR)/build/catalyst
-catalyst: rust-ios-package xcgen
-	@echo "==> Building AgentBuddyMac for Mac Catalyst..."
-	@cd $(IOS_DIR) && xcodebuild \
-		-project AgentBuddy.xcodeproj \
-		-scheme AgentBuddyMac \
-		-configuration $(XCODE_CONFIG) \
-		-destination 'platform=macOS,variant=Mac Catalyst' \
-		-derivedDataPath $(CATALYST_DERIVED_DATA) \
-		build \
-		| tail -6
-
-# Build + (kill any running copy) + launch the freshly-built Catalyst app.
-catalyst-run: catalyst
-	@echo "==> Launching Catalyst app..."
-	@pkill -9 -f "Debug-maccatalyst/AgentBuddy.app" 2>/dev/null; true
-	@open $(CATALYST_DERIVED_DATA)/Build/Products/Debug-maccatalyst/AgentBuddy.app
-
-# Fast Mac Catalyst dev lane. Mirrors `ios-sim-fast` for Catalyst:
-# host-arch-only macabi staticlib via the `ios-dev` Cargo profile (no
-# LTO, codegen-units=256, line-table debuginfo) instead of the full
-# release+LTO+xcframework `rust-ios-package` chain. Warm rebuilds drop
-# from minutes to seconds. Cold first build is still slow because cargo
-# has to compile the codex workspace once for macabi.
-catalyst-fast: rust-ios-macabi-fast xcgen
-	@echo "==> Building AgentBuddyMac for Mac Catalyst (fast)..."
-	@cd $(IOS_DIR) && xcodebuild \
-		-project AgentBuddy.xcodeproj \
-		-scheme AgentBuddyMac \
-		-configuration $(XCODE_CONFIG) \
-		-destination 'platform=macOS,variant=Mac Catalyst' \
-		-derivedDataPath $(CATALYST_DERIVED_DATA) \
-		build \
-		| tail -6
-
-catalyst-fast-run: catalyst-fast
-	@echo "==> Launching Catalyst app..."
-	@pkill -9 -f "Debug-maccatalyst/AgentBuddy.app" 2>/dev/null; true
-	@open $(CATALYST_DERIVED_DATA)/Build/Products/Debug-maccatalyst/AgentBuddy.app
-
-# Direct (unsandboxed) Mac Catalyst build — same binary the DMG
-# distribution lane ships, but built with `DeveloperID` configuration
-# and launched in-place so you can iterate without the archive →
-# export → hdiutil → notarize → staple cycle. Use `make mac-direct-dist`
-# for the signed + notarized DMG.
-MAC_DIRECT_DERIVED := $(IOS_DIR)/build/mac-direct
-mac-direct: rust-ios-package xcgen
-	@echo "==> Building AgentBuddyMac (DeveloperID — unsandboxed)..."
-	@cd $(IOS_DIR) && xcodebuild \
-		-project AgentBuddy.xcodeproj \
-		-scheme AgentBuddyMac \
-		-configuration DeveloperID \
-		-destination 'platform=macOS,variant=Mac Catalyst' \
-		-derivedDataPath $(MAC_DIRECT_DERIVED) \
-		build \
-		| tail -6
-
-mac-direct-run: mac-direct
-	@echo "==> Launching unsandboxed Mac Catalyst app..."
-	@pkill -9 -f "DeveloperID-maccatalyst/AgentBuddy.app" 2>/dev/null; true
-	@open $(MAC_DIRECT_DERIVED)/Build/Products/DeveloperID-maccatalyst/AgentBuddy.app
-
-# Fast unsandboxed Catalyst lane. Same DeveloperID config as `mac-direct`
-# (so MacPairingHost / local Codex / BLE advertiser are all live), but uses
-# the fast macabi-only Rust path so warm rebuilds are seconds. Uses ad-hoc
-# code signing (`CODE_SIGN_IDENTITY=-`) to bypass the Developer ID cert
-# requirement during local iteration.
-mac-direct-fast: rust-ios-macabi-fast xcgen
-	@echo "==> Building AgentBuddyMac (DeveloperID — unsandboxed, fast)..."
-	@cd $(IOS_DIR) && xcodebuild \
-		-project AgentBuddy.xcodeproj \
-		-scheme AgentBuddyMac \
-		-configuration DeveloperID \
-		-destination 'platform=macOS,variant=Mac Catalyst' \
-		-derivedDataPath $(MAC_DIRECT_DERIVED) \
-		ARCHS=arm64 \
-		ONLY_ACTIVE_ARCH=YES \
-		CODE_SIGN_IDENTITY=- \
-		CODE_SIGNING_REQUIRED=NO \
-		CODE_SIGNING_ALLOWED=NO \
-		build \
-		| tail -6
-
-mac-direct-fast-run: mac-direct-fast
-	@echo "==> Launching unsandboxed Mac Catalyst app..."
-	@pkill -9 -f "DeveloperID-maccatalyst/AgentBuddy.app" 2>/dev/null; true
-	@/System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister -f $(MAC_DIRECT_DERIVED)/Build/Products/DeveloperID-maccatalyst/AgentBuddy.app
-	@open $(MAC_DIRECT_DERIVED)/Build/Products/DeveloperID-maccatalyst/AgentBuddy.app
 loop-sim:
 	@$(ROOT)/tools/scripts/loop-ios.sh sim
 
@@ -423,10 +331,6 @@ rust-ios-device-release: alleycat-main $(STAMP_SYNC) $(STAMP_GHOSTTY_IOS)
 	@echo "==> Building Rust for iOS release archive prep (device staticlib + headers)..."
 	@cd $(ROOT) && $(PACKAGE_CARGO_ENV) $(IOS_SCRIPTS)/build-rust.sh --preserve-current --device-only $(CARGO_FEATURES)
 
-rust-mac-release: alleycat-main $(STAMP_SYNC) $(STAMP_GHOSTTY_IOS)
-	@echo "==> Building Rust for Mac Catalyst release archive prep (macabi staticlib + headers)..."
-	@cd $(ROOT) && $(PACKAGE_CARGO_ENV) $(IOS_SCRIPTS)/build-rust.sh --preserve-current --macabi-only $(CARGO_FEATURES)
-
 rust-ios-device-fast: alleycat-main $(STAMP_SYNC) $(STAMP_GHOSTTY_IOS)
 	@echo "==> Building Rust for fast iOS device iteration (raw staticlib + headers)..."
 	@cd $(ROOT) && $(DEV_CARGO_ENV) $(IOS_SCRIPTS)/build-rust.sh --preserve-current --fast-device $(CARGO_FEATURES)
@@ -434,10 +338,6 @@ rust-ios-device-fast: alleycat-main $(STAMP_SYNC) $(STAMP_GHOSTTY_IOS)
 rust-ios-sim-fast: alleycat-main $(STAMP_SYNC) $(STAMP_GHOSTTY_IOS)
 	@echo "==> Building Rust for fast iOS simulator iteration (raw staticlib + headers)..."
 	@cd $(ROOT) && $(DEV_CARGO_ENV) $(IOS_SCRIPTS)/build-rust.sh --preserve-current --fast-sim $(CARGO_FEATURES)
-
-rust-ios-macabi-fast: alleycat-main $(STAMP_SYNC) $(STAMP_GHOSTTY_IOS)
-	@echo "==> Building Rust for fast Mac Catalyst iteration (raw macabi staticlib + headers, host arch only)..."
-	@cd $(ROOT) && $(DEV_CARGO_ENV) $(IOS_SCRIPTS)/build-rust.sh --preserve-current --fast-macabi $(CARGO_FEATURES)
 
 rust-check: alleycat-main
 	@echo "==> cargo check (host, shared crates)..."
@@ -519,7 +419,6 @@ help:
 		'make rust-ios-package   full Rust iOS package lane (bindings + xcframework)' \
 		'make rust-ios-sim-fast  fast Rust iOS simulator lane (raw staticlib only)' \
 		'make rust-ios-device-fast fast Rust iOS device lane (raw staticlib only)' \
-		'make rust-ios-macabi-fast fast Rust Mac Catalyst lane (host-arch macabi staticlib only)' \
 		'make android-alpine-fs  download Android proot Alpine rootfs asset' \
 		'make proot-android     build Android proot executable artifacts' \
 		'make ghostty-ios        build pinned Ghostty iOS renderer artifacts' \
@@ -529,10 +428,6 @@ help:
 		'make desktop-dev        sidecar + tauri dev for the desktop host app' \
 		'make desktop-build      sidecar + tauri build (.app + .dmg, unsigned unless APPLE_* set)' \
 		'make desktop-dist       signed + notarized dmg (APPLE_SIGNING_IDENTITY, APPLE_API_KEY*)' \
-		'make catalyst           full Mac Catalyst build (release+LTO macabi staticlib + xcodebuild)' \
-		'make catalyst-run       full Mac Catalyst build + launch' \
-		'make catalyst-fast      fast Mac Catalyst dev build (ios-dev profile, host arch)' \
-		'make catalyst-fast-run  fast Mac Catalyst dev build + launch' \
 		'make android            fast Android dev build (default ABI/profile: arm64-v8a/android-dev)' \
 		'make android-emulator-fast fast Android dev build using emulator ABI ($(ANDROID_EMULATOR_ABIS))' \
 		'make android-emulator-run  fast emulator build + install + launch on emulator; saves logcat under artifacts/android-emulator-run' \
@@ -784,19 +679,9 @@ test-android:
 
 ios-release-prep: rust-ios-device-release xcgen
 
-mac-release-prep: rust-mac-release xcgen
-
 testflight: ios-release-prep
 	@echo "==> Uploading to TestFlight..."
 	@$(IOS_SCRIPTS)/testflight-upload.sh
-
-mac-testflight: mac-release-prep
-	@echo "==> Uploading Mac Catalyst build to TestFlight..."
-	@$(IOS_SCRIPTS)/testflight-upload-mac.sh
-
-mac-direct-dist: mac-release-prep
-	@echo "==> Building notarized Mac Catalyst DMG for direct distribution..."
-	@$(IOS_SCRIPTS)/direct-dist-mac.sh
 
 appstore-release: ios-release-prep
 	@echo "==> Submitting current repo version to the App Store..."

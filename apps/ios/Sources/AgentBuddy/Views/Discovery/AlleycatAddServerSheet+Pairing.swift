@@ -15,7 +15,7 @@ extension AlleycatAddServerSheet {
 
     var pairingSection: some View {
         DiscoveryFormSection("Pairing") {
-            // Mac (Catalyst + iOS-on-Mac) shows paste-JSON only; iOS shows
+            // Mac (iOS-on-Mac) shows paste-JSON only; iOS shows
             // QR scanning first, with paste available as a production fallback
             // for users who already copied the pairing payload.
             if AgentBuddyPlatform.rendersAsMacApp {

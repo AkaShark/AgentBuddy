@@ -13,19 +13,7 @@ struct AgentBuddyApp: App {
 
     @SceneBuilder
     var body: some Scene {
-        #if targetEnvironment(macCatalyst)
         mainWindowGroup
-            .defaultSize(width: 1120, height: 760)
-            // NOTE: `.windowResizability` is a no-op on Catalyst.
-            // Actual resize bounds are set from
-            // `MacWindowTitleBarStyler` via
-            // `UIWindowScene.sizeRestrictions`.
-            .commands {
-                AgentBuddyCommands(appModel: appModel)
-            }
-        #else
-        mainWindowGroup
-        #endif
     }
 
     private var mainWindowGroup: some Scene {
@@ -43,17 +31,6 @@ struct AgentBuddyApp: App {
                     appRuntime.bind(appModel: appModel, voiceRuntime: voiceRuntime)
                     appDelegate.appRuntime = appRuntime
                     appRuntime.appDidBecomeActive()
-                    #if targetEnvironment(macCatalyst)
-                    LocalCodexBootstrap.shared.startIfNeeded(appModel: appModel)
-                    #endif
-                    // Pair host (BLE advertiser, ultrasonic emitter,
-                    // Bonjour publish, WS listener) and the iPhone client
-                    // (BLE scanner, ultrasonic reader, NISession) are
-                    // strictly opt-in: they only start when the user
-                    // opens the Pair screen in Settings → Experimental,
-                    // and stop on disappear. The screen itself is gated
-                    // behind `#if DEBUG`, so neither stack is reachable
-                    // in Release builds.
                 }
         }
         .onChange(of: scenePhase) { _, newPhase in

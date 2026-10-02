@@ -7,12 +7,6 @@ import SwiftUI
 struct AgentBuddyPreviewScene<Content: View>: View {
     @State private var appModel: AppModel
     @State private var appState: AppState
-    // `.shared` is defined identically on both the iOS and Catalyst
-    // versions of `VoiceRuntimeController`. Calling the synthesized
-    // init directly (`VoiceRuntimeController()`) trips a scope-
-    // resolution hiccup on Catalyst 26 + Swift 6 around the
-    // `@MainActor @Observable` class — the singleton is the safe path
-    // and gives us the same environment object.
     @State private var voiceRuntime = VoiceRuntimeController.shared
 
     private let includeBackground: Bool

@@ -30,7 +30,7 @@ struct AlleycatAddServerSheet: View {
     @State var didRequestInitialScan = false
     @State var cameraDenied = false
     // pasteJSON / showPaste are used by the Mac paste-JSON UI
-    // (Catalyst + iOS-on-Mac) and the iOS QR fallback.
+    // (iOS-on-Mac) and the iOS QR fallback.
     @State var pasteJSON: String = ""
     @State var showPaste: Bool = false
 
@@ -88,7 +88,7 @@ struct AlleycatAddServerSheet: View {
             requestInitialScanIfNeeded()
         }
         // QR scanner cover + camera-denied alert are applied
-        // unconditionally; on Mac builds (Catalyst + iOS-on-Mac) the
+        // unconditionally; on Mac builds (iOS-on-Mac) the
         // pairing section never triggers `requestCameraAndScan`, so
         // neither presentation ever fires.
         .fullScreenCover(isPresented: $showScanner) {

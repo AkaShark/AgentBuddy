@@ -2,12 +2,8 @@ import SwiftUI
 
 extension HomeNavigationView {
     var terminalLauncher: (() -> Void)? {
-        #if targetEnvironment(macCatalyst)
-        return nil
-        #else
         guard experimentalFeatures.isEnabled(.terminal) else { return nil }
         return { navigationPath.append(.terminal(preferredAlleycatNodeId: nil)) }
-        #endif
     }
 
     func preferredTerminalWorkingDirectory() -> String? {

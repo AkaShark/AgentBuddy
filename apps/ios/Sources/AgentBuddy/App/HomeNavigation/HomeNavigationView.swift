@@ -55,7 +55,7 @@ struct HomeNavigationView: View {
         NavigationSplitView {
             sidebarDashboard
                 // Apply Liquid Glass material explicitly to the sidebar
-                // column. Catalyst 26 doesn't automatically paint the
+                // column. UIKit doesn't automatically paint the
                 // sidebar with glass the way iPadOS does, so the column
                 // comes through flat unless we install the material
                 // ourselves. `.ultraThinMaterial` gives the proper
@@ -128,28 +128,6 @@ struct HomeNavigationView: View {
 
     private var commandContent: some View {
         navigationContent
-        #if targetEnvironment(macCatalyst)
-        .onReceive(NotificationCenter.default.publisher(for: .agentBuddyCommandNewSession)) { _ in
-            handleNewSessionTap()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .agentBuddyCommandNavigateBack)) { _ in
-            if !navigationPath.isEmpty { navigationPath.removeLast() }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .agentBuddyCommandNavigateForward)) { _ in
-            if let activeKey = appModel.snapshot?.activeThread,
-               navigationPath.last != .conversation(activeKey) {
-                navigationPath.append(.conversation(activeKey))
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .agentBuddyCommandSelectSession)) { notification in
-            guard let index = notification.userInfo?["index"] as? Int,
-                  let summaries = appModel.snapshot?.sessionSummaries,
-                  summaries.indices.contains(index) else { return }
-            Task { @MainActor in
-                await openSessionAtIndex(summaries[index])
-            }
-        }
-        #endif
     }
 
     var body: some View {
