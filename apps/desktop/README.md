@@ -1,5 +1,9 @@
 # AgentBuddy 桌面主机 App
 
+<p align="center">
+  <img src="src-tauri/icons/128x128@2x.png" alt="搭子 macOS App 图标" width="112" height="112" />
+</p>
+
 macOS 菜单栏应用（Tauri v2 + React/TS）。把 `agentbuddy` 守护进程作为 sidecar 打包，
 以 LaunchAgent `com.akashark.agentbuddycli` 安装运行，并提供概览 / Agents / 配对 / 日志四页控制台。
 设计见 `docs/superpowers/specs/2026-09-23-desktop-host-app-design.md`，实现过程中的取舍见
