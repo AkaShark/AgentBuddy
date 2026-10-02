@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Default Mint dark palette, shared by the system and Compose startup surfaces. -->
     <color name="launch_background">#151619</color>
+    <color name="launch_brand">#293330</color>
+    <color name="launch_on_brand">#E3EAE6</color>
+    <color name="launch_text_primary">#ECECEE</color>
+    <color name="launch_text_secondary">#B6B6BD</color>
+    <color name="launch_text_muted">#9999A3</color>
 </resources>

@@ -5,12 +5,11 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -36,7 +35,6 @@ import com.akashark.agentbuddy.android.state.AppModel
 import com.akashark.agentbuddy.android.state.OpenAIApiKeyStore
 import com.akashark.agentbuddy.android.state.PetOverlayController
 import com.akashark.agentbuddy.android.state.VisibleThreadTracker
-import com.akashark.agentbuddy.android.ui.AnimatedSplashScreen
 import com.akashark.agentbuddy.android.ui.ExperimentalFeatures
 import com.akashark.agentbuddy.android.ui.AgentBuddyApp
 import com.akashark.agentbuddy.android.ui.AgentBuddyAppTheme
@@ -44,8 +42,9 @@ import com.akashark.agentbuddy.android.ui.AgentBuddyThemeManager
 import com.akashark.agentbuddy.android.ui.gallery.MintGallery
 import com.akashark.agentbuddy.android.ui.gallery.MintGalleryScreen
 import com.akashark.agentbuddy.android.ui.WallpaperManager
+import com.akashark.agentbuddy.android.ui.splash.LaunchScreenOverlay
+import com.akashark.agentbuddy.android.ui.splash.LaunchScreenTransition
 import com.akashark.agentbuddy.android.util.LLog
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import uniffi.codex_mobile_client.ThreadKey
 
@@ -72,6 +71,7 @@ class MainActivity : ComponentActivity() {
 
     private var appModel: AppModel? = null
     private val lifecycleController = AppLifecycleController()
+    private var launchTransition: LaunchScreenTransition? = null
     private var openPetSettingsRequest by mutableStateOf(0)
     /** Latest FCM token (cached or fetched); registration is gated on notification permission. */
     private var fcmToken: String? = null
@@ -82,18 +82,26 @@ class MainActivity : ComponentActivity() {
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Must be called before super.onCreate to hand off the system splash
-        // (Theme.App.Starting) to the Compose AnimatedSplashScreen without a
-        // theme-background flash between them.
-        installSplashScreen()
+        val startedAtMillis = SystemClock.elapsedRealtime()
+        val systemSplash = installSplashScreen()
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        val transition = LaunchScreenTransition(
+            startedAtMillis = startedAtMillis,
+            showBranding = savedInstanceState == null && MintGallery.requestedPage(intent) == null,
+        ).also {
+            launchTransition = it
+            it.install(systemSplash, window)
+        }
         // DEBUG state gallery: fixture screens only, no runtime or network.
         MintGallery.requestedPage(intent)?.let { page ->
             showMintGallery(page, dark = MintGallery.requestsDark(intent))
             return
         }
+        // Resolve appearance before the first app frame and persist the same
+        // mode for Android's next process-independent starting window.
+        AgentBuddyThemeManager.initialize(applicationContext)
         OpenAIApiKeyStore(applicationContext).applyToEnvironment()
         ExperimentalFeatures.initialize(applicationContext)
         PetOverlayController.initialize(applicationContext)
@@ -113,9 +121,7 @@ class MainActivity : ComponentActivity() {
         }
         loadPushToken()
 
-        var showSplash by mutableStateOf(true)
         var contentReady by mutableStateOf(false)
-        var minTimeElapsed by mutableStateOf(false)
 
         setContent {
             AgentBuddyAppTheme {
@@ -140,27 +146,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    // Minimum display time
-                    LaunchedEffect(Unit) {
-                        delay(800)
-                        minTimeElapsed = true
-                    }
-
-                    // Dismiss when both ready and min time elapsed (or hard max 3s)
-                    LaunchedEffect(contentReady, minTimeElapsed) {
-                        if (contentReady && minTimeElapsed) showSplash = false
-                    }
-                    LaunchedEffect(Unit) {
-                        delay(3000)
-                        showSplash = false
-                    }
-
-                    AnimatedVisibility(
-                        visible = showSplash,
-                        exit = fadeOut(),
-                    ) {
-                        AnimatedSplashScreen()
-                    }
+                    LaunchScreenOverlay(transition = transition, contentReady = contentReady)
                 }
             }
         }
@@ -215,6 +201,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        launchTransition?.dispose()
+        launchTransition = null
         // A configuration change recreates the Activity immediately; keep the
         // connection and the AppModel subscription alive across it.
         if (isChangingConfigurations && appModel != null) {

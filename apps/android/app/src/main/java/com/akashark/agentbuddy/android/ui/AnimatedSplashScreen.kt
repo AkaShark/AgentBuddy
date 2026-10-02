@@ -1,14 +1,12 @@
 package com.akashark.agentbuddy.android.ui
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,17 +20,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
-import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyBrandMark
+import com.akashark.agentbuddy.android.R
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyIconTile
+import com.akashark.agentbuddy.android.ui.designsystem.components.BuddyTileContent
 import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyChromeTypeLimit
+import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyMotion
 import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySize
 import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddySpacing
 import com.akashark.agentbuddy.android.ui.designsystem.tokens.BuddyTextStyle
@@ -44,15 +50,31 @@ import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 
-/** Shared connection mark and the familiar vertical agent-name carousel. */
+/**
+ * Continues the system splash with a stationary mark and then reveals the details.
+ * Resource colors deliberately follow system light/dark mode, like the launch
+ * window; the user's custom app theme takes over when startup finishes.
+ */
 @Composable
-fun AnimatedSplashScreen() {
+fun AnimatedSplashScreen(
+    showDetails: Boolean = true,
+    onMarkPositioned: ((Rect) -> Unit)? = null,
+) {
     var elapsed by remember { mutableDoubleStateOf(0.0) }
     val reduceMotion = buddyReduceMotion
+    val detailsAlpha by animateFloatAsState(
+        targetValue = if (showDetails) 1f else 0f,
+        animationSpec = BuddyMotion.STATE.spec(reduceMotion),
+        label = "Splash details",
+    )
+    val background = colorResource(R.color.launch_background)
+    val primary = colorResource(R.color.launch_text_primary)
+    val secondary = colorResource(R.color.launch_text_secondary)
+    val muted = colorResource(R.color.launch_text_muted)
 
-    LaunchedEffect(reduceMotion) {
+    LaunchedEffect(reduceMotion, showDetails) {
         elapsed = 0.0
-        if (!reduceMotion) {
+        if (showDetails && !reduceMotion) {
             val start = withFrameNanos { it }
             while (true) {
                 withFrameNanos { elapsed = (it - start) / 1_000_000_000.0 }
@@ -61,36 +83,81 @@ fun AnimatedSplashScreen() {
     }
 
     Box(
-        modifier = Modifier.fillMaxSize().background(AgentBuddyTheme.background),
+        modifier = Modifier.fillMaxSize().background(background),
         contentAlignment = Alignment.Center,
     ) {
-        Column(
-            modifier = Modifier.offset(y = -BuddySpacing.xl),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(BuddySpacing.xl),
-        ) {
-            BuddyBrandMark(size = BuddySize.splashMark)
+        BuddyIconTile(
+            content = BuddyTileContent.BrandMark,
+            fill = colorResource(R.color.launch_brand),
+            foreground = colorResource(R.color.launch_on_brand),
+            size = BuddySize.splashMark,
+            modifier = Modifier.onGloballyPositioned { coordinates ->
+                onMarkPositioned?.invoke(coordinates.boundsInWindow())
+            },
+        )
+        SplashDetails(
+            elapsed = elapsed,
+            primary = primary,
+            secondary = secondary,
+            muted = muted,
+            modifier = Modifier.fillMaxSize().graphicsLayer(alpha = detailsAlpha),
+        )
+    }
+}
+
+/** Measure the actual scaled text before deciding which details fit below the fixed mark. */
+@Composable
+private fun SplashDetails(
+    elapsed: Double,
+    primary: Color,
+    secondary: Color,
+    muted: Color,
+    modifier: Modifier = Modifier,
+) {
+    SubcomposeLayout(modifier = modifier) { constraints ->
+        val contentConstraints = constraints.copy(minWidth = 0, minHeight = 0)
+        val title = subcompose("title") {
             Text(
                 text = "搭子",
-                color = AgentBuddyTheme.textPrimary,
+                color = primary,
                 style = buddyTextStyle(BuddyTextStyle.DISPLAY),
+                maxLines = 1,
             )
-        }
-
-        BuddyChromeTypeLimit {
-            Row(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = BuddySpacing.huge),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                SpinningProviderCarousel(elapsed = elapsed)
-                Text(
-                    text = " 在你的手机上",
-                    color = AgentBuddyTheme.textMuted,
-                    style = buddyTextStyle(BuddyTextStyle.CODE),
-                )
+        }.single().measure(contentConstraints)
+        val footer = subcompose("footer") {
+            BuddyChromeTypeLimit {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SpinningProviderCarousel(elapsed = elapsed, selectedColor = secondary, mutedColor = muted)
+                    Text(
+                        text = " 在你的手机上",
+                        color = muted,
+                        style = buddyTextStyle(BuddyTextStyle.CODE),
+                        maxLines = 1,
+                    )
+                }
             }
+        }.single().measure(contentConstraints)
+
+        val width = constraints.maxWidth
+        val height = constraints.maxHeight
+        val markBottom = (height + BuddySize.splashMark.roundToPx()) / 2
+        val minimumGap = BuddySpacing.md.roundToPx()
+        val normalBottomPadding = BuddySpacing.huge.roundToPx()
+        val bottomPadding = if (height - normalBottomPadding - footer.height >= markBottom + minimumGap) {
+            normalBottomPadding
+        } else {
+            BuddySpacing.md.roundToPx()
+        }
+        val footerTop = height - bottomPadding - footer.height
+        val footerFits = footerTop >= markBottom + minimumGap
+        val titleTop = markBottom + BuddySpacing.xl.roundToPx()
+        val titleFits = footerFits && titleTop + title.height + BuddySpacing.xl.roundToPx() <= footerTop
+
+        layout(width, height) {
+            // The carousel takes priority in short landscape/split-screen windows.
+            // If even it cannot clear the mark, the centered mark remains alone.
+            if (titleFits) title.placeRelative((width - title.width) / 2, titleTop)
+            if (footerFits) footer.placeRelative((width - footer.width) / 2, footerTop)
         }
     }
 }
@@ -101,7 +168,11 @@ private val SplashProviders = listOf(
 )
 
 @Composable
-private fun SpinningProviderCarousel(elapsed: Double) {
+private fun SpinningProviderCarousel(
+    elapsed: Double,
+    selectedColor: Color,
+    mutedColor: Color,
+) {
     val textStyle = buddyTextStyle(BuddyTextStyle.CODE)
     val density = LocalDensity.current
     val rowHeight = with(density) { textStyle.fontSize.toDp() } * (BuddySize.splashProviderRow.value / BuddyTextStyle.CODE.size)
@@ -139,7 +210,7 @@ private fun SpinningProviderCarousel(elapsed: Double) {
 
             Text(
                 text = provider,
-                color = if (selected) AgentBuddyTheme.textSecondary else AgentBuddyTheme.textMuted,
+                color = if (selected) selectedColor else mutedColor,
                 style = textStyle,
                 maxLines = 1,
                 modifier = Modifier

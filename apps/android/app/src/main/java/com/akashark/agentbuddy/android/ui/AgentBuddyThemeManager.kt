@@ -1,7 +1,10 @@
 package com.akashark.agentbuddy.android.ui
 
+import android.app.UiModeManager
 import android.content.Context
 import android.content.res.Configuration
+import android.content.res.Resources
+import android.os.Build
 import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -39,7 +42,26 @@ enum class AgentBuddyAppearanceMode(
             LIGHT -> false
             DARK -> true
         }
+
+    internal fun applicationNightMode(): Int = when (this) {
+        // For the app-local API, AUTO clears the override and inherits the
+        // system configuration, including its scheduled dark-mode policy.
+        SYSTEM -> UiModeManager.MODE_NIGHT_AUTO
+        LIGHT -> UiModeManager.MODE_NIGHT_NO
+        DARK -> UiModeManager.MODE_NIGHT_YES
+    }
 }
+
+internal fun resolveSystemDarkTheme(nightMode: Int?, resolvedUiMode: Int, fallback: Boolean): Boolean =
+    when (nightMode) {
+        UiModeManager.MODE_NIGHT_NO -> false
+        UiModeManager.MODE_NIGHT_YES -> true
+        else -> when (resolvedUiMode and Configuration.UI_MODE_NIGHT_MASK) {
+            Configuration.UI_MODE_NIGHT_NO -> false
+            Configuration.UI_MODE_NIGHT_YES -> true
+            else -> fallback
+        }
+    }
 
 object AgentBuddyThemeManager {
     private val lock = Any()
@@ -47,6 +69,7 @@ object AgentBuddyThemeManager {
     private var initialized = false
     private var definitionCache = LinkedHashMap<String, AgentBuddyThemeDefinition>()
     private var systemIsDark = false
+    private var appliedApplicationNightMode: Int? = null
 
     var appearanceMode by mutableStateOf(AgentBuddyAppearanceMode.SYSTEM)
         private set
@@ -97,18 +120,18 @@ object AgentBuddyThemeManager {
             lightTheme = loadAndResolve(selectedLightSlug) ?: AgentBuddyResolvedTheme.defaultLight
             darkTheme = loadAndResolve(selectedDarkSlug) ?: AgentBuddyResolvedTheme.defaultDark
             val nightModeFlags = context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
-            val systemIsDarkMode = nightModeFlags == Configuration.UI_MODE_NIGHT_YES
-            systemIsDark = systemIsDarkMode
+            systemIsDark = readSystemDarkTheme(nightModeFlags == Configuration.UI_MODE_NIGHT_YES)
             appearanceMode = loadAppearanceMode()
             activeTheme = themeForMode(appearanceMode)
             // The system font is the default only when the user never chose one.
             monoFontEnabled = preferences?.getBoolean(FONT_MONO_KEY, false) ?: false
             initialized = true
+            syncApplicationNightMode()
         }
     }
 
     fun applySystemTheme(isDark: Boolean) {
-        systemIsDark = isDark
+        systemIsDark = readSystemDarkTheme(isDark)
         applyActiveTheme()
     }
 
@@ -122,7 +145,36 @@ object AgentBuddyThemeManager {
             appearanceMode = mode
             themeVersion += 1
         }
+        systemIsDark = readSystemDarkTheme(systemIsDark)
         applyActiveTheme()
+        syncApplicationNightMode()
+    }
+
+    private fun readSystemDarkTheme(fallback: Boolean): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return fallback
+        // Context/Compose configuration can contain our app-local override.
+        // Consult the global user preference first; the framework resolves
+        // AUTO/CUSTOM schedules, so we do not reproduce their clock policy.
+        val manager = appContext?.getSystemService(UiModeManager::class.java)
+        return resolveSystemDarkTheme(
+            nightMode = manager?.nightMode,
+            resolvedUiMode = Resources.getSystem().configuration.uiMode,
+            fallback = fallback,
+        )
+    }
+
+    private fun syncApplicationNightMode() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || previewDark != null) return
+        val manager = appContext?.getSystemService(UiModeManager::class.java) ?: return
+        val mode = appearanceMode.applicationNightMode()
+        if (appliedApplicationNightMode == mode) return
+        // Publish before the call: Android may recreate the activity to apply
+        // this configuration. initialize() and repeated selections stay inert.
+        appliedApplicationNightMode = mode
+        runCatching { manager.setApplicationNightMode(mode) }.onFailure { error ->
+            appliedApplicationNightMode = null
+            Log.w(THEME_LOG_TAG, "Failed to synchronize application night mode", error)
+        }
     }
 
     fun applyFont(isMono: Boolean) {

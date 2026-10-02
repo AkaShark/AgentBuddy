@@ -1,13 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <!-- Theme shown BEFORE onCreate completes. Background follows the default
-         Mint light/dark palette. The mint icon tile keeps the connection mark
-         legible on either background. Compose then applies the saved app theme. -->
-    <style name="Theme.App.Starting" parent="Theme.SplashScreen.IconBackground">
+    <!-- Draw our complete 112dp brand tile inside the system's 288dp icon
+         viewport. Compose uses this same palette and tile geometry to hand off
+         without a second icon shape or a saved-theme color jump. -->
+    <style name="Theme.App.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/launch_background</item>
-        <item name="windowSplashScreenIconBackgroundColor">@color/ic_launcher_background</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_mark</item>
         <item name="postSplashScreenTheme">@style/Theme.App</item>
     </style>
 

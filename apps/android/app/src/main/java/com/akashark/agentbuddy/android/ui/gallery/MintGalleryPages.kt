@@ -1,5 +1,12 @@
 package com.akashark.agentbuddy.android.ui.gallery
 
+import android.content.res.Configuration
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import com.akashark.agentbuddy.android.ui.AgentBuddyTheme
 import com.akashark.agentbuddy.android.ui.AnimatedSplashScreen
 
 /**
@@ -8,7 +15,7 @@ import com.akashark.agentbuddy.android.ui.AnimatedSplashScreen
  */
 val mintGalleryPages: List<MintGalleryPage> =
     listOf(
-        MintGalleryPage("splash", "启动画面") { AnimatedSplashScreen() },
+        MintGalleryPage("splash", "启动画面") { GallerySplashPage() },
         MintGalleryPage("components", "组件") { GalleryComponentsPage() },
         MintGalleryPage("settings", "设置") { GallerySettingsPage() },
         MintGalleryPage("appearance", "外观") { GalleryAppearancePage() },
@@ -61,3 +68,26 @@ val mintGalleryPages: List<MintGalleryPage> =
         MintGalleryPage("project-picker-empty", "项目（暂无）") { GalleryProjectPickerPage(empty = true) },
         MintGalleryPage("tasks-all-empty", "全部任务（无主机）") { GalleryTasksAllPage(GallerySessionsFixtures.state(summaries = emptyList(), connectedHostCount = 0, activeKey = null)) },
     )
+
+/** Preview the launch resources in the gallery's requested mode without changing the device. */
+@Composable
+private fun GallerySplashPage() {
+    val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val dark = AgentBuddyTheme.isDark
+    val previewContext = remember(context, configuration, dark) {
+        val previewConfiguration = Configuration(configuration).apply {
+            uiMode = (uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or
+                (if (dark) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO)
+        }
+        context.createConfigurationContext(previewConfiguration)
+    }
+    // Only this resource-based preview needs an overridden context. Activity
+    // effects and every other gallery page keep their original context.
+    CompositionLocalProvider(
+        LocalContext provides previewContext,
+        LocalConfiguration provides previewContext.resources.configuration,
+    ) {
+        AnimatedSplashScreen()
+    }
+}

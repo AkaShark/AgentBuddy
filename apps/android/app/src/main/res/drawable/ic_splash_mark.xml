@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The system's 288dp icon viewport contains exactly the same centered 112dp
+     tile used by Compose. Its 112dp square is inside the 192dp safe circle. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="288dp"
+    android:height="288dp"
+    android:viewportWidth="288"
+    android:viewportHeight="288">
+    <path
+        android:fillColor="@color/launch_brand"
+        android:pathData="M120,88 H168 C185.673,88 200,102.327 200,120 V168 C200,185.673 185.673,200 168,200 H120 C102.327,200 88,185.673 88,168 V120 C88,102.327 102.327,88 120,88 Z" />
+    <!-- 24-unit master mark on an 89.6dp viewport (80% of the tile). -->
+    <group
+        android:translateX="99.2"
+        android:translateY="99.2"
+        android:scaleX="3.7333333"
+        android:scaleY="3.7333333">
+        <path
+            android:fillColor="@android:color/transparent"
+            android:strokeColor="@color/launch_on_brand"
+            android:strokeWidth="2.8"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:pathData="M13,5 H9 C6.79,5 5,6.79 5,9 V13 M11,19 H15 C17.21,19 19,17.21 19,15 V11 M10,14 L14,10" />
+    </group>
+</vector>

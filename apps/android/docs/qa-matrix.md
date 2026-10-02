@@ -25,6 +25,7 @@ Current tests (`app/src/test/java/com/akashark/agentbuddy/android/`):
 - `state/SnapshotExtensionsTest` — snapshot display helpers (model labels)
 - `state/SshHostKeyMismatchTest` — typed SSH host-key prompts (changed key, unreadable saved key) read from Rust errors
 - `ui/AgentBuddyAppearanceModeTest`, `ui/ConversationTextSizingTest` — appearance mode and text sizing
+- `ui/splash/LaunchScreenTimingTest` — one startup deadline across native initialization and Compose, including readiness changes and failure fallback
 - `ui/AgentBuddyResolvedThemeTest` — Mint semantic roles from `agentbuddy.*` keys, iOS-equivalent fallbacks for other themes, `#RRGGBBAA` alpha stripping
 - `ui/homeshell/HomeTaskPresentationTest`, `ui/homeshell/HomeShellSummariesTest` — home task state projection, section partitioning, summaries
 - `ui/settings/ThemePickerSectionsTest` — theme picker 推荐 / 全部主题 grouping
@@ -43,14 +44,21 @@ Current tests (`app/src/test/java/com/akashark/agentbuddy/android/`):
 | Check | Android | iOS parity |
 |---|---|---|
 | Brand mark | Native connection vector replaces the cat in the startup tile and in-app brand tiles; both use the same component with brand/onBrand colors and proportional corners | Same 24-unit paths, round 2.8-unit strokes, and 32/112 corner ratio |
-| Startup layout | 112dp brand tile, wordmark, theme background; light/dark appearance reviewed on Pixel 9 | Same tile, spacing, typography roles, and center offset |
+| Startup layout | Stationary 112dp brand tile centered on the system mark; title below, agent names at the bottom; Mint launch colors | Same tile, typography and carousel; Android centers the mark to match its OS launch window |
 | Agent carousel | Three clipped/faded rows; codex → pi → amp → opencode → claude → droid → hermes → devin → grok; no provider icons | Same names, order and 0.9-second timing |
 | Remove animations | Two Pixel 9 captures 1.2 seconds apart remain on codex; original system animation setting restored | Reduce Motion keeps the first frame |
-| System splash | Default Mint light/dark background with a mint icon tile | System launch remains OS-managed; the in-app splash uses the selected theme |
-| Startup handoff | Normal cold launch reaches the home screen; existing 800ms minimum / 3s maximum unchanged | Existing lifecycle timing retained |
+| System splash | Native and Compose launch layers share the rounded tile and Mint light/dark palette; Android 12+ persists the app's light/dark/system preference for the next starting window | Android-specific OS integration; iOS launch behavior unchanged |
+| Startup handoff | Native layer fades into the matching Compose mark; the 800ms branding deadline starts in `onCreate`, so initialization consumes that time instead of adding a second 800ms wait; 3s fallback measured from the same start when content fails | Android-specific timing; no iOS follow-up needed |
+| Activity recreation | Appearance changes and other configuration recreation skip the Compose branding overlay | Platform lifecycle behavior |
+| Compact height | Pixel 9 landscape keeps the mark centered and the carousel clear; title hides first, then footer padding shrinks when needed; extremely short windows show only the mark | Android layout accommodates its fixed system-mark position |
 
-Validation: cached-native `:app:assembleDebug` passed; installed and reviewed on
-physical Pixel 9.
+Validation: cached-native `:app:assembleDebug` and 10 focused startup/appearance
+unit tests passed; installed on physical Pixel 9. Cold-launch recordings verified
+light mode while the system is dark, dark mode, and following system appearance
+with animations disabled. Two reduced-motion gallery captures 1.2 seconds apart
+have identical splash pixels. Device appearance, rotation and animation settings
+were restored after verification; temporary QA media was removed.
+The fallback deadline cannot interrupt synchronous native initialization.
 The DEBUG gallery accepts `--es mint_gallery splash` and `--ez mint_dark true`
 for repeatable review without starting the runtime.
 
