@@ -10,7 +10,11 @@ its public support website. The initial internal release is 1.5.0 (12).
 `ANDROID_PLAY_PUBLISH_ENABLED=true` and
 `ANDROID_PLAY_RELEASE_STATUS=completed` are configured. The service account
 has app-scoped read and testing-track release permissions. API preflight
-passed; this alone does not verify a subsequent CI upload.
+passed. The automatic upload was subsequently verified by Mobile Release run
+[36982249184](https://github.com/AkaShark/AgentBuddy/actions/runs/36982249184):
+**1.5.0 (513091881)** is published to internal testers. All jobs in that run and
+Mobile CI run [36982249309](https://github.com/AkaShark/AgentBuddy/actions/runs/36982249309)
+completed successfully.
 
 Saved in Play Console (pending review where applicable): privacy policy,
 no ads, content rating, no government/financial/health features, category and
@@ -46,11 +50,39 @@ Latest completion pass (2026-10-02):
 - The owner will recruit testers. Console currently shows 0 enrolled closed
   testers; at least 12 must remain opted in for 14 continuous days before the
   production-access application.
+- Closed testing **Alpha** targets all 178 Console country/region entries and
+  reuses the existing `tester` email list. The feedback address is
+  `aaksharker@gmail.com`. The list currently contains one address; list membership
+  alone is not enrollment and does not start the 14-day requirement. Add recruited
+  testers to that list, then share the opt-in link after the closed release is live.
+- Version **513091881** was promoted to Alpha with Chinese release notes.
+  The release and store/content setup were submitted together as 15 changes.
+  Console shows **changes in review**, with automatic pre-review checks still
+  running at handoff; passing these checks queues the Google review. Managed
+  publishing is off, so approval makes the closed release available automatically.
+  This is a submitted review, not a claim that Google has approved the app.
+- Console required acknowledgment of the one-time version-code jump from manual
+  code 12 to the existing CI time-based scheme. This release was acknowledged.
+  Future codes must remain higher than 513091881 and below Play's
+  [2,100,000,000 maximum](https://support.google.com/googleplay/android-developer/answer/17367361).
+  Non-blocking diagnostics also mention mapping/native symbols: R8 minification
+  is disabled, and native debug symbols are currently not published. Improve
+  native symbol publishing separately for crash diagnosis; never substitute
+  symbols from a different build.
 
 Validation: Android debug compile, unit tests and APK build passed; iOS physical
 arm64 compile passed after project regeneration; the report service's nine tests
-passed. CI upload and device installation must be verified against the new build,
-not inferred from the API preflight or an older workflow run.
+passed. The public privacy page matches the deployed main-branch source. A live
+synthetic report was submitted, privately retrieved, and deleted. The new signed
+CI APK/AAB checksums were verified; APK metadata confirms package identity,
+version 513091881 and target API 36. Android physical-device UI verification is
+still pending because ADB had no connected device at handoff.
+
+Latest local AAB: `artifacts/google-play/AgentBuddy-1.5.0-513091881.aab`.
+SHA-256: `1ef01246345efc3413c5c42b1ce809a77a596d6e872b95c7ea8b6ccb4ad96e8c`.
+The four store screenshots remain under
+`artifacts/google-play/screenshots/pixel9/`. Submission and internal-release
+evidence is under `artifacts/google-play/verification/`.
 
 ## Before the first Play upload
 
