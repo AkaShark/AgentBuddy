@@ -32,7 +32,7 @@ android {
         applicationId = "com.akashark.agentbuddy.android"
         minSdk = 26
         targetSdk = 36
-        versionCode = 11
+        versionCode = 12
         versionName = "1.5.0"
         buildConfigField("boolean", "ENABLE_ON_DEVICE_BRIDGE", "true")
         buildConfigField("String", "RUNTIME_STARTUP_MODE", "\"hybrid\"")
@@ -177,7 +177,6 @@ dependencies {
         exclude(group = "org.jetbrains", module = "annotations-java5")
     }
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
-    implementation("com.android.billingclient:billing-ktx:7.0.0")
 
     implementation("androidx.media3:media3-exoplayer:1.4.1")
     implementation("androidx.media3:media3-ui:1.4.1")
