@@ -81,8 +81,9 @@ still pending because ADB had no connected device at handoff.
 Latest local AAB: `artifacts/google-play/AgentBuddy-1.5.0-513091881.aab`.
 SHA-256: `1ef01246345efc3413c5c42b1ce809a77a596d6e872b95c7ea8b6ccb4ad96e8c`.
 The four store screenshots remain under
-`artifacts/google-play/screenshots/pixel9/`. Submission and internal-release
-evidence is under `artifacts/google-play/verification/`.
+`artifacts/google-play/screenshots/pixel9/`. The final submission screenshot is
+`artifacts/google-play/verification/closed-testing-submitted.png`; intermediate
+Console screenshots and local report-service dependencies were cleaned up.
 
 ## Before the first Play upload
 
