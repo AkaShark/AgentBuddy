@@ -42,7 +42,8 @@ Current tests (`app/src/test/java/com/akashark/agentbuddy/android/`):
 
 - Compile SDK and target SDK are 36; `:app:compileDebugKotlin` and `:app:testDebugUnitTest` pass locally.
 - Play release/preflight script tests and release workflow `actionlint` checks pass.
-- First signed API 36 AAB upload, Play App Signing, service-account app permissions and internal tester installation remain pending Console setup.
+- Signed API 36 release bundle builds locally, including release lint. CameraX is updated to 1.4.2 because its previous image-processing native library used 4 KB LOAD alignment; verify all packaged native libraries before upload.
+- First AAB validation, service-account app permissions and internal tester installation remain pending Console setup. Play App Signing is enabled in the Console.
 - Before tester rollout, smoke-test Android 16 launch, system back navigation, keyboard/insets, remote pairing, notifications and voice on device. JVM tests do not validate target-SDK behavior changes.
 - This is Android distribution configuration; iOS runtime/parity behavior is unchanged.
 
