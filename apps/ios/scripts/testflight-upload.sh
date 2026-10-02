@@ -379,6 +379,7 @@ if [[ -n "$build_id" && -n "$WHAT_TO_TEST" ]]; then
     fi
 fi
 
+beta_review_status="not requested"
 if [[ "$ASSIGN_BETA_GROUP" == "1" && -n "$build_id" ]]; then
     beta_group_ids=()
     external_group_requested=0
@@ -438,7 +439,26 @@ if [[ "$ASSIGN_BETA_GROUP" == "1" && -n "$build_id" ]]; then
 
         if [[ "$SUBMIT_BETA_REVIEW" == "1" && "$external_group_requested" -eq 1 ]]; then
             echo "==> Submitting build $build_id for Beta App Review"
-            asc testflight review submit --build-id "$build_id" --confirm --output json >/dev/null
+            if review_output="$(asc testflight review submit --build-id "$build_id" --confirm --output json 2>&1)"; then
+                beta_review_status="submitted"
+            else
+                review_exit_code=$?
+                # Apple permits only one build per version train in beta review.
+                # The upload and group assignment have already succeeded; leave
+                # this build available without disguising other submission errors.
+                if [[ "$review_output" == *"Another build in the same train is already in beta review."* ]]; then
+                    beta_review_status="deferred"
+                    review_warning="Build $build_id was uploaded, but Beta App Review submission is deferred because another build of $MARKETING_VERSION is in review. Submit this build after that review completes; external testing is still pending."
+                    if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+                        printf '::warning title=TestFlight review deferred::%s\n' "$review_warning"
+                    else
+                        printf 'Warning: %s\n' "$review_warning" >&2
+                    fi
+                else
+                    printf '%s\n' "$review_output" >&2
+                    exit "$review_exit_code"
+                fi
+            fi
         fi
     fi
 fi
@@ -462,6 +482,19 @@ echo "    Build:       $BUILD_NUMBER"
 echo "    IPA:         $IPA_PATH"
 if [[ -n "${build_id:-}" ]]; then
     echo "    Build record: $build_id"
+fi
+echo "    Beta review:  $beta_review_status"
+if [[ "$beta_review_status" == "deferred" ]]; then
+    echo "    External testing is pending; this build has not been submitted for Beta App Review."
+    echo "    After the current review completes, run: asc testflight review submit --build-id $build_id --confirm"
+    if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+        {
+            printf '### TestFlight review deferred\n\n'
+            printf 'Version %s / build %s was uploaded and assigned to its beta groups. Another build of this version is in review, so this build has **not been submitted for Beta App Review** and external testing is pending.\n\n' "$MARKETING_VERSION" "$BUILD_NUMBER"
+            printf 'After the current review completes, submit the existing build without uploading it again:\n\n'
+            printf '`asc testflight review submit --build-id %s --confirm`\n' "$build_id"
+        } >>"$GITHUB_STEP_SUMMARY"
+    fi
 fi
 if [[ "$PROJECT_VERSION_BUMP_REQUIRED" == "1" ]]; then
     echo "    Next repo version: $PROJECT_VERSION_BUMP_TARGET"

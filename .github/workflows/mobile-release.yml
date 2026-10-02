@@ -127,6 +127,9 @@ jobs:
         with:
           xcode-version: '26.3'
 
+      - name: Validate Watch app icon
+        run: bash apps/ios/scripts/validate-app-icon.sh
+
       - name: Install build dependencies
         run: brew install xcodegen
 

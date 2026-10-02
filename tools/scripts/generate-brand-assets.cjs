@@ -90,8 +90,9 @@ async function main() {
   }
   // Watch still consumes the Icon Composer bundle; keep it on the same mark.
   await write(`${ios}/AppIcon.icon/Assets/agentbuddy-link.svg`, svg(mark()));
+  // Omit the optional Display P3 override so untagged SVG colors stay in sRGB.
+  // Xcode 26.3 rejects "srgb" as a value for color-space-for-untagged-svg-colors.
   await write(`${ios}/AppIcon.icon/icon.json`, JSON.stringify({
-    'color-space-for-untagged-svg-colors': 'srgb',
     fill: { solid: 'srgb:0.76471,0.90588,0.70980,1.00000' },
     groups: [{ layers: [{ 'image-name': 'agentbuddy-link.svg', name: 'AgentBuddy paired links' }],
       shadow: { kind: 'neutral', opacity: 0.15 }, translucency: { enabled: false, value: 0 } }],
