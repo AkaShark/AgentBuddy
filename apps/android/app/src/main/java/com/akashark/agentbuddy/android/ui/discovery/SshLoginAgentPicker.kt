@@ -173,8 +173,15 @@ internal fun availableSshBridgeKinds(agents: List<RemoteAgentAvailability>): Lis
         .map { it.kind }
         .sortedBy(::sshRuntimeSortRank)
 
-private fun isSshBridgeKind(kind: AgentRuntimeKind): Boolean =
-    kind.metadata?.capabilities?.supportsSshBridge ?: false
+// Same rule as iOS: the SSH bridge bootstrap can launch claude / pi /
+// opencode on the remote; Codex (and anything else) reaches the host through
+// the guided Codex connect or the alleycat pairing path.
+private fun isSshBridgeKind(kind: AgentRuntimeKind): Boolean {
+    kind.metadata?.capabilities?.supportsSshBridge?.let { supports ->
+        return supports && kind != "codex"
+    }
+    return kind == "claude" || kind == "pi" || kind == "opencode"
+}
 
 private fun sshRuntimeLabel(kind: AgentRuntimeKind): String = kind.runtimeLabel
 
