@@ -5,7 +5,9 @@ use crate::sys::time::TimeVal;
 use crate::Result;
 use cfg_if::cfg_if;
 use libc::{self, c_int, c_void, socklen_t};
-use std::ffi::{CStr, CString, OsStr, OsString};
+#[cfg(all(apple_targets, feature = "net"))]
+use std::ffi::{CStr, CString};
+use std::ffi::{OsStr, OsString};
 use std::mem::{self, MaybeUninit};
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::{AsFd, AsRawFd};
@@ -1438,11 +1440,13 @@ impl<'a> Set<'a, bool> for SetBool {
 }
 
 /// Getter for an `u8` value.
+#[cfg(feature = "net")]
 struct GetU8 {
     len: socklen_t,
     val: MaybeUninit<u8>,
 }
 
+#[cfg(feature = "net")]
 impl Get<u8> for GetU8 {
     fn uninit() -> Self {
         GetU8 {
@@ -1470,10 +1474,12 @@ impl Get<u8> for GetU8 {
 }
 
 /// Setter for an `u8` value.
+#[cfg(feature = "net")]
 struct SetU8 {
     val: u8,
 }
 
+#[cfg(feature = "net")]
 impl<'a> Set<'a, u8> for SetU8 {
     fn new(val: &'a u8) -> SetU8 {
         SetU8 { val: *val }
@@ -1590,11 +1596,13 @@ impl<'a> Set<'a, OsString> for SetOsString<'a> {
 }
 
 /// Getter for a `CString` value.
+#[cfg(all(apple_targets, feature = "net"))]
 struct GetCString<T: AsMut<[u8]>> {
     len: socklen_t,
     val: MaybeUninit<T>,
 }
 
+#[cfg(all(apple_targets, feature = "net"))]
 impl<T: AsMut<[u8]>> Get<CString> for GetCString<T> {
     fn uninit() -> Self {
         GetCString {
