@@ -1297,7 +1297,8 @@ mod tests {
             | proto::ThreadItem::ImageGeneration { id, .. }
             | proto::ThreadItem::EnteredReviewMode { id, .. }
             | proto::ThreadItem::ExitedReviewMode { id, .. }
-            | proto::ThreadItem::ContextCompaction { id, .. } => id,
+            | proto::ThreadItem::ContextCompaction { id, .. }
+            | proto::ThreadItem::Sleep { id, .. } => id,
         }
     }
 

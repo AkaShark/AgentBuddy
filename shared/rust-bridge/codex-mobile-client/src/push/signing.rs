@@ -47,6 +47,7 @@ pub(crate) fn platform_wire(platform: AppPushPlatform) -> &'static str {
     match platform {
         AppPushPlatform::Ios => "ios",
         AppPushPlatform::Android => "android",
+        AppPushPlatform::Harmony => "harmony",
     }
 }
 

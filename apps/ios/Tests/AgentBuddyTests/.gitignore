@@ -1,0 +1,2 @@
+# Per-run fixture endpoint; keep real configuration in ~/Downloads/AgentBuddy.
+DeviceRegression.local.json

@@ -824,3 +824,29 @@ export-fixture:
 
 export-fixture-run:
 	@cd shared/rust-bridge && cargo run -p codex-tui --bin export-fixture --release -- $(ARGS)
+
+# HarmonyOS uses an isolated staged project and caches under ~/.agentBuddy.
+.PHONY: harmony harmony-setup harmony-doctor rust-harmony harmony-hap harmony-install harmony-clean harmony-test
+harmony-setup:
+	@bash apps/harmony/scripts/bootstrap.sh
+
+harmony-doctor:
+	@bash apps/harmony/scripts/doctor.sh
+
+rust-harmony:
+	@bash apps/harmony/scripts/build-rust.sh
+
+harmony-hap:
+	@bash apps/harmony/scripts/build-hap.sh
+
+harmony: rust-harmony
+	@bash apps/harmony/scripts/build-hap.sh
+
+harmony-install: harmony
+	@bash apps/harmony/scripts/install.sh
+
+harmony-clean:
+	@python3 apps/harmony/scripts/clean.py
+
+harmony-test:
+	@"$${DEVECO_ROOT:-/Applications/DevEco-Studio.app/Contents}/tools/node/bin/node" --test apps/harmony/tests/*.test.mjs

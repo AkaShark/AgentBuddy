@@ -67,7 +67,7 @@ export interface GrantFields {
   aud: string
   host: string
   device: string
-  platform: "ios" | "android"
+  platform: "ios" | "android" | "harmony"
   environment: "sandbox" | "production" | "none"
   targetSha256: string
   agent: string

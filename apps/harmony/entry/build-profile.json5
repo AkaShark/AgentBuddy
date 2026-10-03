@@ -1,0 +1,7 @@
+{
+  "apiType": "stageMode",
+  "buildOption": {
+    "nativeLib": {"filter": {"excludes": ["**/x86_64/**", "**/armeabi-v7a/**"]}}
+  },
+  "targets": [{"name":"default"}]
+}

@@ -63,6 +63,10 @@ semver = { version = "1", default-features = false }
 linkify = "0.10"
 unicode-segmentation = "1"
 
+# Native TLS dependencies must be built with the OHOS SDK, not host macOS libs.
+[target.'cfg(target_env = "ohos")'.dependencies]
+openssl-sys = { version = "0.9", features = ["vendored"] }
+
 [features]
 rpc-trace = []
 # [litter-fork] Opt-in iSH (on-device Alpine Linux emulator) backend. OFF by

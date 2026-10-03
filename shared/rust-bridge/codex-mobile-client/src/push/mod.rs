@@ -35,6 +35,7 @@ use crate::types::{AgentRuntimeKind, ThreadKey};
 pub enum AppPushPlatform {
     Ios,
     Android,
+    Harmony,
 }
 
 /// APNs environment of an iOS device token.
@@ -48,10 +49,10 @@ pub enum AppApnsEnvironment {
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct AppPushRegistration {
     pub platform: AppPushPlatform,
-    /// APNs device token (hex) or FCM registration token.
+    /// APNs device token (hex), FCM registration token, or Harmony Push Kit token.
     pub token: String,
     /// Required for iOS (defaults to `Production` when absent); ignored on
-    /// Android.
+    /// Android and Harmony.
     pub apns_environment: Option<AppApnsEnvironment>,
     /// Worker base URL, used only for the best-effort direct revoke when a
     /// host is unreachable.

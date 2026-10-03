@@ -318,7 +318,7 @@ internal fun ConversationTranscriptList(
  * Resolve the user-message position in the currently-loaded transcript.
  * `forkThreadFromMessage` / `editMessage` on the Rust side expect an index
  * into the thread's items filtered to user messages — see
- * `rollback_depth_for_turn` in `mobile_client/thread_projection.rs`.
+ * `rollback_depth_for_turn` in `mobile_client/message_actions.rs`.
  * Recomputing from the live `items` keeps the index correct under
  * pagination (older turns can shift positions; a cached `sourceTurnIndex`
  * from a prior hydrate would be stale).

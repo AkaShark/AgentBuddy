@@ -404,6 +404,7 @@ impl MobileClient {
             upstream::ClientRequest::ThreadRollback { params, .. } => {
                 Some(params.thread_id.as_str())
             }
+            upstream::ClientRequest::ThreadRevert { params, .. } => Some(params.thread_id.as_str()),
             upstream::ClientRequest::ThreadUnsubscribe { params, .. } => {
                 Some(params.thread_id.as_str())
             }
@@ -1312,6 +1313,7 @@ fn client_request_wire_method(request: &upstream::ClientRequest) -> &'static str
         upstream::ClientRequest::ThreadResume { .. } => "thread/resume",
         upstream::ClientRequest::ThreadFork { .. } => "thread/fork",
         upstream::ClientRequest::ThreadRollback { .. } => "thread/rollback",
+        upstream::ClientRequest::ThreadRevert { .. } => "thread/revert",
         upstream::ClientRequest::ThreadTurnsList { .. } => "thread/turns/list",
         upstream::ClientRequest::TurnStart { .. } => "turn/start",
         upstream::ClientRequest::TurnSteer { .. } => "turn/steer",

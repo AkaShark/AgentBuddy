@@ -386,3 +386,38 @@ attached automatically. Android compile/unit tests/APK and iOS physical-arm64
 compile passed. Backend tests cover consent, size, origin, admin authentication,
 rate limits, idempotency, retention and storage failure. Physical Android UI
 verification remains pending while no device is connected.
+
+
+### Shared message-boundary regression (2026-10-02)
+
+The Harmony port found that shared `rollback_depth_for_turn` counted hydrated
+items (including tools/reasoning/replies) as turns. The shared fix now counts user
+boundaries: edit removes the selected prompt and later turns; a message fork
+keeps the selected prompt and reply. Rust rejects running/queued/active-goal
+history and ambiguous multi-prompt or autonomous turns. Returned history remains
+marked as loaded after the composite operation. New paginated hosts use
+`thread/revert` with a stable turn ID and authoritative pagination; only a
+definitive unsupported-method response permits legacy rollback. Timeouts do not
+retry, and failed boundary forks are archived automatically.
+
+Five shared Rust regression tests cover tool-heavy transcripts, an unanswered
+last prompt, pagination, invalid/ambiguous selection, busy state, and actual
+edit/fork RPC depths plus preservation of the source thread. 878 shared tests
+passed serially (5 existing ignored); two existing cloud-sync tests conflict
+through a global table during parallel execution. The subsequent Pixel 9 regression is recorded below; iOS device execution
+is tracked separately in the Harmony task list. Platform source edits only update the
+comment pointing to the moved shared helper. Harmony also restores image drafts;
+Swift/Kotlin's existing text-only composer prefill remains a follow-up.
+
+### Pixel 9 physical binding regression (2026-10-02)
+
+Device `45211FDAQ00309` (Pixel 9): rebuilt current arm64 Rust JNI library and
+UniFFI Kotlin bindings, built and installed app plus instrumentation APKs.
+`MobileHistoryDeviceTest` passed (1 test): full cursor pages, Sleep hydration,
+unique item IDs, fork source preservation, edit draft, first-message revert to
+empty history, and an injected revert failure without legacy rollback retry.
+`NativeContextInitTest` passed (2 tests): initialized Android context is visible
+to iroh and alleycat agent discovery does not panic. The history server is the
+isolated synthetic fixture in `tools/qa`; production-host and visual UI coverage
+is not implied by these tests. Logs are under
+`~/Downloads/AgentBuddy/device-regression/logs/pixel9-*.log`.

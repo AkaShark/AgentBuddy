@@ -1,0 +1,8 @@
+{
+  "name": "entry",
+  "version": "0.1.0",
+  "dependencies": {
+    "@agentbuddy/core": "file:../generated/core",
+    "@luvi/lv-markdown-in": "3.4.7"
+  }
+}

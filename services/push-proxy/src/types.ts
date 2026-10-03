@@ -27,10 +27,14 @@ export interface Env {
   FCM_PROJECT_ID: string
   FCM_CLIENT_EMAIL: string
   FCM_PRIVATE_KEY: string
+  // Huawei API Console service-account JSON. Never include in a mobile bundle.
+  HARMONY_SERVICE_ACCOUNT?: string
   DEBUG_PUSH_ADMIN_TOKEN?: string
   // "<kid>:<64 hex X25519 private key>", comma-separated during rotation (spec §5.5, §11).
   PUSH_TARGET_SEAL_KEY?: string
   // Vars (wrangler.toml [vars])
+  // Development-only Huawei test delivery; WORK classification rights are still required.
+  HARMONY_TEST_MESSAGE?: string
   APNS_TOPIC?: string
   DEBUG_PUSH_ENABLED?: string
   LEGACY_KEEPALIVE_ENABLED?: string

@@ -531,7 +531,7 @@ impl TryFrom<AppListThreadTurnsRequest> for upstream::ThreadTurnsListParams {
             cursor: value.cursor,
             limit: value.limit,
             sort_direction: value.sort_direction.map(Into::into),
-            items_view: None,
+            items_view: Some(upstream::TurnItemsView::Full),
         })
     }
 }
@@ -1230,6 +1230,24 @@ impl TryFrom<AppWriteConfigValueRequest> for upstream::ConfigValueWriteParams {
 mod tests {
     use super::*;
     use crate::types::enums::ApprovalKind;
+
+    #[test]
+    fn turns_request_explicitly_loads_full_history_on_summary_default_hosts() {
+        let request = AppListThreadTurnsRequest {
+            thread_id: "t1".to_string(),
+            cursor: Some("older".to_string()),
+            limit: Some(5),
+            sort_direction: Some(AppTurnsSortDirection::Descending),
+        };
+        let params: upstream::ThreadTurnsListParams = request.try_into().unwrap();
+        assert_eq!(
+            serde_json::to_value(params).unwrap(),
+            serde_json::json!({
+                "threadId": "t1", "cursor": "older", "limit": 5,
+                "sortDirection": "desc", "itemsView": "full"
+            })
+        );
+    }
 
     #[test]
     fn pending_approval_roundtrip() {

@@ -38,6 +38,8 @@ use codex_app_server_protocol as upstream;
 
 mod dynamic_tools;
 mod event_loop;
+mod message_actions;
+mod message_mutations;
 pub(crate) mod minigame;
 mod store_listener;
 #[cfg(test)]
@@ -45,6 +47,7 @@ mod tests;
 mod thread_projection;
 
 use self::dynamic_tools::*;
+use self::message_actions::*;
 use self::store_listener::*;
 use self::thread_projection::*;
 pub use self::thread_projection::{
@@ -3052,7 +3055,9 @@ impl MobileClient {
             cursor,
             limit,
             sort_direction: Some(upstream::SortDirection::Desc),
-            items_view: None,
+            // Newer hosts default to summaries, which omit tool/commentary items.
+            // Hydration needs the authoritative full items for each paged turn.
+            items_view: Some(upstream::TurnItemsView::Full),
         };
         let request = upstream::ClientRequest::ThreadTurnsList {
             request_id: upstream::RequestId::Integer(crate::next_request_id()),
@@ -3379,138 +3384,11 @@ impl MobileClient {
         );
         // Remove by id under the store lock: rewriting the whole list from an
         // earlier snapshot could resurrect a draft autosend just dequeued.
-        self.app_store.remove_thread_follow_up_draft(key, preview_id);
+        self.app_store
+            .remove_thread_follow_up_draft(key, preview_id);
         self.app_store
             .finish_server_mutating_command_success(&key.server_id, &direct_command_id);
         Ok(())
-    }
-
-    /// Roll back the current thread to a selected user turn and return the
-    /// message text that should be restored into the composer for editing.
-    pub async fn edit_message(
-        &self,
-        key: &ThreadKey,
-        selected_turn_index: u32,
-    ) -> Result<String, RpcError> {
-        self.get_session(&key.server_id)?;
-        let current = self.snapshot_thread(key)?;
-        ensure_thread_is_editable(&current)?;
-        let rollback_depth = rollback_depth_for_turn(&current, selected_turn_index as usize)?;
-        let prefill_text = user_boundary_text_for_turn(&current, selected_turn_index as usize)?;
-
-        if rollback_depth > 0 {
-            let response = self
-                .server_thread_rollback(
-                    &key.server_id,
-                    upstream::ThreadRollbackParams {
-                        thread_id: key.thread_id.clone(),
-                        num_turns: rollback_depth,
-                    },
-                )
-                .await
-                .map_err(|e| RpcError::Deserialization(e.to_string()))?;
-            let turns = response.thread.turns.clone();
-            let mut snapshot = thread_snapshot_from_upstream_thread_with_overrides(
-                &key.server_id,
-                response.thread,
-                current.model.clone(),
-                current.reasoning_effort.clone(),
-                current.effective_approval_policy.clone(),
-                current.effective_sandbox_policy.clone(),
-            )
-            .map_err(RpcError::Deserialization)?;
-            copy_thread_runtime_fields(&current, &mut snapshot);
-            reconcile_active_turn(Some(&current), &mut snapshot, &turns);
-            self.app_store.upsert_thread_snapshot(snapshot);
-        }
-
-        self.set_active_thread(Some(key.clone()));
-        Ok(prefill_text)
-    }
-
-    /// Fork a thread from a selected user message boundary.
-    pub async fn fork_thread_from_message(
-        &self,
-        key: &ThreadKey,
-        selected_turn_index: u32,
-        cwd: Option<String>,
-        model: Option<String>,
-        approval_policy: Option<crate::types::AppAskForApproval>,
-        sandbox: Option<crate::types::AppSandboxMode>,
-        developer_instructions: Option<String>,
-        persist_extended_history: bool,
-    ) -> Result<ThreadKey, RpcError> {
-        self.get_session(&key.server_id)?;
-        let source = self.snapshot_thread(key)?;
-        ensure_thread_is_editable(&source)?;
-        let rollback_depth = rollback_depth_for_turn(&source, selected_turn_index as usize)?;
-
-        let developer_instructions =
-            crate::local_runtime_instructions::splice_local_runtime_developer_instructions(
-                self,
-                &key.server_id,
-                developer_instructions,
-            );
-
-        let response = self
-            .server_thread_fork(
-                &key.server_id,
-                crate::types::AppForkThreadRequest {
-                    thread_id: key.thread_id.clone(),
-                    model,
-                    cwd,
-                    approval_policy,
-                    sandbox,
-                    developer_instructions,
-                    persist_extended_history,
-                    exclude_turns: false,
-                }
-                .try_into()
-                .map_err(|e: crate::RpcClientError| RpcError::Deserialization(e.to_string()))?,
-            )
-            .await
-            .map_err(|e| RpcError::Deserialization(e.to_string()))?;
-
-        let fork_model = Some(response.model);
-        let fork_reasoning = response
-            .reasoning_effort
-            .map(|value| reasoning_effort_string(value.into()));
-        let mut snapshot = thread_snapshot_from_upstream_thread_with_overrides(
-            &key.server_id,
-            response.thread,
-            fork_model.clone(),
-            fork_reasoning.clone(),
-            Some(response.approval_policy.into()),
-            Some(response.sandbox.into()),
-        )
-        .map_err(RpcError::Deserialization)?;
-        let next_key = snapshot.key.clone();
-
-        if rollback_depth > 0 {
-            let rollback_response = self
-                .server_thread_rollback(
-                    &key.server_id,
-                    upstream::ThreadRollbackParams {
-                        thread_id: next_key.thread_id.clone(),
-                        num_turns: rollback_depth,
-                    },
-                )
-                .await
-                .map_err(|e| RpcError::Deserialization(e.to_string()))?;
-            snapshot = thread_snapshot_from_upstream_thread_with_overrides(
-                &key.server_id,
-                rollback_response.thread,
-                fork_model,
-                fork_reasoning,
-                snapshot.effective_approval_policy.clone(),
-                snapshot.effective_sandbox_policy.clone(),
-            )
-            .map_err(RpcError::Deserialization)?;
-        }
-
-        self.app_store.upsert_thread_snapshot(snapshot);
-        self.set_active_thread(Some(next_key.clone()));
-        Ok(next_key)
     }
 
     pub async fn respond_to_approval(

@@ -34,7 +34,7 @@ const TIMESTAMP_RE = /^[0-9]{1,12}$/
 
 interface SubscriptionRequest {
   deviceId: string
-  platform: "ios" | "android"
+  platform: "ios" | "android" | "harmony"
   apnsEnvironment: "sandbox" | "production" | null
   sealedTarget: string
   agent: string
@@ -50,7 +50,7 @@ function parseSubscription(raw: unknown): SubscriptionRequest | string {
   if (!isRecord(raw)) return "body must be a JSON object"
   const { deviceId, platform, apnsEnvironment, sealedTarget, agent, threadId, turnId } = raw
   if (typeof deviceId !== "string" || !HEX64_RE.test(deviceId)) return "deviceId must be 64 lowercase hex"
-  if (platform !== "ios" && platform !== "android") return 'platform must be "ios" or "android"'
+  if (platform !== "ios" && platform !== "android" && platform !== "harmony") return 'platform must be "ios", "android" or "harmony"'
   let environment: "sandbox" | "production" | null = null
   if (platform === "ios") {
     if (apnsEnvironment !== "sandbox" && apnsEnvironment !== "production") {

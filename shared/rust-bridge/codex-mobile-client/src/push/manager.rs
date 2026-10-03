@@ -408,7 +408,7 @@ pub(crate) fn normalize_registration(
         return None;
     }
     let apns_environment = match registration.platform {
-        AppPushPlatform::Android => None,
+        AppPushPlatform::Android | AppPushPlatform::Harmony => None,
         AppPushPlatform::Ios => Some(
             registration
                 .apns_environment
@@ -1933,6 +1933,15 @@ mod tests {
         }))
         .unwrap();
         assert_eq!(android.apns_environment, None);
+        let harmony = normalize_registration(Some(AppPushRegistration {
+            platform: AppPushPlatform::Harmony,
+            apns_environment: Some(AppApnsEnvironment::Sandbox),
+            ..registration(" harmony-token ")
+        }))
+        .unwrap();
+        assert_eq!(harmony.token, "harmony-token");
+        assert_eq!(harmony.apns_environment, None);
+        assert_eq!(signing::platform_wire(harmony.platform), "harmony");
     }
 
     fn store_with_thread(seed: u8, thread: &str, runtime: &str) -> crate::store::AppStoreReducer {

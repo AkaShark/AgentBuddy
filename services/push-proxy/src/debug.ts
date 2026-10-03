@@ -59,7 +59,7 @@ function parseDebugRequest(raw: unknown): DebugPushRequest | string {
   if (!isRecord(raw)) return "body must be a JSON object"
   if (Object.keys(raw).some((key) => !ALLOWED_FIELDS.has(key))) return "body contains an unsupported field"
   const { platform, pushToken, apnsEnvironment, mode, title, body, hostId, threadId, turnId } = raw
-  if (platform !== "ios" && platform !== "android") return 'platform must be "ios" or "android"'
+  if (platform !== "ios" && platform !== "android" && platform !== "harmony") return 'platform must be "ios", "android" or "harmony"'
   const tokenError = pushTokenError(platform, pushToken)
   if (tokenError) return tokenError
   let environment: "sandbox" | "production" | null = null

@@ -592,3 +592,47 @@ migration (here `v3`). In that case, redeploy the older code with the
 
 Old apps keep working until step 4. Nothing here enables paid plans, creates
 releases or submits store reviews.
+
+### HarmonyOS Push Kit v3 (HOS-018)
+
+The v2 signed/sealed subscription path accepts `platform: "harmony"` with no
+APNs environment. The phone passes its native Push Kit token into the shared
+Rust `PushManager`; tokens remain sealed to the Worker. The host must also run
+a version that accepts the `harmony` platform. Older hosts that only accept
+`ios` / `android` reject the grant and cannot deliver Harmony notifications.
+
+Before deploying this channel:
+
+1. Create the `com.akashark.agentbuddy.mobile` application in AppGallery
+   Connect, associate the signing profile with that application, and enable
+   Push Kit. A successful DevEco debug signature alone does not establish the
+   Push Kit application identity.
+2. Enable notification self-classification for **WORK** (task completion is a
+   work reminder). The sender does not relabel these messages as marketing.
+3. Download the same project's Push API service-account JSON from Huawei API
+   Console. Store it outside Git (for this work, under
+   `~/.agentBuddy/signing/harmony/`). Set the Worker secret
+   `HARMONY_SERVICE_ACCOUNT` to that JSON. Required fields are `project_id`,
+   `key_id`, `sub_account`, and `private_key`. Never ship this secret in a HAP.
+4. `HARMONY_TEST_MESSAGE=true` optionally selects Huawei's test-message mode;
+   leave it absent for normal delivery. This does not grant missing service
+   rights. Deploy the Worker and compatible host together, then verify a real
+   background completion on a registered device.
+
+The sender uses a directly signed PS256 service-account JWT, the **v3**
+`messages:send` endpoint and `push-type: 0`. Every notification sets
+`foregroundShow: false`, uses the shared task routing keys in
+`clickAction.data`, and uses a stable per-turn `appMessageId` / `notifyId` for
+retry deduplication. It checks the business response code as well as HTTP
+status. Broad `80300007` errors do not revoke registrations because they may
+mean a project/permission mismatch; only explicit token-format rejection for
+the supplied token is treated as an invalid registration.
+
+The debug endpoint supports Harmony **alert** sends only; it does not emulate
+background data messages. Existing APNs and FCM delivery and legacy keepalive
+remain unchanged.
+
+Primary API references:
+[service-account JWT](https://developer.huawei.com/consumer/cn/doc/doccenter-capabilities/push-jwt-token),
+[notification fields](https://developer.huawei.com/consumer/cn/doc/doccenter-references/api/push-scenariozed-api-request-param),
+[provider response codes](https://developer.huawei.com/consumer/cn/doc/doccenter-references/api/push-scenariozed-api-response).

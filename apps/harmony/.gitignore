@@ -1,0 +1,13 @@
+/generated/
+/build/
+/entry/build/
+/entry/libs/
+/oh_modules/
+/node_modules/
+/.hvigor/
+/.idea/
+/local.properties
+/oh-package-lock.json5
+*.p12
+*.cer
+*.p7b

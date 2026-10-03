@@ -71,7 +71,9 @@ for arg in "$@"; do
   esac
 done
 
-mkdir -p "$FRAMEWORKS_DIR" "$GENERATED_HEADERS_DIR" "$GENERATED_DEVICE_DIR" "$GENERATED_SIM_DIR"
+mkdir -p "$FRAMEWORKS_DIR" "$GENERATED_HEADERS_DIR"
+if [ "$SIM_ONLY" -eq 0 ]; then mkdir -p "$GENERATED_DEVICE_DIR"; fi
+if [ "$DEVICE_ONLY" -eq 0 ]; then mkdir -p "$GENERATED_SIM_DIR"; fi
 
 if [ -z "${RUSTC_WRAPPER:-}" ] && [ "${CARGO_INCREMENTAL:-}" != "1" ] && command -v sccache >/dev/null 2>&1; then
   export RUSTC_WRAPPER="$(command -v sccache)"

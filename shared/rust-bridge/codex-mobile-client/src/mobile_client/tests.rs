@@ -1056,7 +1056,8 @@ mod mobile_client_tests {
                         }))
                         .map_err(|error| RpcError::Deserialization(error.to_string()))
                     }
-                    upstream::ClientRequest::ThreadTurnsList { .. } => {
+                    upstream::ClientRequest::ThreadTurnsList { params, .. } => {
+                        assert_eq!(params.items_view, Some(upstream::TurnItemsView::Full));
                         Err(RpcError::Deserialization(
                             "server error -32601: method `thread/turns/list` is not implemented"
                                 .to_string(),

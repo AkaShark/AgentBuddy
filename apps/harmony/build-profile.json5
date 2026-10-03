@@ -1,0 +1,23 @@
+{
+  "app": {
+    "signingConfigs": [],
+    "products": [{
+      "name": "default",
+      "compatibleSdkVersion": "6.1.1(24)",
+      "targetSdkVersion": "26.0.0",
+      "runtimeOS": "HarmonyOS",
+      "buildOption": {
+        "strictMode": {"useNormalizedOHMUrl": true},
+        "externalNativeOptions": {"abiFilters": ["arm64-v8a"]}
+      }
+    }],
+    "buildModeSet": [{"name":"debug"}, {"name":"release"}]
+  },
+  "modules": [{
+    "name": "entry", "srcPath": "./entry",
+    "targets": [{"name":"default","applyToProducts":["default"]}]
+  }, {
+    "name": "agentbuddy_core", "srcPath": "./generated/core",
+    "targets": [{"name":"default","applyToProducts":["default"]}]
+  }]
+}

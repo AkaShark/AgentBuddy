@@ -530,6 +530,13 @@ fn convert_thread_item(
             false,
         ),
         ThreadItem::HookPrompt { .. } => return None,
+        ThreadItem::Sleep { duration_ms, .. } => (
+            HydratedConversationItemContent::Note(HydratedNoteData {
+                title: "Wait".to_string(),
+                body: format!("Requested wait: {duration_ms} ms"),
+            }),
+            false,
+        ),
     };
 
     Some(HydratedConversationItem {
@@ -2142,6 +2149,46 @@ diff --git a/parser.rs b/parser.rs\n\
             }
             _ => panic!("expected CommandExecution content"),
         }
+    }
+
+    #[test]
+    fn test_sleep_wire_item_preserves_history_and_wait_duration() {
+        let wait: ThreadItem = serde_json::from_value(serde_json::json!({
+            "type": "sleep", "id": "wait-1", "durationMs": 60000
+        }))
+        .expect("newer remote wait items must deserialize");
+        assert_eq!(wait.id(), "wait-1");
+        let turns = vec![make_turn(
+            "turn-1",
+            vec![
+                ThreadItem::UserMessage {
+                    id: "user-1".into(),
+                    content: vec![UserInput::Text {
+                        text: "Wait then reply".into(),
+                        text_elements: vec![],
+                    }],
+                },
+                wait,
+                ThreadItem::AgentMessage {
+                    id: "reply-1".into(),
+                    text: "Done".into(),
+                    phase: None,
+                    memory_citation: None,
+                },
+            ],
+        )];
+        let items = hydrate_turns(&turns, &HydrationOptions::default());
+        assert_eq!(items.len(), 3);
+        assert_eq!(items[1].id, "wait-1");
+        assert_eq!(items[1].source_turn_id.as_deref(), Some("turn-1"));
+        assert!(!items[1].is_from_user_turn_boundary);
+        assert_eq!(
+            items[1].content,
+            HydratedConversationItemContent::Note(HydratedNoteData {
+                title: "Wait".into(),
+                body: "Requested wait: 60000 ms".into(),
+            })
+        );
     }
 
     #[test]

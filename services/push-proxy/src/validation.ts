@@ -39,7 +39,7 @@ export function hasControlChars(value: string): boolean {
 
 // APNs tokens are hex and end up in the APNs request path; FCM tokens are
 // printable ASCII without whitespace.
-export function pushTokenError(platform: "ios" | "android", token: unknown): string | null {
+export function pushTokenError(platform: "ios" | "android" | "harmony", token: unknown): string | null {
   if (typeof token !== "string") return "pushToken must be a string"
   if (platform === "ios") {
     return new RegExp(`^[0-9a-fA-F]{1,${MAX_IOS_TOKEN_LENGTH}}$`).test(token)
@@ -48,7 +48,7 @@ export function pushTokenError(platform: "ios" | "android", token: unknown): str
   }
   return new RegExp(`^[\\x21-\\x7e]{1,${MAX_ANDROID_TOKEN_LENGTH}}$`).test(token)
     ? null
-    : `pushToken must be a printable FCM token of at most ${MAX_ANDROID_TOKEN_LENGTH} characters`
+    : `pushToken must be a printable native push token of at most ${MAX_ANDROID_TOKEN_LENGTH} characters`
 }
 
 export function blockedHostIds(env: Env): Set<string> {

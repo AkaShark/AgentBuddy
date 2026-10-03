@@ -33,7 +33,7 @@ export interface SealKey {
 export interface ExpectedTarget {
   hostId: string
   deviceId: string
-  platform: "ios" | "android"
+  platform: "ios" | "android" | "harmony"
   apnsEnvironment: "sandbox" | "production" | null
 }
 

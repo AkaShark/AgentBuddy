@@ -1,3 +1,4 @@
+import { sendHarmonyAlert } from "./harmony"
 // Visible turn-completion alerts (spec §7.3 APNs, §7.4 FCM) and the single-shot
 // debug sender (§7.5). The legacy silent keepalive push stays in apns.ts/fcm.ts.
 import { apnsHost, clearAPNsJWTCache, generateAPNsJWT } from "./apns"
@@ -15,7 +16,7 @@ const PROVIDER_TIMEOUT_MS = 10_000
 const APNS_INVALID_TOKEN_REASONS = new Set(["BadDeviceToken", "DeviceTokenNotForTopic", "Unregistered"])
 const APNS_PROVIDER_TOKEN_REASONS = new Set(["ExpiredProviderToken", "InvalidProviderToken"])
 
-export type Platform = "ios" | "android"
+export type Platform = "ios" | "android" | "harmony"
 export type ApnsEnvironment = "sandbox" | "production"
 export type TurnKind = "completed" | "failed"
 
@@ -188,6 +189,9 @@ export async function sendTurnAlert(env: Env, target: PushTarget, alert: TurnAle
   const collapseKey = await turnCollapseKey(alert.hostId, alert.threadId, alert.turnId)
   const { title, body } = turnAlertText(alert.kind)
   const data = turnRoutingData(alert)
+  if (target.platform === "harmony") {
+    return sendHarmonyAlert(env, target.pushToken, { title, body, routing: data, collapseKey })
+  }
 
   if (target.platform === "ios") {
     const environment = target.apnsEnvironment ?? "production"
@@ -244,13 +248,13 @@ export interface DebugPushRequest {
 }
 
 export interface DebugPushResult {
-  provider: "apns" | "fcm"
+  provider: "apns" | "fcm" | "harmony"
   accepted: boolean
   providerStatus: number | null
   error: string | null
 }
 
-function debugResult(provider: "apns" | "fcm", result: ProviderResult): DebugPushResult {
+function debugResult(provider: "apns" | "fcm" | "harmony", result: ProviderResult): DebugPushResult {
   if (result.kind !== "response") {
     return { provider, accepted: false, providerStatus: null, error: result.kind }
   }
@@ -262,6 +266,14 @@ function debugResult(provider: "apns" | "fcm", result: ProviderResult): DebugPus
 // Exactly one provider send per call: no retry, no stored state. A rejected
 // provider credential is still dropped from the cache for the next call.
 export async function sendDebugPush(env: Env, req: DebugPushRequest): Promise<DebugPushResult> {
+  if (req.platform === "harmony") {
+    if (req.mode !== "alert") return { provider: "harmony", accepted: false, providerStatus: null, error: "unsupported_mode" }
+    const result = await sendHarmonyAlert(env, req.pushToken, {
+      title: req.title, body: req.body, routing: req.routing,
+      collapseKey: `t-${(await sha256Hex(crypto.randomUUID())).slice(0, 32)}`,
+    }, false)
+    return { provider: "harmony", accepted: result.state === "sent", providerStatus: result.providerStatus, error: result.reason }
+  }
   if (req.platform === "ios") {
     const environment = req.apnsEnvironment ?? "production"
     const alert = req.mode === "alert"
