@@ -220,6 +220,13 @@ internal object GalleryConversationFixtures {
                 "\n\n1. 第一项：`/Users/me/Projects/AgentBuddy/apps/android/app/src/main/java/com/akashark/agentbuddy/android/ui/conversation/TimelineMessageRows.kt`\n" +
                 "2. 第二项：普通文字\n",
         ),
+        AppMessageRenderBlock.Markdown(
+            markdown = "| 模块 | 状态 | 说明 | 负责人 | 链接 |\n" +
+                "|---|:---:|---|---|---|\n" +
+                "| 登录 | ✅ | 状态恢复时的重复跳转已修复，冷启动不再闪烁 | Alice | [PR](https://github.com/AkaShark/AgentBuddy) |\n" +
+                "| 首页 | ⏳ | 列表解析挪到后台，`parseSessions()` 分页加载 | Bob | — |\n" +
+                "| 推送 | ❌ | 待排查 | — | — |",
+        ),
         AppMessageRenderBlock.CodeBlock(
             language = "bash",
             code = "./gradlew :app:testDebugUnitTest --tests 'com.akashark.agentbuddy.android.ui.conversation.MathMarkdownTest' --info --stacktrace --no-daemon\necho done",

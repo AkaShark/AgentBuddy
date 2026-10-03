@@ -1,6 +1,7 @@
 package com.akashark.agentbuddy.android.ui.conversation
 
 import android.util.TypedValue
+import android.text.Spanned
 import android.text.method.LinkMovementMethod
 import android.view.ActionMode
 import android.view.Menu
@@ -23,6 +24,9 @@ import io.noties.markwon.AbstractMarkwonPlugin
 import io.noties.markwon.Markwon
 import io.noties.markwon.core.MarkwonTheme
 import io.noties.markwon.ext.latex.JLatexMathPlugin
+import io.noties.markwon.ext.tables.TableAwareMovementMethod
+import io.noties.markwon.ext.tables.TablePlugin
+import io.noties.markwon.ext.tables.TableRowSpan
 import io.noties.markwon.inlineparser.MarkwonInlineParserPlugin
 import io.noties.markwon.syntax.SyntaxHighlightPlugin
 import io.noties.prism4j.Prism4j
@@ -99,6 +103,15 @@ internal fun SelectableMarkdownText(
         palette = palette,
     )
     val markdown = remember(text) { normalizeMathMarkdown(text) }
+    val rendered = remember(markwon, markdown) { markwon.toMarkdown(markdown) }
+    // A table row is drawn to its line's bounds, and the platform adds line
+    // spacing to every line but the last, so under the Mint line height the
+    // table's last row came out short. Tables keep the natural line height.
+    val lineHeightPx = if (rendered.hasTableRows()) {
+        null
+    } else {
+        lineHeightRatio?.let { markdownTextSizePx * it }
+    }
 
     AndroidView(
         factory = { ctx ->
@@ -110,7 +123,7 @@ internal fun SelectableMarkdownText(
                     textSize = resolvedTextSize,
                     typeface = typeface,
                     usePhysicalDpTextSize = usePhysicalDpTextSize,
-                    lineHeightPx = lineHeightRatio?.let { markdownTextSizePx * it },
+                    lineHeightPx = lineHeightPx,
                 )
                 onTextViewReady?.invoke(this)
             }
@@ -123,9 +136,9 @@ internal fun SelectableMarkdownText(
                 textSize = resolvedTextSize,
                 typeface = typeface,
                 usePhysicalDpTextSize = usePhysicalDpTextSize,
-                lineHeightPx = lineHeightRatio?.let { markdownTextSizePx * it },
+                lineHeightPx = lineHeightPx,
             )
-            markwon.setMarkdown(tv, markdown)
+            markwon.setParsedMarkdown(tv, rendered)
         },
         modifier = modifier,
     )
@@ -148,13 +161,26 @@ internal fun configureSelectableMarkdownTextView(
     } else {
         textView.textSize = textSize
     }
-    lineHeightPx?.let { TextViewCompat.setLineHeight(textView, it.roundToInt()) }
+    // The view is reused as streamed text changes, so a block that turns into
+    // a table must drop the line height it had before.
+    if (lineHeightPx != null) {
+        TextViewCompat.setLineHeight(textView, lineHeightPx.roundToInt())
+    } else {
+        textView.setLineSpacing(0f, 1f)
+    }
     textView.linksClickable = true
-    textView.movementMethod = LinkMovementMethod.getInstance()
+    textView.movementMethod = TableAwareLinkMovementMethod
     textView.setLinkTextColor(linkColor)
     textView.setTextIsSelectable(true)
     textView.customSelectionActionModeCallback = RunInTerminalSelectionMenu(textView)
 }
+
+/**
+ * Table cells are drawn by a span, so links inside them need the table-aware
+ * wrapper to receive taps. Stateless, so one instance serves every view.
+ */
+private val TableAwareLinkMovementMethod =
+    TableAwareMovementMethod.wrap(LinkMovementMethod.getInstance())
 
 /**
  * Adds a "Run in Terminal" item to the text-selection ActionMode of the
@@ -238,6 +264,7 @@ private fun rememberConversationMarkwon(
         Markwon.builder(context)
             .usePlugin(SyntaxHighlightPlugin.create(prism4j, conversationPrismTheme(palette.isDark)))
             .usePlugin(MarkwonInlineParserPlugin.create())
+            .usePlugin(mintTablePlugin(context, palette))
             .usePlugin(
                 JLatexMathPlugin.create(markdownTextSizePx, markdownTextSizePx * 1.12f) { builder ->
                     builder.inlinesEnabled(true)
@@ -251,6 +278,24 @@ private fun rememberConversationMarkwon(
             .build()
     } catch (_: Exception) {
         Markwon.create(context)
+    }
+}
+
+/**
+ * GFM tables: hairline Mint rules, header row on the code background, and
+ * Markwon's faint zebra (text colour at low alpha) on odd rows.
+ */
+private fun mintTablePlugin(
+    context: android.content.Context,
+    palette: MarkdownPalette,
+): TablePlugin {
+    val density = context.resources.displayMetrics.density
+    return TablePlugin.create { builder ->
+        builder
+            .tableBorderColor(palette.rule)
+            .tableBorderWidth(density.roundToInt().coerceAtLeast(1))
+            .tableCellPadding((8 * density).roundToInt())
+            .tableHeaderRowBackgroundColor(palette.codeBackground)
     }
 }
 
@@ -291,6 +336,9 @@ private class MintMarkdownThemePlugin(
         const val CODE_TO_BODY_RATIO = 14f / 16f
     }
 }
+
+private fun Spanned.hasTableRows(): Boolean =
+    getSpans(0, length, TableRowSpan::class.java).isNotEmpty()
 
 /** Prism highlight theme for the App's theme mode (not the system setting). */
 internal fun conversationPrismTheme(isDark: Boolean): io.noties.markwon.syntax.Prism4jTheme =
