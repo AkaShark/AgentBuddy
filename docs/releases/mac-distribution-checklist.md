@@ -16,9 +16,20 @@ this application.
 
 ## App Store Connect
 
-The current desktop configuration distributes an app/DMG and does not implement
-a Mac App Store or TestFlight packaging/upload lane. The existing iOS/Catalyst
-record uses `com.akashark.agentbuddy`, which differs from the Tauri identifier.
-A future App Store release needs its own deliberate bundle identity, sandbox
-compatibility and packaging setup; do not reuse the retired Catalyst binary or
-claim its metadata/screenshots describe the Tauri application.
+As of 2026-10-03, macOS distribution is Developer ID-signed, notarized DMG only.
+Do not add a Mac App Store replacement build or restore the retired Catalyst /
+Mac TestFlight lanes. `Desktop release` remains enabled for both DMG architectures.
+
+The existing iOS/Catalyst record uses `com.akashark.agentbuddy`, which differs
+from the Tauri identifier. Manage only its macOS submission when retiring the
+old store release; retain the shared app record and the independent iOS submission.
+
+On 2026-10-03, macOS 1.5.0 (build `202609251324`), submission
+`745f6765-533e-4670-a182-21dc5f91b8e4`, was canceled in App Store Connect and
+verified as **Removed**. The iOS 1.5.0 submission remained **Waiting for Review**.
+
+The unused repository Actions secrets `MAC_APP_STORE_PROFILE_B64`,
+`MAC_DIST_CERT_P12_B64`, and `MAC_DIST_CERT_PASSWORD` were removed on 2026-10-03
+after verifying no current workflow referenced them. Keep `MAC_DEVELOPER_ID_CERT_*`
+for DMG signing and shared `ASC_*` credentials for notarization and iOS releases.
+Removing these CI secrets does not revoke Apple certificates or delete local keys.
