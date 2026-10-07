@@ -1,12 +1,18 @@
-AgentBuddy is a native mobile client for Codex.
+AgentBuddy is a native companion for AI coding agents running on computers you control. Connect from your iPhone or iPad to follow tasks, continue conversations, and review requests while away from your desk.
 
-Connect to local or remote Codex servers, manage coding sessions from anywhere, and keep conversations moving without opening your laptop.
+KEEP YOUR WORK IN VIEW
+Organize tasks, projects, and hosts in one place. Open an existing conversation or start a new coding task on a connected host.
 
-Features:
-- Discover Codex servers on your local network automatically
-- Connect to remote machines over SSH and start Codex remotely
-- Talk to Codex with voice input for fast, hands-free prompts
-- Review conversation history, reasoning, code blocks, and images in a mobile-native UI
-- Stay connected to the servers you control instead of sending your work through a hosted relay
+FOLLOW THE DETAILS
+Read streaming responses, code blocks, images, and command output in a native interface. Keep track of progress without keeping your laptop open.
 
-AgentBuddy is open source and built for people who want their coding agent with them wherever they are.
+STAY IN CONTROL
+Review approval requests and decide whether to allow or deny an action. Send follow-up instructions as your agent works.
+
+CONNECT YOUR OWN HOSTS
+Discover compatible hosts on your local network, pair with your AgentBuddy host, or connect over SSH. Supported agents depend on the software installed and configured on your host.
+
+MADE FOR YOUR WORKFLOW
+Use voice input where supported, switch between light and dark themes, and keep your coding conversations close at hand.
+
+A compatible host and a configured coding agent are required. AgentBuddy does not include an AI model subscription; third-party accounts, API access, and charges may apply. AgentBuddy is an independent open-source client for compatible coding agents. Available agents and models depend on your host configuration.

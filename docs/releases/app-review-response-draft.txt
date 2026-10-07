@@ -1,0 +1,14 @@
+DRAFT — associate the replacement CI build before submitting for review.
+
+Submission: 6d9703a8-27f7-4c56-9c36-78633ceea90c
+
+Guideline 4.3(a)
+AgentBuddy is an independently maintained open-source derivative. We acknowledge its upstream foundations and do not claim that a new icon alone makes it a different product. The reviewed build was 1.5.0 (202609251324). The repository now includes changes made after that build: dedicated Tasks / Projects / Hosts navigation; task sections for decisions requiring attention, running work, and recent conversations; inline approval results; recent tasks within project cards; and MyFlicker integration for appropriately configured hosts.
+
+Using the existing host setup instructions, open Tasks to find work requiring a decision, open its conversation and respond to the approval, then open Projects to resume a recent task in that project. Hosts provides connection and available-runtime controls. These are workflow changes; project management, multiple agents, and approvals also existed in our upstream foundations.
+
+Guideline 2.5.4
+We removed the text Picture-in-Picture feature and its silent audio loop. Audio background mode remains for explicit user-initiated realtime voice conversations. From Tasks, use the voice control beside the new-task composer. Realtime can be enabled in Settings if previously disabled. Configured voice access is required. The attached IMG_2699.MP4 demonstrates the Projects screen and voice entry/setup flow. It stops at the API-key prompt; it does not demonstrate an established voice call or audible background playback.
+
+Metadata
+The English and Simplified Chinese descriptions now describe compatibility generically, without provider-specific examples.

@@ -1,0 +1,13 @@
+Baseline: 19187f0, the repository's initial Baozi import. This is a source comparison, not an assertion about Apple's binary comparison or other developers' current App Store apps.
+
+ab27372 (2026-09-27): dedicated Tasks / Projects / Hosts shell replacing the centralized HomeDashboard presentation.
+8e3c679 (2026-09-27): inline Mint approvals, result cards, and conversation header.
+db9c8f8 (2026-09-29): recent tasks directly in the current project card.
+f018158 (2026-10-01): iOS MyFlicker integration and live command cards, requiring a configured compatible host.
+ac42e57 (2026-10-02): paired-link Mint identity replacing inherited cat artwork.
+
+The reviewed build number is 202609251324. These commits are later; a replacement archive must contain them before citing them as reviewable changes.
+
+Current correction: removed text PiP UI, controller, renderer, host view, and SilentAudioKeeper. Retained real voice background capability. Dictation start failure now tears down its tap/engine/audio session, and duplicate recording starts are ignored.
+
+User decisions: keep China mainland availability; do not restrict provider features; do not provision a new review environment. Do not claim Guideline 5 is resolved. Do not claim audible background voice is verified until a real-device recording exists.

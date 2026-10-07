@@ -1,1 +1,1 @@
-Bug fixes and improvements.
+Organize work in Tasks, Projects, and Hosts, with recent tasks available from each project. Updated AgentBuddy branding and task approval presentation. Removed text Picture-in-Picture and its silent audio playback, and improved cleanup when voice recording cannot start.

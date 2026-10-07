@@ -127,7 +127,6 @@ struct TasksHomeView: View {
                 if item.isPinned { actions.unpinThread(item.key) } else { actions.pinThread(item.key) }
             },
             hide: { actions.hideThread($0.key) },
-            pictureInPicture: { StreamingPiPController.shared.start(for: $0.key) },
             delete: { deleteTarget = $0 }
         )
     }

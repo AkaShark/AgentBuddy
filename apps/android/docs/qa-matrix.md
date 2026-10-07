@@ -421,3 +421,9 @@ to iroh and alleycat agent discovery does not panic. The history server is the
 isolated synthetic fixture in `tools/qa`; production-host and visual UI coverage
 is not implied by these tests. Logs are under
 `~/Downloads/AgentBuddy/device-regression/logs/pixel9-*.log`.
+
+## iOS App Review audio cleanup (2026-10-07)
+
+- iOS-only: removed task text Picture-in-Picture, its sample-buffer renderer, and silent audio loop. Existing notifications and Live Activities remain. Android has no matching text PiP action or silent loop to remove.
+- Real WebRTC voice and its background capability remain. Physical-device audible-background recording is still required for App Review 2.5.4.
+- Check task menus, dictation start/failure/cancel, voice connect/failure/hang-up, and completion notifications. Audio must be released after failure or hang-up.

@@ -8,7 +8,6 @@ struct TaskActionHandlers {
     var fork: (HomeTaskItem) -> Void
     var togglePin: (HomeTaskItem) -> Void
     var hide: (HomeTaskItem) -> Void
-    var pictureInPicture: ((HomeTaskItem) -> Void)?
     var delete: (HomeTaskItem) -> Void
 }
 
@@ -43,13 +42,6 @@ struct TaskActionsMenuContent: View {
                 Label("Unpin", systemImage: "pin.slash")
             } else {
                 Label("Pin", systemImage: "pin")
-            }
-        }
-        if let pictureInPicture = handlers.pictureInPicture {
-            Button {
-                pictureInPicture(item)
-            } label: {
-                Label("Picture in Picture", systemImage: "pip.enter")
             }
         }
         Button {

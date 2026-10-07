@@ -21,6 +21,7 @@ final class VoiceTranscriptionManager {
     }
 
     func startRecording() {
+        guard !isRecording else { return }
         bufferCollector.reset()
         error = nil
 
@@ -48,14 +49,17 @@ final class VoiceTranscriptionManager {
             Task { @MainActor in self.audioLevel = level }
         }
 
+        // Retain the engine before starting so a failed start releases both
+        // the input tap and the audio session through the normal cleanup path.
+        audioEngine = engine
         do {
             try engine.start()
         } catch {
+            teardownEngine()
             self.error = "Failed to start audio engine."
             return
         }
 
-        audioEngine = engine
         isRecording = true
     }
 
