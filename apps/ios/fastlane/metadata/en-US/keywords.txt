@@ -1,1 +1,1 @@
-codex,ssh,developer,terminal,coding,agent,remote
+coding,agent,remote,ssh,developer,code,assistant,projects,tasks,terminal
